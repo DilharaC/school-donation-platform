@@ -2,9 +2,9 @@ name: CI Workflow
 
 on:
   push:
-    branches: [main]
+    branches: ["my_changes"]
   pull_request:
-    branches: [main]
+    branches: ["main"]
 
 jobs:
   build:
@@ -12,50 +12,52 @@ jobs:
 
     steps:
       # 1. Checkout code
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Set up PHP
+      # -------------------------
+      # Laravel Backend
+      # -------------------------
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: "8.2"
           extensions: mbstring, bcmath, ctype, fileinfo, json, tokenizer
 
-      # 3. Install Laravel dependencies
-      - name: Install Composer dependencies
+      - name: Install Laravel dependencies
         working-directory: ./Backend
         run: composer install --no-progress --prefer-dist --no-interaction
 
-      # 4. Set up .env
       - name: Set up .env file
         working-directory: ./Backend
         run: cp .env.example .env
 
-      # 5. Inject secrets
       - name: Inject secrets into .env
         working-directory: ./Backend
         run: |
           echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
           echo "APP_KEY=${{ secrets.APP_KEY }}" >> .env
 
-      # 6. Generate Laravel app key
-      - name: Generate app key
+      - name: Generate Laravel app key
         working-directory: ./Backend
         run: php artisan key:generate
 
-      # 7. Set up Node.js
+      - name: Run Laravel tests
+        working-directory: ./Backend
+        run: php artisan test
+
+      # -------------------------
+      # Frontend
+      # -------------------------
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: "18"
 
-      # 8. Install frontend dependencies
       - name: Install frontend dependencies
         working-directory: ./Frontend
         run: npm install
 
-      # 9. Build frontend
       - name: Build frontend
         working-directory: ./Frontend
         run: npm run build
