@@ -13,26 +13,38 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    # -------------------------
+    # Laravel Backend
+    # -------------------------
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
       with:
         php-version: "8.2"
 
     - name: Install Laravel dependencies
+      working-directory: ./Backend
       run: composer install --no-progress --prefer-dist
 
+    - name: Generate app key
+      working-directory: ./Backend
+      run: php artisan key:generate
+
+    - name: Run Laravel tests
+      working-directory: ./Backend
+      run: php artisan test
+
+    # -------------------------
+    # Frontend
+    # -------------------------
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
         node-version: "18"
 
-    - name: Install Frontend
-      working-directory: ./frontend
+    - name: Install Frontend dependencies
+      working-directory: ./Frontend
       run: npm install
 
     - name: Build Frontend
-      working-directory: ./frontend
+      working-directory: ./Frontend
       run: npm run build
-
-    - name: Run Laravel tests
-      run: php artisan test
