@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Donor extends Model
+{
+    protected $table = 'donors';        // Table name
+    protected $primaryKey = 'donor_id'; // Primary key
+
+    public $incrementing = true;        // Auto-increment
+    protected $keyType = 'int';         // Primary key type
+
+    // Only one timestamp column (created_at)
+    const CREATED_AT = 'created_at';
+    const UPDATED_AT = null;
+
+    // Fields that can be filled
+    protected $fillable = [
+        'full_name',
+        'email',
+        'password',
+        'phone',
+        'address'
+    ];
+}

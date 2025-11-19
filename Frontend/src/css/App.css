@@ -1,0 +1,366 @@
+body {
+    margin: 0;
+    font-family: 'Roboto', sans-serif;
+    background-color: #f7f7f7;
+    padding-top: 102px; /* same height as header */
+}
+
+
+.App {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+a { text-decoration: none; color: inherit; }
+h1, h2, h3 { font-family: 'Montserrat', sans-serif; }
+header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: #f7f7f7;
+    z-index: 1000;
+    height: 102px;
+    transition: top 0.3s ease, box-shadow 0.3s ease;
+}
+header.show-shadow {
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+header.hide {
+    top: -102px;
+}
+nav {
+    max-width: 1400px;
+    margin: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 100%;
+}
+.logo h2 {
+    margin: 0;
+    font-family: 'Montserrat', sans-serif;
+    font-size:1.7rem;
+}
+.nav-links {
+    display: flex;
+    gap: 25px;
+    align-items: center;
+}
+.nav-links a {
+    font-size: 17px;
+    margin: 0;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: bold;
+    color: #444;
+    text-decoration: none;
+    padding: 10px;
+}
+.nav-links a:hover {
+    color: #e63946;
+}
+.nav-cta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+}
+.nav-cta a.btn-primary {
+    background-color: #e63946;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-weight: bold;
+    text-decoration: none;
+    
+    font-size: 15px;
+}
+.nav-cta a.btn-primary:hover {
+    background-color: #c92532;
+}
+.nav-cta a.btn-secondary,
+.user-name {
+    background-color: #f1f1f1; /* same background for login & username */
+    color: #444;
+    padding: 10px 15px;
+    border-radius: 5px;
+    text-decoration: none;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+.nav-cta a.btn-secondary:hover,
+.user-name:hover {
+    background-color: #eaeaea;
+}
+/* Logout dropdown */
+.user-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    min-width: 120px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    z-index: 1001;
+}
+.user-dropdown a {
+    display: block;
+    padding: 10px 15px;
+    text-decoration: none;
+    color: #444;
+}
+.user-dropdown a:hover {
+    background: #f7f7f7;
+}
+@media(max-width:768px){
+    nav { flex-direction: column; gap: 10px; }
+    .nav-links { flex-direction: column; gap: 10px; }
+}
+/* Header & Navigation */
+header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: #f7f7f7;
+    z-index: 1000;
+    height: 102px; /* original header height */
+    transition: top 0.3s ease, box-shadow 0.3s ease;
+}
+header.show-shadow {
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+header.hide {
+    top: -102px;
+}
+
+nav {
+    max-width: 1400px;
+    margin: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 100%;
+   
+   
+    color: #444;
+}
+    .logo h2 {margin: 0;
+       font-size: 1.7rem;
+        font-family: 'Montserrat', sans-serif;
+       
+    }
+ 
+nav a:hover { text-decoration: none; }
+.nav-links{
+    display: flex;
+    align-items: center;
+    gap: 25px;
+}
+.nav-links a {
+    font-size: 17px;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: bold;
+        color: #444;
+        text-decoration: none;
+        padding: 10px;
+    }
+    .nav-links a:hover {
+        color: #e63946;
+    }
+.nav-cta a.btn-primary {
+    background-color: #e63946;
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-weight: bold;
+    margin: 0;
+        font-size: 15px;
+
+}
+.nav-cta a.btn-secondary {
+    
+    color: #444;
+    padding: 10px 20px;
+    border-radius: 5px;
+}
+
+/* Hero Section */
+.hero {
+    width: 100vw;
+    max-width: 96%; 
+    margin: 0 auto;     /* center horizontally */
+    height: 83vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    color: #fff;
+    overflow: hidden;
+    border-radius: 30px;
+    background: linear-gradient(rgba(0,0,0,0.6), rgba(0, 0, 0, 0.24)),
+                url("uploads/images/school-children-dressed-uniform-have-fun-play-schoolyard.jpg") center/cover no-repeat;
+    box-sizing: border-box; /* include padding/border in width */
+}
+
+
+
+.hero h1 { font-size: 3em; margin-bottom: 20px; text-shadow: 2px 2px 6px rgba(0,0,0,0.7);}
+.hero p { font-size: 1.2em; margin-bottom: 30px; text-shadow: 2px 2px 6px rgba(0,0,0,0.7); }
+.btn-primary {
+    background-color: #e63946;
+    color: #ffffff;
+    padding: 12px 30px;
+    border: none;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.btn-primary:hover { background-color: #c92532; }
+
+/* Sections */
+section { padding: 60px 50px; }
+.section-title { text-align: center; margin-bottom: 50px; }
+
+.about-section {
+    max-width: 1300px;
+    margin: auto;
+    border-radius: 40px;
+    line-height: 40px;
+    font-size: x-large;
+    font-weight: 600;
+    color: #333;
+    padding: 60px 50px;
+}
+.about-section .section-description {
+    max-width: 1000px;
+    margin: 20px auto 0 auto;
+    text-align: center;
+    font-family: 'Lora', serif;
+    font-size: 1em;
+    line-height: 1.8;
+    color: #444;
+    font-style: italic;
+}
+
+/* Cards */
+.cards { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+.card {
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    padding: 20px;
+    flex: 1 1 300px;
+    max-width: 350px;
+}
+
+/* Footer */
+footer { padding: 30px 50px; text-align: center; background-color: #333; color: #fff; }
+footer a { color: #FFC107; margin: 0 10px; }
+
+/* Contact Form */
+.contact-section { max-width: 1400px; margin: auto; }
+.contact-section input, .contact-section textarea {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+.contact-form button { background-color: #43A047; color: #fff; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; }
+.contact-form button:hover { background-color: #388E3C; }
+
+@media(max-width:768px){
+    nav { flex-direction: column; }
+    nav a { margin: 10px 0; }
+    .cards { flex-direction: column; align-items: center; }
+}
+
+
+
+
+
+/* Sidebar styles */
+.sidebar {
+  width: 350px;
+  height: 100%;
+  position: fixed;
+  top: 0;
+  right: -400px;
+  background: #fff;
+  transition: right 0.5s ease;
+  box-shadow: -4px 0 12px rgba(0,0,0,0.15);
+  border-radius: 10px 0 0 10px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.sidebar.show { right: 0; }
+
+.sidebar-header {
+  background: linear-gradient(135deg, #ce1322, #e63946);
+  color: #fff;
+  padding: 20px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 10px 0 0 0;
+}
+
+.sidebar-header #closeSidebar {
+  font-size: 28px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+.sidebar-header #closeSidebar:hover { transform: rotate(90deg); }
+
+.sidebar-content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sidebar-content p { margin: 4px 0; font-size: 15px; color: #333; }
+
+.sidebar-content p strong { min-width: 110px; color: #555; font-weight: 600; }
+
+.sidebar-content img { max-width: 100%; border-radius: 10px; margin-top: 5px; }
+
+.dashboard-btn {
+  background: #4a90e2;
+  padding: 10px;
+  text-align: center;
+  border-radius: 8px;
+  font-weight: bold;
+  color: #fff;
+  text-decoration: none;
+  margin-top: auto;
+}
+.dashboard-btn:hover { background: #357ABD; }
+
+.sidebar-bottom {
+  padding: 15px 20px;
+}
+.logout-btn {
+  background: #e63946;
+  padding: 6px 10px;
+  font-size: 14px;
+  border-radius: 6px;
+  width: 90%;
+  margin: 0 auto;
+  text-align: center;
+  display: block;
+  color: #fff;
+  cursor: pointer;
+}
+.logout-btn:hover { background: #c92532; transform: translateY(-1px); }
