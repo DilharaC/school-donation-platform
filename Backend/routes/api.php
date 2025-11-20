@@ -6,6 +6,8 @@ use App\Http\Controllers\DonorController;
 use App\Http\Controllers\DonationRequestController;
 use App\Http\Controllers\AuthController;
 
+use App\Http\Controllers\SchoolController;
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -16,6 +18,10 @@ use App\Http\Controllers\AuthController;
 | is assigned the "api" middleware group. Enjoy building your API!
 |
 */
+
+
+Route::post('/school/register', [SchoolController::class, 'register']);
+
 
 
 Route::post('/login', [AuthController::class, 'login']);
