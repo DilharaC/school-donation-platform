@@ -21,7 +21,7 @@ class School extends Model
         'registration_no',
         'category',
         'level',
-        'address',
+        
         'district',
         'province',
         'postal_code',
@@ -29,6 +29,7 @@ class School extends Model
         'contact_person',
         'contact_email',
         'contact_phone',
+        'address'  ,
         'alt_phone',
         'website',
         'student_count',
