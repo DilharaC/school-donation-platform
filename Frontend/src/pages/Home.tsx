@@ -5,6 +5,7 @@ import heroImage from '../uploads/images/school-children-dressed-uniform-have-fu
 const Home: React.FC = () => {
   return (
     <>
+    
       {/* Hero */}
       <section
         id="home"

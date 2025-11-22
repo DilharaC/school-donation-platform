@@ -4,24 +4,20 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable; // ✅ important
 
-class School extends Model
+class School extends Authenticatable
 {
     use HasFactory;
 
-    // Optional if table name is non-standard
     protected $table = 'schools';
-
-    // Primary key (default is id, change if different)
     protected $primaryKey = 'school_id';
 
-    // Fillable fields (all columns you want to mass assign)
     protected $fillable = [
         'school_name',
         'registration_no',
         'category',
         'level',
-        
         'district',
         'province',
         'postal_code',
@@ -29,7 +25,7 @@ class School extends Model
         'contact_person',
         'contact_email',
         'contact_phone',
-        'address'  ,
+        'address',
         'alt_phone',
         'website',
         'student_count',
@@ -50,8 +46,11 @@ class School extends Model
         'prev_donations'
     ];
 
-    // Hide sensitive fields when converting to JSON
-    protected $hidden = [
-        'password_hash'
-    ];
+    protected $hidden = ['password_hash'];
+
+    // Relationship: A school has many donation requests
+    public function donationRequests()
+    {
+        return $this->hasMany(DonationRequest::class, 'school_id', 'school_id');
+    }
 }

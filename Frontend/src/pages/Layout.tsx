@@ -1,14 +1,21 @@
 // Layout.tsx
 import React, { useState, useEffect } from 'react';
-import { Outlet, Link } from 'react-router-dom';
+import { Outlet, Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import '../css/App.css';
 
-// Use `any` type to avoid strict property errors
-const Layout: React.FC<{ currentUser: any }> = ({ currentUser }) => {
+interface LayoutProps {
+  currentUser: any;
+  setCurrentUser: (user: any) => void;
+}
+
+const Layout: React.FC<LayoutProps> = ({ currentUser, setCurrentUser }) => {
   const [headerHidden, setHeaderHidden] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  const navigate = useNavigate();
 
+  // Scroll effect for header
   useEffect(() => {
     const handleScroll = () => {
       setHeaderHidden(scrollY < window.scrollY && window.scrollY > 100);
@@ -18,10 +25,26 @@ const Layout: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [scrollY]);
 
-  const handleLogout = () => {
-    // clear user from context/state
-    setSidebarVisible(false);
-    // you might want to also clear `currentUser` in parent state
+  // Logout function
+  const handleLogout = async () => {
+    try {
+      // 1. Get CSRF cookie
+      await axios.get('http://localhost:8000/sanctum/csrf-cookie', { withCredentials: true });
+
+      // 2. Call logout
+      await axios.post('http://localhost:8000/api/logout', {}, { withCredentials: true });
+
+      // 3. Clear local user state
+      setCurrentUser(null);
+      localStorage.removeItem('currentUser');
+
+      // 4. Redirect to home
+      navigate('/');
+      alert('Logged out successfully');
+    } catch (err: any) {
+      console.error('Logout failed:', err);
+      alert('Logout failed. Please try again.');
+    }
   };
 
   return (
@@ -30,6 +53,7 @@ const Layout: React.FC<{ currentUser: any }> = ({ currentUser }) => {
       <header className={`header ${headerHidden ? 'hide' : ''} ${scrollY > 50 ? 'show-shadow' : ''}`}>
         <nav>
           <div className="logo"><h2>SchoolDonate</h2></div>
+
           <div className="nav-links">
             <Link to="/">Home</Link>
             <Link to="/about">About</Link>
@@ -37,11 +61,13 @@ const Layout: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             <Link to="/blog">Blog</Link>
             <Link to="/contact">Contact</Link>
           </div>
+
           <div className="nav-cta">
             <a href="#donate" className="btn-primary">Donate Now</a>
+
             {currentUser ? (
               <span className="btn-secondary" onClick={() => setSidebarVisible(true)}>
-                <i className="fa-regular fa-user"></i> {currentUser.userType === 'school' ? currentUser.schoolName : currentUser.donorName}
+                <i className="fa-regular fa-user"></i> {currentUser.name}
               </span>
             ) : (
               <Link to="/login" className="btn-secondary">Login</Link>
@@ -57,21 +83,27 @@ const Layout: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             <h3>Account Details</h3>
             <span id="closeSidebar" onClick={() => setSidebarVisible(false)}>&times;</span>
           </div>
+
           <div className="sidebar-content">
             {currentUser ? (
               <>
                 {currentUser.userType === 'donor' ? (
                   <>
-                    <p><strong>Full Name:</strong> {currentUser.donorName}</p>
+                    <p><strong>Full Name:</strong> {currentUser.name}</p>
                     <p><strong>Email:</strong> {currentUser.email}</p>
-                    <p><strong>Phone:</strong> {currentUser.phone}</p>
-                    <p><strong>Address:</strong> {currentUser.address}</p>
+                    <p><strong>Phone:</strong> {currentUser.phone || 'Not provided'}</p>
+                    <p><strong>Address:</strong> {currentUser.address || 'Not provided'}</p>
                     <Link to="/donor-dashboard" className="dashboard-btn">Dashboard</Link>
                   </>
                 ) : (
                   <>
-                    <p><strong>School Name:</strong> {currentUser.schoolName}</p>
-                    {currentUser.logoUrl && <p><strong>Logo:</strong><br /><img src={currentUser.logoUrl} alt="School Logo" /></p>}
+                    <p><strong>School Name:</strong> {currentUser.name}</p>
+                    {currentUser.logoUrl && (
+                      <p>
+                        <strong>Logo:</strong><br />
+                        <img src={currentUser.logoUrl} alt="School Logo" />
+                      </p>
+                    )}
                     <Link to="/school-dashboard" className="dashboard-btn">Dashboard</Link>
                   </>
                 )}

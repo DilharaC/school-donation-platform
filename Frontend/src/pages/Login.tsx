@@ -1,85 +1,97 @@
-// Login.tsx
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import '../css/App.css';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+
+interface User {
+  userType: "donor" | "school";
+  donorName?: string;
+  schoolName?: string;
+  email?: string;
+}
 
 interface LoginResponse {
   success: boolean;
-  user?: {
-    userType: 'donor' | 'school';
-    donorName?: string;
-    schoolName?: string;
-    email?: string;
-    phone?: string;
-    address?: string;
-    logoUrl?: string;
-  };
+  user?: User;
   message?: string;
 }
 
-const Login: React.FC<{ setCurrentUser: (user: any) => void }> = ({ setCurrentUser }) => {
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+const Login: React.FC<{ setCurrentUser: (user: User) => void }> = ({ setCurrentUser }) => {
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    axios.defaults.baseURL = "http://localhost:8000";
+    axios.defaults.withCredentials = true;
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
+    setLoading(true);
 
     try {
-      const response = await axios.post<LoginResponse>('http://127.0.0.1:8000/api/login', { identifier, password });
+      await axios.get("/sanctum/csrf-cookie");
+
+      const response = await axios.post<LoginResponse>("/api/login", {
+        identifier,
+        password,
+      });
+
       if (response.data.success && response.data.user) {
         setCurrentUser(response.data.user);
-        navigate('/');
+        navigate("/");
       } else {
-        setError(response.data.message || 'Login failed.');
+        setError(response.data.message || "Login failed.");
       }
     } catch (err: any) {
-      console.error(err);
-      setError(err.response?.data?.message || 'Server error.');
+      setError(err.response?.data?.message || "Server error.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div
       style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8f9fa, #e9ecef)',
-        padding: '20px',
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        minHeight: "100vh",
+        background: "#f5f7fa",
       }}
     >
       <form
         onSubmit={handleSubmit}
         style={{
-          background: '#fff',
-          padding: '40px 30px',
-          borderRadius: '12px',
-          width: '100%',
-          maxWidth: '400px',
-          boxShadow: '0 15px 30px rgba(0,0,0,0.1)',
-          transition: 'transform 0.2s',
+          width: 380,
+          padding: 35,
+          borderRadius: 14,
+          background: "#ffffff",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+          animation: "fadeIn 0.3s ease-in-out",
         }}
       >
-        <h2 style={{ textAlign: 'center', marginBottom: '25px', color: '#343a40' }}>Login</h2>
+        <h2
+          style={{
+            textAlign: "center",
+            marginBottom: 25,
+            fontSize: 24,
+            fontWeight: "bold",
+            color: "#333",
+          }}
+        >
+          Login
+        </h2>
+
         {error && (
-          <div
-            style={{
-              color: '#e63946',
-              background: '#ffe5e5',
-              padding: '10px',
-              borderRadius: '5px',
-              textAlign: 'center',
-              marginBottom: '15px',
-            }}
-          >
+          <p style={{ color: "#e63946", fontSize: 14, marginBottom: 12, textAlign: "center" }}>
             {error}
-          </div>
+          </p>
         )}
+
         <input
           type="text"
           placeholder="Email or Registration No"
@@ -87,15 +99,18 @@ const Login: React.FC<{ setCurrentUser: (user: any) => void }> = ({ setCurrentUs
           onChange={(e) => setIdentifier(e.target.value)}
           required
           style={{
-            width: '100%',
-            padding: '12px 15px',
-            marginBottom: '15px',
-            borderRadius: '8px',
-            border: '1px solid #ced4da',
-            outline: 'none',
-            transition: 'border 0.2s',
+            width: "100%",
+            padding: 12,
+            marginBottom: 16,
+            borderRadius: 8,
+            border: "1px solid #ccc",
+            fontSize: 15,
+            transition: "0.2s",
           }}
+          onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
+          onBlur={(e) => (e.currentTarget.style.borderColor = "#ccc")}
         />
+
         <input
           type="password"
           placeholder="Password"
@@ -103,43 +118,35 @@ const Login: React.FC<{ setCurrentUser: (user: any) => void }> = ({ setCurrentUs
           onChange={(e) => setPassword(e.target.value)}
           required
           style={{
-            width: '100%',
-            padding: '12px 15px',
-            marginBottom: '20px',
-            borderRadius: '8px',
-            border: '1px solid #ced4da',
-            outline: 'none',
-            transition: 'border 0.2s',
+            width: "100%",
+            padding: 12,
+            marginBottom: 16,
+            borderRadius: 8,
+            border: "1px solid #ccc",
+            fontSize: 15,
+            transition: "0.2s",
           }}
+          onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
+          onBlur={(e) => (e.currentTarget.style.borderColor = "#ccc")}
         />
+
         <button
           type="submit"
+          disabled={loading}
           style={{
-            width: '100%',
-            padding: '12px',
-            background: '#e63946',
-            color: '#fff',
-            fontWeight: 'bold',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            transition: 'background 0.2s',
+            width: "100%",
+            padding: 12,
+            background: loading ? "#7ca6f9" : "#2563eb",
+            color: "white",
+            border: "none",
+            borderRadius: 8,
+            fontSize: 16,
+            cursor: loading ? "not-allowed" : "pointer",
+            transition: "0.2s",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = '#d62839')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = '#e63946')}
         >
-          Login
+          {loading ? "Logging in..." : "Login"}
         </button>
-        <p style={{ textAlign: 'center', marginTop: '15px', color: '#495057' }}>
-          Don't have an account?{' '}
-          <a href="/donor-register" style={{ color: '#e63946', fontWeight: '500' }}>
-            Register as Donor
-          </a>{' '}
-          or{' '}
-          <a href="/school-register" style={{ color: '#e63946', fontWeight: '500' }}>
-            Register as School
-          </a>
-        </p>
       </form>
     </div>
   );

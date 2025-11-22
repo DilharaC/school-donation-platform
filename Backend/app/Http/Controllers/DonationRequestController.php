@@ -7,20 +7,25 @@ use Illuminate\Http\Request;
 
 class DonationRequestController extends Controller
 {
-    // Fetch projects (GET)
+    // Fetch projects
     public function index(Request $request)
     {
         $search = $request->query('search', '');
         $category = $request->query('category', 'All');
-        $page = $request->query('page', 1);
-        $limit = $request->query('limit', 6);
+        $page = (int) $request->query('page', 1);
+        $limit = (int) $request->query('limit', 6);
 
-        $query = DonationRequest::query();
+        $query = DonationRequest::with('school');
 
-        // Search by title or description
+        // Search by title, description, or school name
         if ($search) {
-            $query->where('request_title', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->where('request_title', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhereHas('school', function ($q2) use ($search) {
+                      $q2->where('school_name', 'like', "%{$search}%");
+                  });
+            });
         }
 
         // Filter by category
@@ -30,18 +35,35 @@ class DonationRequestController extends Controller
 
         $total = $query->count();
 
-        // Pagination
         $projects = $query->skip(($page - 1) * $limit)
                           ->take($limit)
                           ->get();
 
+        // Map to include school_name safely
+        $projects = $projects->map(function ($project) {
+            return [
+                'request_id' => $project->request_id,
+                'school_id' => $project->school_id,
+                'school_name' => $project->school->school_name ?? 'Unknown School',
+                'request_title' => $project->request_title,
+                'category' => $project->category,
+                'quantity' => $project->quantity,
+                'estimated_price' => $project->estimated_price,
+                'amount_raised' => $project->amount_raised,
+                'description' => $project->description,
+                'image_url' => $project->image_url,
+                'document_url' => $project->document_url,
+                'status' => $project->status,
+            ];
+        });
+
         return response()->json([
             'projects' => $projects,
-            'total' => $total
+            'total' => $total,
         ]);
     }
 
-    // Create project (POST)
+    // Create project
     public function create(Request $request)
     {
         $request->validate([
@@ -65,6 +87,9 @@ class DonationRequestController extends Controller
             'status' => 'Pending'
         ]);
 
-        return response()->json(['message' => 'Donation request created', 'request' => $donationRequest]);
+        return response()->json([
+            'message' => 'Donation request created',
+            'request' => $donationRequest
+        ]);
     }
 }
