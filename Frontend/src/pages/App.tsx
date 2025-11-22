@@ -45,7 +45,7 @@ const App: React.FC = () => {
         element={<Layout currentUser={currentUser} setCurrentUser={setCurrentUser} />}
       >
         <Route index element={<Home />} />
-        <Route path="projects" element={<Projects currentUser={currentUser} />} />
+        <Route path="projects" element={<Projects />} />
         <Route path="donate/:requestId" element={<DonationForm currentUser={currentUser} />} />
         <Route path="donation/success" element={<DonationSuccess />} />
         <Route path="donation/failed" element={<DonationFailed />} />

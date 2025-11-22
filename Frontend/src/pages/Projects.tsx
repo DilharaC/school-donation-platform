@@ -18,12 +18,13 @@ interface Project {
 }
 
 interface ProjectsProps {
-  currentUser: any;
+  // currentUser: any;
 }
 
 const categories = ["All", "Technology", "Books", "Infrastructure", "Furniture", "Arts", "Sports"];
 
-const Projects: React.FC<ProjectsProps> = ({ currentUser }) => {
+
+const Projects: React.FC<ProjectsProps> = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
