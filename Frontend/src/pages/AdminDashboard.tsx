@@ -66,20 +66,6 @@ const DollarSign = () => (
   </svg>
 );
 
-// Data
-const campaigns = [
-  { name: "New Library Fund", raised: 45000, goal: 50000, donors: 234 },
-  { name: "Sports Equipment", raised: 12500, goal: 20000, donors: 98 },
-  { name: "Science Lab Upgrade", raised: 28000, goal: 40000, donors: 156 },
-];
-
-const stats = [
-  { label: "Total Donations", value: "$127,450", change: "+12.5%", icon: DollarSign },
-  { label: "Total Donors", value: "1,248", change: "+8.2%", icon: Users },
-  { label: "Active Campaigns", value: "23", change: "+3", icon: Heart },
-  { label: "Avg. Donation", value: "$102", change: "+5.4%", icon: TrendingUp },
-];
-
 
 
 
