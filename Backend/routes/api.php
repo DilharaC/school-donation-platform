@@ -23,7 +23,7 @@ Route::middleware('web')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/logout', [AuthController::class, 'logout']);
 });
-
+Route::middleware('auth:sanctum')->get('/recent-donors', [DonationController::class, 'recentDonors']);
 Route::post('/donor/register', [DonorController::class, 'register']);
 Route::post('/school/register', [SchoolController::class, 'register']);
 Route::get('/donation_requests', [DonationRequestController::class, 'index']);

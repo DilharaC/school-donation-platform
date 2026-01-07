@@ -117,4 +117,24 @@ class DonationController extends Controller
             ]);
         }
     }
+    
+    public function recentDonors()
+{
+    $donors = \App\Models\Donation::where('status', 'paid')
+                ->orderBy('created_at', 'desc')
+                ->take(10)
+                ->get(['donor_name as name', 'amount', 'created_at as time']);
+
+    // Format time in a human-readable way
+    $donors->transform(function ($donor) {
+        $donor->time = $donor->created_at->diffForHumans();
+        $donor->initials = collect(explode(' ', $donor->name))
+                                ->map(fn($n) => strtoupper(substr($n, 0, 1)))
+                                ->join('');
+        return $donor;
+    });
+
+    return response()->json($donors);
+}
+
 }

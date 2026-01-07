@@ -7,6 +7,10 @@ import Login from "./Login";
 import DonationForm from "./DonationForm";
 import DonationSuccess from "./DonationSuccess";
 import DonationFailed from "./DonationFailed";
+import AdminDashboard from "./AdminDashboard";
+
+
+
 
 interface User {
   userType: "donor" | "school";
@@ -34,8 +38,12 @@ const App: React.FC = () => {
     }
   }, [currentUser]);
 
+   
+
   return (
     <Routes>
+       {/* Admin Dashboard */}
+    <Route path="/admin" element={<AdminDashboard />} />
       {/* Login page */}
       <Route path="/login" element={<Login setCurrentUser={setCurrentUser} />} />
 
@@ -45,6 +53,7 @@ const App: React.FC = () => {
         element={<Layout currentUser={currentUser} setCurrentUser={setCurrentUser} />}
       >
         <Route index element={<Home />} />
+        
         <Route path="projects" element={<Projects />} />
         <Route path="donate/:requestId" element={<DonationForm currentUser={currentUser} />} />
         <Route path="donation/success" element={<DonationSuccess />} />
