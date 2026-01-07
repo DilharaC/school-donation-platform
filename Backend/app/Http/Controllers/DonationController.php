@@ -7,6 +7,8 @@ use App\Models\Donation;
 use App\Models\DonationRequest;
 use Illuminate\Support\Facades\Auth;
 use Stripe\Stripe;
+use Illuminate\Support\Facades\DB;   // ✅ ADD THIS
+use Carbon\Carbon;      
 use Stripe\Checkout\Session as StripeSession;
 
 class DonationController extends Controller
@@ -118,23 +120,53 @@ class DonationController extends Controller
         }
     }
     
-    public function recentDonors()
+public function recentDonors()
 {
     $donors = \App\Models\Donation::where('status', 'paid')
-                ->orderBy('created_at', 'desc')
-                ->take(10)
-                ->get(['donor_name as name', 'amount', 'created_at as time']);
+        ->orderBy('created_at', 'desc')
+        ->take(10)
+        ->get([
+            'donor_name as name',
+            'amount',
+            'created_at'
+        ]);
 
-    // Format time in a human-readable way
     $donors->transform(function ($donor) {
-        $donor->time = $donor->created_at->diffForHumans();
+        $donor->time = $donor->created_at
+            ? $donor->created_at->diffForHumans()
+            : null;
+
         $donor->initials = collect(explode(' ', $donor->name))
-                                ->map(fn($n) => strtoupper(substr($n, 0, 1)))
-                                ->join('');
+            ->map(fn ($n) => strtoupper(substr($n, 0, 1)))
+            ->join('');
+
+        unset($donor->created_at); // optional cleanup
+
         return $donor;
     });
 
     return response()->json($donors);
+}
+
+public function donationTrends()
+{
+    $data = \App\Models\Donation::where('status', 'paid')
+        ->select(
+            DB::raw("MONTH(created_at) as month"),
+            DB::raw("SUM(amount) as total")
+        )
+        ->groupBy(DB::raw("MONTH(created_at)"))
+        ->orderBy(DB::raw("MONTH(created_at)"))
+        ->get();
+
+    $formatted = $data->map(function ($item) {
+        return [
+            'month' => Carbon::create()->month($item->month)->format('M'),
+            'donations' => (int) $item->total
+        ];
+    });
+
+    return response()->json($formatted);
 }
 
 }

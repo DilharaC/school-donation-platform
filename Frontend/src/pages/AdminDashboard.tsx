@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import '../css/index.css';
+import axios from 'axios';
+import { useEffect } from 'react';
+
 
 // SVG Icons
 const Search = () => (
@@ -77,23 +80,10 @@ const stats = [
   { label: "Avg. Donation", value: "$102", change: "+5.4%", icon: TrendingUp },
 ];
 
-const donors = [
-  { name: "Sarah Johnson", amount: 500, time: "2 hours ago", initials: "SJ" },
-  { name: "Michael Chen", amount: 250, time: "5 hours ago", initials: "MC" },
-  { name: "Emily Rodriguez", amount: 1000, time: "8 hours ago", initials: "ER" },
-  { name: "David Kim", amount: 150, time: "12 hours ago", initials: "DK" },
-  { name: "Jessica Williams", amount: 300, time: "1 day ago", initials: "JW" },
-  { name: "Robert Brown", amount: 750, time: "1 day ago", initials: "RB" },
-];
 
-const chartData = [
-  { month: "Jan", donations: 12400 },
-  { month: "Feb", donations: 15800 },
-  { month: "Mar", donations: 18200 },
-  { month: "Apr", donations: 21500 },
-  { month: "May", donations: 19800 },
-  { month: "Jun", donations: 23400 },
-];
+
+
+
 
 const navItems = [
   { icon: LayoutDashboard, label: "Overview" },
@@ -127,6 +117,7 @@ interface ButtonProps {
   size?: 'default' | 'icon';
   className?: string;
   onClick?: () => void;
+    disabled?: boolean;
 }
 
 interface InputProps {
@@ -247,6 +238,98 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({ trigger, items }) => {
 
 const AdminDashboard: React.FC = () => {
   const [activeItem, setActiveItem] = useState("Overview");
+  const [recentDonors, setRecentDonors] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [activeCampaigns, setActiveCampaigns] = useState<any[]>([]);
+  const [stats, setStats] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 3;
+
+  const displayedCampaigns = activeCampaigns.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+  const hasNextPage = currentPage * itemsPerPage < activeCampaigns.length;
+
+ useEffect(() => {
+  const fetchDashboardData = async () => {
+    try {
+      // Fetch campaigns, donors, and chart data
+      const [campaignRes, donorsRes, totalDonorsRes, chartRes] = await Promise.all([
+        axios.get('http://localhost:8000/api/donation_requests?status=Approved'),
+        axios.get('http://localhost:8000/api/recent-donors'),
+        axios.get('http://localhost:8000/api/registered-donors'),
+
+        axios.get('http://localhost:8000/api/donation-trends')
+      ]);
+
+      // Set campaigns
+      setActiveCampaigns(campaignRes.data.projects || []);
+
+      // Set recent donors
+      const donors = donorsRes.data.map((d: any) => ({
+        ...d,
+        initials: d.name
+          ? d.name
+              .split(' ')
+              .map((n: string) => n[0])
+              .join('')
+              .toUpperCase()
+          : '?'
+      }));
+      setRecentDonors(donors);
+
+      // Set chart data
+      setChartData(chartRes.data || []);
+
+      // Set stats
+      const totalDonations = (campaignRes.data.projects || []).reduce(
+        (sum: number, c: any) => sum + Number(c.amount_raised || 0),
+        0
+      );
+      const totalDonors = totalDonorsRes.data.length;
+      const activeCampaignCount = campaignRes.data.projects.length;
+      const avgDonation = totalDonors > 0 ? totalDonations / totalDonors : 0;
+
+      setStats([
+        {
+          label: "Total Donations",
+          value: `$${totalDonations.toLocaleString()}`,
+          change: "+12.5%", 
+          icon: DollarSign
+        },
+        {
+          label: "Total Donors",
+          value: totalDonors,
+          change: "+8.2%",
+          icon: Users
+        },
+        {
+          label: "Active Campaigns",
+          value: activeCampaignCount,
+          change: "+3",
+          icon: Heart
+        },
+        {
+          label: "Avg. Donation",
+          value: `$${avgDonation.toFixed(2)}`,
+          change: "+5.4%",
+          icon: TrendingUp
+        },
+      ]);
+
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err);
+    }
+  };
+
+  fetchDashboardData();
+
+  const chartInterval = setInterval(fetchDashboardData, 15000); // refresh chart & stats
+
+  return () => clearInterval(chartInterval);
+}, []);
+
 
   return (
    <div className="flex h-screen bg-slate-50">
@@ -277,25 +360,24 @@ const AdminDashboard: React.FC = () => {
 
 
 
-        {navItems.map((item) => (
-  <button
-    key={item.label}
-    onClick={() => setActiveItem(item.label)}
-    className={`relative w-full flex items-center gap-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-      activeItem === item.label
-        ? "bg-blue-50 text-blue-700 before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-blue-600 before:rounded-r"
-        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-    }`}
-  >
-    {/* Only render icon if it exists */}
-    {item.icon && (
-      <div className="w-5 h-5 flex items-center justify-center">
-        <item.icon />
-      </div>
-    )}
-    <span>{item.label}</span>
-  </button>
-))}
+            {navItems.map((item) => (
+              <button
+                key={item.label}
+                onClick={() => setActiveItem(item.label)}
+               className={`relative w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+  activeItem === item.label
+    ? "bg-blue-50 text-blue-700 before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-blue-600 before:rounded-r"
+    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+}`}
+
+              >
+              <div className="w-5 h-5 flex items-center justify-center">
+  <item.icon />
+</div>
+
+                {item.label}
+              </button>
+            ))}
           </nav>
         </div>
       </aside>
@@ -360,26 +442,27 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {stats.map((stat) => (
-                <Card key={stat.label} className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-blue-50">
-                        <div className="w-5 h-5 text-blue-600">
-                          <stat.icon />
-                        </div>
-                      </div>
-                    </div>
-                    <span className="text-xs font-medium text-green-600">{stat.change}</span>
-                  </div>
-                  <div className="mt-4">
-                    <p className="text-sm text-slate-500">{stat.label}</p>
-                    <h3 className="text-2xl font-bold mt-1 text-slate-900">{stat.value}</h3>
-                  </div>
-                </Card>
-              ))}
+           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+  {stats.map((stat) => (
+    <Card key={stat.label} className="p-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-blue-50">
+            <div className="w-5 h-5 text-blue-600">
+              <stat.icon />
             </div>
+          </div>
+        </div>
+        <span className="text-xs font-medium text-green-600">{stat.change}</span>
+      </div>
+      <div className="mt-4">
+        <p className="text-sm text-slate-500">{stat.label}</p>
+        <h3 className="text-2xl font-bold mt-1 text-slate-900">{stat.value}</h3>
+      </div>
+    </Card>
+  ))}
+</div>
+
 
             {/* Charts and Lists Grid */}
             <div className="grid gap-6 lg:grid-cols-7">
@@ -440,37 +523,63 @@ const AdminDashboard: React.FC = () => {
                 </ResponsiveContainer>
               </Card>
 
-              {/* Campaigns List */}
-              <Card className="p-6 lg:col-span-3">
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-slate-900">Active Campaigns</h3>
-                  <p className="text-sm text-slate-500">Top performing campaigns</p>
-                </div>
+          {/* Campaigns List */}
+<Card className="p-6 lg:col-span-3">
+  {/* Card Title */}
+  <div className="mb-4 flex items-center justify-between">
+    <h3 className="text-lg font-semibold text-slate-900">Active Campaigns</h3>
+    <p className="text-sm text-slate-500">Overview of ongoing campaigns</p>
+  </div>
+  <div className="space-y-6">
+    {displayedCampaigns.map((campaign) => {
+      const progress = (campaign.amount_raised / campaign.estimated_price) * 100;
 
-                <div className="space-y-6">
-                  {campaigns.map((campaign) => {
-                    const progress = (campaign.raised / campaign.goal) * 100;
+      return (
+        <div key={campaign.request_id}>
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="font-medium text-slate-900">{campaign.request_title}</h4>
+            <span className="text-sm text-slate-500">{campaign.category}</span>
+          </div>
+          
+          <Progress value={progress} className="h-2 mb-2" />
 
-                    return (
-                      <div key={campaign.name}>
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium text-slate-900">{campaign.name}</h4>
-                          <span className="text-sm text-slate-500">{campaign.donors} donors</span>
-                        </div>
-                        <Progress value={progress} className="h-2 mb-2" />
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-slate-500">
-                            ${campaign.raised.toLocaleString()} raised
-                          </span>
-                          <span className="font-medium text-slate-900">
-                            ${campaign.goal.toLocaleString()} goal
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </Card>
+          <div className="flex items-center justify-between text-sm mb-1">
+            <span className="text-slate-500">{campaign.quantity} items requested</span>
+            <span className="font-medium text-slate-900">
+              ${campaign.amount_raised.toLocaleString()} raised
+            </span>
+          </div>
+
+          <p className="text-sm text-slate-500">{campaign.school_name}</p>
+        </div>
+      );
+    })}
+
+    {/* Pagination Buttons */}
+    <div className="flex justify-between mt-4">
+      {/* Previous Button */}
+      <Button
+        onClick={() => setCurrentPage(currentPage - 1)}
+        variant="default"
+        className="px-6"
+        disabled={currentPage === 1} // disable if on first page
+      >
+        Previous
+      </Button>
+
+      {/* Next Button */}
+      <Button
+        onClick={() => setCurrentPage(currentPage + 1)}
+        variant="default"
+        className="px-6"
+        disabled={!hasNextPage} // disable if no more pages
+      >
+        Next
+      </Button>
+    </div>
+  </div>
+</Card>
+
             </div>
 
             {/* Recent Donors */}
@@ -483,24 +592,24 @@ const AdminDashboard: React.FC = () => {
                 <button className="text-sm text-blue-600 hover:underline font-medium">View all</button>
               </div>
 
-              <div className="space-y-4">
-                {donors.map((donor) => (
-                  <div key={donor.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="bg-blue-50 text-blue-600 font-medium text-sm">
-                        {donor.initials}
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-slate-900">{donor.name}</p>
-                        <p className="text-sm text-slate-500">{donor.time}</p>
-                      </div>
-                    </div>
-                    <span className="font-semibold text-green-600">
-                      +${donor.amount}
-                    </span>
-                  </div>
-                ))}
-              </div>
+             <div className="space-y-4">
+  {recentDonors.map((donor, index) => (
+    <div key={index} className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <Avatar className="bg-blue-50 text-blue-600 font-medium text-sm">
+          {donor.initials}
+        </Avatar>
+        <div>
+          <p className="font-medium text-slate-900">{donor.name}</p>
+          <p className="text-sm text-slate-500">{donor.time}</p>
+        </div>
+      </div>
+      <span className="font-semibold text-green-600">
+        +${donor.amount}
+      </span>
+    </div>
+  ))}
+</div>
             </Card>
           </div>
         </main>
