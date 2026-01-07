@@ -1,8 +1,9 @@
+
 body {
     margin: 0;
     font-family: 'Roboto', sans-serif;
     background-color: #f7f7f7;
-    padding-top: 102px; /* same height as header */
+    padding-top: 102px;
 }
 
 
@@ -81,7 +82,7 @@ nav {
 }
 .nav-cta a.btn-secondary,
 .user-name {
-    background-color: #f1f1f1; /* same background for login & username */
+    background-color: #f1f1f1;
     color: #444;
     padding: 10px 15px;
     border-radius: 5px;
@@ -94,7 +95,7 @@ nav {
 .user-name:hover {
     background-color: #eaeaea;
 }
-/* Logout dropdown */
+
 .user-dropdown {
     display: none;
     position: absolute;
@@ -120,7 +121,7 @@ nav {
     nav { flex-direction: column; gap: 10px; }
     .nav-links { flex-direction: column; gap: 10px; }
 }
-/* Header & Navigation */
+
 header {
     position: fixed;
     top: 0;
@@ -128,7 +129,7 @@ header {
     width: 100%;
     background: #f7f7f7;
     z-index: 1000;
-    height: 102px; /* original header height */
+    height: 102px; 
     transition: top 0.3s ease, box-shadow 0.3s ease;
 }
 header.show-shadow {
@@ -189,11 +190,11 @@ nav a:hover { text-decoration: none; }
     border-radius: 5px;
 }
 
-/* Hero Section */
+
 .hero {
     width: 100vw;
     max-width: 96%; 
-    margin: 0 auto;     /* center horizontally */
+    margin: 0 auto;    
     height: 83vh;
     display: flex;
     flex-direction: column;
@@ -205,7 +206,7 @@ nav a:hover { text-decoration: none; }
     border-radius: 30px;
     background: linear-gradient(rgba(0,0,0,0.6), rgba(0, 0, 0, 0.24)),
                 url("uploads/images/school-children-dressed-uniform-have-fun-play-schoolyard.jpg") center/cover no-repeat;
-    box-sizing: border-box; /* include padding/border in width */
+    box-sizing: border-box; 
 }
 
 
@@ -223,7 +224,7 @@ nav a:hover { text-decoration: none; }
 }
 .btn-primary:hover { background-color: #c92532; }
 
-/* Sections */
+
 section { padding: 60px 50px; }
 .section-title { text-align: center; margin-bottom: 50px; }
 
@@ -248,7 +249,7 @@ section { padding: 60px 50px; }
     font-style: italic;
 }
 
-/* Cards */
+
 .cards { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
 .card {
     background-color: #fff;
@@ -259,11 +260,11 @@ section { padding: 60px 50px; }
     max-width: 350px;
 }
 
-/* Footer */
+
 footer { padding: 30px 50px; text-align: center; background-color: #333; color: #fff; }
 footer a { color: #FFC107; margin: 0 10px; }
 
-/* Contact Form */
+
 .contact-section { max-width: 1400px; margin: auto; }
 .contact-section input, .contact-section textarea {
     width: 100%;
@@ -285,7 +286,7 @@ footer a { color: #FFC107; margin: 0 10px; }
 
 
 
-/* Sidebar styles */
+
 .sidebar {
   width: 350px;
   height: 100%;
