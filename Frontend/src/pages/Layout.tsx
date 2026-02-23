@@ -184,7 +184,7 @@ const Layout: React.FC<LayoutProps> = ({ currentUser, setCurrentUser }) => {
                     <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                       <li>
                         <Link
-                          to={currentUser.userType === 'donor' ? '/donor-dashboard' : '/school-dashboard'}
+                          to={currentUser.userType === 'donor' ? '/donor-dashboard' : '/school/schooloverview'}
                           style={{ display: 'block', padding: '8px 10px', textDecoration: 'none', color: '#1f2937' }}
                           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}

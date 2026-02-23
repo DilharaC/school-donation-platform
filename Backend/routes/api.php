@@ -44,15 +44,20 @@ Route::get('/donation_requests/{id}/donations', [DonationController::class, 'don
 
 Route::get('/dashboard/kpis-today-weekly', [DashboardController::class, 'kpisTodayWithWeeklyChange']);
 
-
+Route::get('/donation_requests/{id}/evidences', [DonationRequestController::class, 'listEvidences']);
 
 Route::get('/donations', [DonationController::class, 'listDonations']);
+Route::post('/donation_requests/{id}/evidences', [DonationRequestController::class, 'uploadEvidence']);
+Route::delete('/donation_request_evidences/{id}', [DonationRequestController::class, 'deleteEvidence']);
 
 
 
+Route::middleware('auth:school')->group(function () {
+    Route::get('/school/me', [SchoolController::class, 'me']);
+    Route::post('/school/me', [SchoolController::class, 'updateMe']); // use POST for multipart (file upload)
+});
 
-
-
+Route::post('/donation_requests/{id}/update', [DonationRequestController::class, 'update']);
 
 Route::get('/reports/summary', [DonationController::class, 'reportsSummary']);
 Route::get('/reports/trends', [DonationController::class, 'reportsTrends']);
@@ -75,7 +80,7 @@ Route::get('/donations/verify', [DonationController::class, 'verifySession']);
 // Protected routes (must be authenticated)
 // -----------------------------
 
-Route::middleware('auth:sanctum')->get('/school/overview', [SchoolDashboardController::class, 'overview']);
+Route::middleware('auth:school')->get('/school/overview', [SchoolController::class, 'overview']);
 Route::delete('/donation_requests/{id}', [DonationRequestController::class, 'destroy']);
 Route::middleware(['web', 'auth:sanctum'])->group(function () {
      

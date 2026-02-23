@@ -10,7 +10,6 @@ use App\Models\School;
 
 class AuthController extends Controller
 {
-    // CSRF endpoint
     public function csrfCookie()
     {
         return response()->json([
@@ -19,79 +18,77 @@ class AuthController extends Controller
         ]);
     }
 
-    // Login without userType (auto detect from identifier)
-    public function login(Request $request)
-    {
-        $request->validate([
-            'identifier' => 'required|string',
-            'password' => 'required|string',
-        ]);
+   public function login(Request $request)
+{
+    $request->validate([
+        'identifier' => 'required|string',
+        'password' => 'required|string',
+    ]);
 
-        $identifier = $request->identifier;
-        $password = $request->password;
+    $identifier = trim($request->identifier);
+    $password = $request->password;
 
-        $user = null;
-        $type = null;
+    $user = null;
+    $type = null;
 
-        // Try donor first
-        $donor = Donor::where('email', $identifier)->first();
-
-        if ($donor) {
-            $user = $donor;
-            $type = "donor";
-        }
-
-        // If no donor found → try school (email or registration_no)
-        if (!$user) {
-            $school = School::where('email', $identifier)
-                            ->orWhere('registration_no', $identifier)
-                            ->first();
-
-            if ($school) {
-                $user = $school;
-                $type = "school";
-            }
-        }
-
-        if (!$user) {
-            return response()->json([
-                "success" => false,
-                "message" => "User not found"
-            ], 404);
-        }
-
-        // Correct password field detection
-        $hashed = $user->password ?? $user->password_hash;
-
-        if (!Hash::check($password, $hashed)) {
-            return response()->json([
-                "success" => false,
-                "message" => "Incorrect password"
-            ], 401);
-        }
-
-        // Sanctum login session
-        Auth::login($user);
-
-        return response()->json([
-            "success" => true,
-            "user" => [
-                "userType" => $type,
-                "id"       => $user->id,
-                "name"     => $type === "donor" ? $user->full_name : $user->school_name,
-                "email"    => $user->email,
-                "phone"    => $user->phone ?? null,
-                "address"  => $user->address ?? null,
-                "logoUrl"  => $user->logo_url ?? null,
-            ]
-        ]);
+    // 1) Donor login by email
+    $donor = Donor::where('email', $identifier)->first();
+    if ($donor) {
+        $user = $donor;
+        $type = "donor";
     }
 
-   public function logout(Request $request)
-{
-    Auth::guard('web')->logout();
-    $request->session()->invalidate();
-    $request->session()->regenerateToken();
-    return response()->json(['success' => true]);
+    // 2) School login ONLY by registration_no
+    if (!$user) {
+        $school = School::where('registration_no', $identifier)->first();
+        if ($school) {
+            $user = $school;
+            $type = "school";
+        }
+    }
+
+    if (!$user) {
+        return response()->json([
+            "success" => false,
+            "message" => "User not found"
+        ], 404);
+    }
+
+    $hashed = $user->password ?? $user->password_hash;
+
+    if (!Hash::check($password, $hashed)) {
+        return response()->json([
+            "success" => false,
+            "message" => "Incorrect password"
+        ], 401);
+    }
+
+    // login using correct guard
+    if ($type === 'school') {
+        Auth::guard('school')->login($user);
+    } else {
+        Auth::guard('web')->login($user);
+    }
+
+    return response()->json([
+        "success" => true,
+        "user" => [
+            "userType" => $type,
+            "id"       => $user->id,
+            "name"     => $type === "donor" ? $user->full_name : $user->school_name,
+            "email"    => $type === "donor" ? $user->email : null,
+        ]
+    ]);
 }
+
+    public function logout(Request $request)
+    {
+        Auth::guard('web')->logout();
+        Auth::guard('school')->logout();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return response()->json(['success' => true]);
+    }
 }

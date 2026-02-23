@@ -75,8 +75,8 @@ type NavItem = { icon: React.FC; label: string; to: string };
 
 const schoolNavItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Overview", to: "/school/schooloverview" },
-  { icon: SchoolIcon, label: "My School", to: "/school/profile" },
-  { icon: ClipboardList, label: "My Requests", to: "/school/requests" },
+  { icon: SchoolIcon, label: "My School", to: "/school/myschool" },
+  { icon: ClipboardList, label: "My Requests", to: "/school/myrequests" },
   { icon: Heart, label: "Donations", to: "/school/donations" },
   { icon: FileText, label: "Documents", to: "/school/documents" },
   { icon: Bell, label: "Notifications", to: "/school/notifications" },
