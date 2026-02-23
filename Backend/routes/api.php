@@ -74,6 +74,8 @@ Route::get('/donations/verify', [DonationController::class, 'verifySession']);
 // -----------------------------
 // Protected routes (must be authenticated)
 // -----------------------------
+
+Route::middleware('auth:sanctum')->get('/school/overview', [SchoolDashboardController::class, 'overview']);
 Route::delete('/donation_requests/{id}', [DonationRequestController::class, 'destroy']);
 Route::middleware(['web', 'auth:sanctum'])->group(function () {
      

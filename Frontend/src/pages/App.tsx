@@ -10,12 +10,16 @@ import DonationForm from "./DonationForm";
 import DonationSuccess from "./DonationSuccess";
 import DonationFailed from "./DonationFailed";
 import AdminDashboard from "../pages/AdminDashboard";
+import SchoolOverview from "../pages/SchoolOverview";
+
 import Campaign from "../pages/adminpages/Campaign";
 import Reports from "../pages/adminpages/reports";
+
 
 import Donors from "../pages/adminpages/Donors";
 import Analytics from "../pages/adminpages/analytics";
 import Schools from "../pages/adminpages/schools";
+import SchoolLayout from "../schooldashboardcomponents/SchoolLayout";
 
 
 
@@ -70,6 +74,19 @@ const App: React.FC = () => {
 
 
          
+
+  {/* ================= SCHOOL ================= */}
+  <Route path="/school" element={<SchoolLayout />}>
+    <Route index element={<Navigate to="schooloverview" />} />
+    <Route path="schooloverview" element={<SchoolOverview />} />
+    {/* <Route path="profile" element={<SchoolProfile />} />
+    <Route path="requests" element={<SchoolRequests />} />
+    <Route path="donations" element={<SchoolDonations />} />
+    <Route path="documents" element={<SchoolDocuments />} />
+    <Route path="notifications" element={<SchoolNotifications />} />
+    <Route path="settings" element={<SchoolSettings />} /> */}
+  </Route>
+
           {/* Add other admin pages here */}
         </Route>
       {/* All other pages wrapped in Layout */}

@@ -449,4 +449,147 @@ class SchoolController extends Controller
             'affected' => $affected,
         ]);
     }
+
+
+
+
+
+
+    public function overview(Request $request)
+    {
+        $user = Auth::user();
+
+        // ✅ You must have school_id on authenticated school user
+        $schoolId = $user->school_id ?? null;
+
+        if (!$schoolId) {
+            return response()->json(['message' => 'School not authenticated'], 401);
+        }
+
+        // --- school basic info ---
+        $school = DB::table('schools')
+            ->where('school_id', $schoolId)
+            ->first();
+
+        if (!$school) {
+            return response()->json(['message' => 'School not found'], 404);
+        }
+
+        // --- totals (paid only) ---
+        $summary = DB::table('donation_requests')
+            ->leftJoin('donations', function ($join) {
+                $join->on('donation_requests.request_id', '=', 'donations.request_id')
+                    ->whereRaw("LOWER(donations.status)='paid'");
+            })
+            ->where('donation_requests.school_id', $schoolId)
+            ->selectRaw('COALESCE(SUM(donations.amount),0) as total_received')
+            ->selectRaw('COUNT(donations.donation_id) as donations_count')
+            ->selectRaw('MAX(donations.created_at) as last_donation_at')
+            ->first();
+
+        // --- campaign counts ---
+        $activeCampaigns = DB::table('donation_requests')
+            ->where('school_id', $schoolId)
+            ->where('status', 'Approved') // your system uses Approved/Pending
+            ->count();
+
+        $pendingCampaigns = DB::table('donation_requests')
+            ->where('school_id', $schoolId)
+            ->where('status', 'Pending')
+            ->count();
+
+        // --- recent donations (paid only) ---
+        $recentDonations = DB::table('donations')
+            ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+            ->where('donation_requests.school_id', $schoolId)
+            ->whereRaw("LOWER(donations.status)='paid'")
+            ->orderByDesc('donations.created_at')
+            ->limit(8)
+            ->get([
+                'donations.donation_id',
+                'donations.donor_name',
+                'donations.donor_email',
+                'donations.amount',
+                'donations.created_at',
+                'donation_requests.request_title',
+            ]);
+
+        // add "time_ago"
+        $recentDonations->transform(function ($d) {
+            $d->time_ago = $d->created_at ? Carbon::parse($d->created_at)->diffForHumans() : null;
+            return $d;
+        });
+
+        // --- top campaigns (latest 5) ---
+        $campaigns = DB::table('donation_requests')
+            ->where('school_id', $schoolId)
+            ->orderByDesc('created_at')
+            ->limit(5)
+            ->get([
+                'request_id',
+                'request_title',
+                'category',
+                'estimated_price',
+                'amount_raised',
+                'status',
+                'created_at',
+            ]);
+
+        // --- trend (last 30 days): paid amount per day ---
+        $from = Carbon::now()->subDays(29)->startOfDay();
+        $to   = Carbon::now()->endOfDay();
+
+        $trendRows = DB::table('donations')
+            ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+            ->where('donation_requests.school_id', $schoolId)
+            ->whereBetween('donations.created_at', [$from, $to])
+            ->whereRaw("LOWER(donations.status)='paid'")
+            ->selectRaw("DATE(donations.created_at) as day, SUM(donations.amount) as total")
+            ->groupBy('day')
+            ->orderBy('day')
+            ->get();
+
+        $trendMap = $trendRows->pluck('total', 'day');
+
+        $trend = [];
+        $cursor = $from->copy();
+        while ($cursor <= $to) {
+            $day = $cursor->toDateString();
+            $trend[] = [
+                'day' => $day,
+                'total' => (float)($trendMap[$day] ?? 0),
+            ];
+            $cursor->addDay();
+        }
+
+        // ✅ build safe document link
+        $documentLink = $school->documents_url ? url($school->documents_url) : null;
+
+        return response()->json([
+            'school' => [
+                'school_id' => (int)$school->school_id,
+                'school_name' => $school->school_name,
+                'registration_no' => $school->registration_no,
+                'contact_email' => $school->contact_email,
+                'contact_phone' => $school->contact_phone,
+                'district' => $school->district,
+                'province' => $school->province,
+                'address' => $school->address,
+                'need_score' => (float)($school->need_score ?? 0),
+                'verified' => (int)($school->verified ?? 0),
+                'status' => strtolower($school->status ?? 'inactive'),
+                'document_link' => $documentLink,
+            ],
+            'kpis' => [
+                'total_received' => (float)($summary->total_received ?? 0),
+                'donations_count' => (int)($summary->donations_count ?? 0),
+                'last_donation_at' => $summary->last_donation_at,
+                'active_campaigns' => (int)$activeCampaigns,
+                'pending_campaigns' => (int)$pendingCampaigns,
+            ],
+            'trend_30d' => $trend,
+            'recent_donations' => $recentDonations,
+            'top_campaigns' => $campaigns,
+        ]);
+    }
 }
