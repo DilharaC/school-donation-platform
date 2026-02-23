@@ -25,4 +25,17 @@ class Donor extends Authenticatable
         'phone',
         'address'
     ];
+
+       // A donor can have many donations
+    public function donations()
+    {
+        return $this->hasMany(Donation::class, 'donor_id', 'donor_id');
+    }
+
+    // Optional: Count only active donations (status = Approved or Completed)
+    public function activeDonations()
+    {
+        return $this->donations()->where('status', 'Approved'); // or 'Completed'
+    }
+    
 }

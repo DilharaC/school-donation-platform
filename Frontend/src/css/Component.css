@@ -1,4 +1,4 @@
-
+/* 
 body {
     margin: 0;
     font-family: 'Roboto', sans-serif;
@@ -258,6 +258,7 @@ section { padding: 60px 50px; }
     padding: 20px;
     flex: 1 1 300px;
     max-width: 350px;
+   
 }
 
 
@@ -364,4 +365,4 @@ footer a { color: #FFC107; margin: 0 10px; }
   color: #fff;
   cursor: pointer;
 }
-.logout-btn:hover { background: #c92532; transform: translateY(-1px); }
+.logout-btn:hover { background: #c92532; transform: translateY(-1px); } */

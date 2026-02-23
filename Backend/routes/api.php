@@ -7,6 +7,7 @@ use App\Http\Controllers\SchoolController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DonationController;
 use App\Http\Controllers\DonationRequestController;
+use App\Http\Controllers\DashboardController;
 
 // -----------------------------
 // CSRF Route
@@ -25,7 +26,42 @@ Route::middleware('web')->group(function () {
 });
 Route::get('/recent-donors', [DonationController::class, 'recentDonors']);
 Route::get('/donation-trends', [DonationController::class, 'donationTrends']);
+Route::get('/analytics/schools-map', [DonationController::class, 'schoolsDonationMap']);
 Route::get('/registered-donors', [DonorController::class, 'allDonors']);
+// routes/api.php
+Route::get('/donors-active', [DonationController::class, 'donorsWithActiveDonations']);
+
+Route::get('/all-donors', [DonationController::class, 'allDonorsWithStats']);
+
+Route::get('/schools-donations', [SchoolController::class, 'schoolsWithDonations']);
+
+Route::get('/donation_requests/{id}', [DonationRequestController::class, 'show']);
+Route::put('/donation_requests/{id}/status', [DonationRequestController::class, 'updateStatus']);
+
+Route::get('/donation_requests/{id}/donations', [DonationController::class, 'donationsByRequest']);
+
+
+
+Route::get('/dashboard/kpis-today-weekly', [DashboardController::class, 'kpisTodayWithWeeklyChange']);
+
+
+
+Route::get('/donations', [DonationController::class, 'listDonations']);
+
+
+
+
+
+
+
+Route::get('/reports/summary', [DonationController::class, 'reportsSummary']);
+Route::get('/reports/trends', [DonationController::class, 'reportsTrends']);
+Route::get('/reports/top-provinces', [DonationController::class, 'reportsTopProvinces']);
+Route::get('/reports/top-campaigns', [DonationController::class, 'reportsTopCampaigns']);
+
+
+Route::get('/schools', [SchoolController::class, 'listSchools']);
+Route::post('/schools/bulk-update', [SchoolController::class, 'bulkUpdate']);
 
 
 Route::post('/donor/register', [DonorController::class, 'register']);
@@ -38,9 +74,11 @@ Route::get('/donations/verify', [DonationController::class, 'verifySession']);
 // -----------------------------
 // Protected routes (must be authenticated)
 // -----------------------------
+Route::delete('/donation_requests/{id}', [DonationRequestController::class, 'destroy']);
 Route::middleware(['web', 'auth:sanctum'])->group(function () {
      
     Route::post('/donations/create', [DonationController::class, 'createDonation']);
+    
     
     Route::get('/user', function (Request $request) {
         $user = $request->user();
