@@ -2,7 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./pages/App";
-import "./css/App.css";
+import "./css/Component.css";
+import 'leaflet/dist/leaflet.css';
+import "./css/index.css";
 
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

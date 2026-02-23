@@ -30,9 +30,11 @@ class DonorController extends Controller
     }
    public function allDonors()
 {
-    $donors = Donor::all(['donor_id', 'full_name', 'email', 'phone', 'created_at']);
+    $donors = Donor::withCount(['donations as active_donations_count' => function ($q) {
+        $q->where('status', 'Approved'); // count only active/completed donations
+    }])->get(['donor_id', 'full_name', 'email', 'phone', 'created_at']);
 
-    // Add initials for frontend display (optional)
+    // Add initials for frontend display
     $donors->transform(function ($donor) {
         $names = explode(' ', $donor->full_name);
         $donor->initials = strtoupper(substr($names[0], 0, 1) . (isset($names[1]) ? substr($names[1], 0, 1) : ''));
@@ -41,5 +43,6 @@ class DonorController extends Controller
 
     return response()->json($donors);
 }
+
 }
 

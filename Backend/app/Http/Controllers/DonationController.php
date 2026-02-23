@@ -150,23 +150,375 @@ public function recentDonors()
 
 public function donationTrends()
 {
-    $data = \App\Models\Donation::where('status', 'paid')
-        ->select(
-            DB::raw("MONTH(created_at) as month"),
-            DB::raw("SUM(amount) as total")
-        )
-        ->groupBy(DB::raw("MONTH(created_at)"))
-        ->orderBy(DB::raw("MONTH(created_at)"))
+    $start = \Carbon\Carbon::now()->subMonths(11)->startOfMonth();
+    $end   = \Carbon\Carbon::now()->endOfMonth();
+
+    // Get sums by YYYY-MM (so year is included)
+    $rows = \App\Models\Donation::where('status', 'paid')
+        ->whereBetween('created_at', [$start, $end])
+        ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as ym, SUM(amount) as total")
+        ->groupBy('ym')
+        ->orderBy('ym')
         ->get();
 
-    $formatted = $data->map(function ($item) {
-        return [
-            'month' => Carbon::create()->month($item->month)->format('M'),
-            'donations' => (int) $item->total
+    // Map results for fast lookup
+    $map = $rows->pluck('total', 'ym');
+
+    // Fill missing months with 0
+    $result = [];
+    $cursor = $start->copy();
+    while ($cursor <= $end) {
+        $ym = $cursor->format('Y-m');
+        $result[] = [
+            'month' => $cursor->format('M'),     // Jan, Feb...
+            'ym' => $ym,                         // 2026-01 (optional but useful)
+            'donations' => (int) ($map[$ym] ?? 0),
         ];
+        $cursor->addMonth();
+    }
+
+    return response()->json($result);
+}
+  public function schoolsDonationMap()
+{
+    $schools = DB::table('schools')
+        ->leftJoin('donation_requests', 'schools.school_id', '=', 'donation_requests.school_id')
+        ->leftJoin('donations', function($join) {
+            $join->on('donation_requests.request_id', '=', 'donations.request_id')
+                 ->where('donations.status', 'paid'); 
+        })
+        ->select(
+            'schools.school_id',
+            'schools.school_name',
+            'schools.district',
+            'schools.province',
+            'schools.latitude',
+            'schools.longitude',
+            DB::raw('COALESCE(SUM(donations.amount), 0) as total_received'),
+            'schools.need_score' 
+        )
+        ->groupBy(
+            'schools.school_id',
+            'schools.school_name',
+            'schools.district',
+            'schools.province',
+            'schools.latitude',
+            'schools.longitude',
+            'schools.need_score' 
+        )
+        ->get();
+
+    return response()->json($schools);
+}
+
+public function donorsWithActiveDonations()
+{
+    $donors = DB::table('donations')
+        ->select(
+            'donor_id',
+            'donor_name',
+            'donor_email',
+            DB::raw('COUNT(*) as active_donations_count'),
+            DB::raw('SUM(amount) as total_donated'), 
+            DB::raw('MIN(created_at) as joined_at')  
+        )
+        ->where('status', 'paid')
+        ->groupBy('donor_id', 'donor_name', 'donor_email')
+        ->orderBy('joined_at', 'desc')
+        ->get();
+
+    
+    $donors->transform(function ($donor) {
+        $names = explode(' ', $donor->donor_name);
+        $donor->initials = strtoupper(substr($names[0], 0, 1) . (isset($names[1]) ? substr($names[1], 0, 1) : ''));
+        $donor->created_at = $donor->joined_at; 
+        return $donor;
     });
 
-    return response()->json($formatted);
+    return response()->json($donors);
+}
+
+public function allDonorsWithStats()
+{
+    $donors = DB::table('donors')
+        ->leftJoin('donations', function($join) {
+            $join->on('donors.donor_id', '=', 'donations.donor_id')
+                 ->where('donations.status', 'paid'); 
+        })
+        ->select(
+            'donors.donor_id',
+            'donors.full_name',
+            'donors.email',
+            'donors.phone',
+            DB::raw('COUNT(donations.donation_id) as active_donations_count'),
+            DB::raw('COALESCE(SUM(donations.amount), 0) as total_donated'),
+            'donors.created_at'
+        )
+        ->groupBy(
+            'donors.donor_id',
+            'donors.full_name',
+            'donors.email',
+            'donors.phone',
+            'donors.created_at'
+        )
+        ->orderBy('donors.created_at', 'desc')
+        ->get();
+
+    
+    $donors->transform(function ($donor) {
+        $names = explode(' ', $donor->full_name);
+        $donor->initials = strtoupper(
+            substr($names[0], 0, 1) . (isset($names[1]) ? substr($names[1], 0, 1) : '')
+        );
+        return $donor;
+    });
+
+    return response()->json($donors);
+}
+
+public function donationsByRequest($requestId)
+{
+    $rows = \App\Models\Donation::where('request_id', $requestId)
+        ->where('status', 'paid') // only paid donations
+        ->orderBy('created_at', 'desc')
+        ->get([
+            'donation_id',
+            'donor_name',
+            'donor_email',
+            'amount',
+            'status',
+            'created_at'
+        ]);
+
+    return response()->json([
+        'donations' => $rows
+    ]);
+}
+
+public function listDonations(Request $request)
+{
+    $status = strtolower($request->query('status', 'all')); // paid | pending | all
+    $search = trim($request->query('search', ''));
+    $page   = max(1, (int) $request->query('page', 1));
+    $limit  = max(1, min(50, (int) $request->query('limit', 10)));
+
+    $q = DB::table('donations')
+        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
+        ->select(
+            'donations.donation_id',
+            'donations.request_id',
+            'donations.donor_id',
+            'donations.donor_name',
+            'donations.donor_email',
+            'donations.amount',
+            'donations.status',
+            'donations.created_at',
+            'donation_requests.request_title',
+            'donation_requests.school_id',
+            'schools.school_name',
+            'schools.district',
+            'schools.province'
+        );
+
+    // ✅ Case-insensitive status filter
+    if ($status !== 'all') {
+        $q->whereRaw('LOWER(donations.status) = ?', [$status]); // matches Paid/paid/PAID
+    }
+
+    if ($search !== '') {
+        $q->where(function ($qq) use ($search) {
+            $qq->where('donations.donor_name', 'like', "%{$search}%")
+               ->orWhere('donations.donor_email', 'like', "%{$search}%")
+               ->orWhere('donation_requests.request_title', 'like', "%{$search}%")
+               ->orWhere('schools.school_name', 'like', "%{$search}%")
+               ->orWhere('schools.province', 'like', "%{$search}%")
+               ->orWhere('schools.district', 'like', "%{$search}%");
+        });
+    }
+
+    $total = (clone $q)->count();
+
+    $rows = $q->orderBy('donations.created_at', 'desc')
+        ->skip(($page - 1) * $limit)
+        ->take($limit)
+        ->get();
+
+    // ✅ Normalize status + initials + time
+    $rows->transform(function ($r) {
+        $name = $r->donor_name ?: 'Anonymous';
+        $parts = preg_split('/\s+/', trim($name));
+
+        $r->initials = strtoupper(substr($parts[0] ?? 'A', 0, 1) . substr($parts[1] ?? '', 0, 1));
+        $r->time = $r->created_at ? Carbon::parse($r->created_at)->diffForHumans() : null;
+
+        // ✅ always send lowercase status to frontend
+        $r->status = strtolower($r->status ?? 'pending');
+
+        return $r;
+    });
+
+    return response()->json([
+        'donations' => $rows,
+        'total' => $total,
+        'page' => $page,
+        'limit' => $limit,
+    ]);
+    // ✅ Date filter (optional)
+$dateFrom = $request->query('dateFrom', null);
+if ($dateFrom) {
+    $q->where('donations.created_at', '>=', $dateFrom);
+}
+
+// ✅ Sorting (optional)
+$sortBy = $request->query('sortBy', 'created_at');
+$sortDir = $request->query('sortDir', 'desc');
+
+$allowedSort = ['created_at', 'amount', 'status'];
+if (!in_array($sortBy, $allowedSort)) $sortBy = 'created_at';
+$sortDir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
+
+$q->orderBy("donations.$sortBy", $sortDir);
+}
+
+
+
+
+
+
+
+
+// methaninin plallehata
+
+public function reportsSummary(Request $request)
+{
+    $dateFrom = $request->query('dateFrom');
+    $dateTo   = $request->query('dateTo');
+
+    $from = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : Carbon::now()->subDays(30)->startOfDay();
+    $to   = $dateTo   ? Carbon::parse($dateTo)->endOfDay()     : Carbon::now()->endOfDay();
+
+    // Base query: donations + request + school
+    $base = DB::table('donations')
+        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
+        ->whereBetween('donations.created_at', [$from, $to]);
+
+    // KPIs
+    $totalDonations = (clone $base)->count();
+    $paidCount = (clone $base)->whereRaw("LOWER(donations.status)='paid'")->count();
+    $pendingCount = (clone $base)->whereRaw("LOWER(donations.status)='pending'")->count();
+
+    $paidAmount = (clone $base)->whereRaw("LOWER(donations.status)='paid'")
+        ->sum('donations.amount');
+
+    $avgPaid = $paidCount > 0 ? ($paidAmount / $paidCount) : 0;
+
+    $uniqueDonors = (clone $base)->whereRaw("LOWER(donations.status)='paid'")
+        ->distinct('donations.donor_email')
+        ->count('donations.donor_email');
+
+    // Status breakdown
+    $statusBreakdown = (clone $base)
+        ->selectRaw("LOWER(donations.status) as status, COUNT(*) as count")
+        ->groupBy('status')
+        ->orderBy('count', 'desc')
+        ->get();
+
+    return response()->json([
+        'range' => [
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+        ],
+        'kpis' => [
+            'total_donations' => (int)$totalDonations,
+            'paid_count' => (int)$paidCount,
+            'pending_count' => (int)$pendingCount,
+            'paid_amount' => (float)$paidAmount,
+            'avg_paid' => (float)$avgPaid,
+            'unique_donors' => (int)$uniqueDonors,
+        ],
+        'status_breakdown' => $statusBreakdown,
+    ]);
+}
+
+public function reportsTrends(Request $request)
+{
+    $dateFrom = $request->query('dateFrom');
+    $dateTo   = $request->query('dateTo');
+
+    $from = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : Carbon::now()->subDays(30)->startOfDay();
+    $to   = $dateTo   ? Carbon::parse($dateTo)->endOfDay()     : Carbon::now()->endOfDay();
+
+    // Daily trend (paid only) for the date range
+    $rows = DB::table('donations')
+        ->whereBetween('created_at', [$from, $to])
+        ->whereRaw("LOWER(status)='paid'")
+        ->selectRaw("DATE(created_at) as day, SUM(amount) as total, COUNT(*) as count")
+        ->groupBy('day')
+        ->orderBy('day')
+        ->get();
+
+    // Fill missing days with 0
+    $mapTotal = $rows->pluck('total', 'day');
+    $mapCount = $rows->pluck('count', 'day');
+
+    $result = [];
+    $cursor = $from->copy()->startOfDay();
+    while ($cursor <= $to) {
+        $d = $cursor->toDateString();
+        $result[] = [
+            'day' => $d,
+            'amount' => (float)($mapTotal[$d] ?? 0),
+            'count' => (int)($mapCount[$d] ?? 0),
+        ];
+        $cursor->addDay();
+    }
+
+    return response()->json($result);
+}
+
+public function reportsTopProvinces(Request $request)
+{
+    $dateFrom = $request->query('dateFrom');
+    $dateTo   = $request->query('dateTo');
+
+    $from = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : Carbon::now()->subDays(30)->startOfDay();
+    $to   = $dateTo   ? Carbon::parse($dateTo)->endOfDay()     : Carbon::now()->endOfDay();
+
+    $rows = DB::table('donations')
+        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
+        ->whereBetween('donations.created_at', [$from, $to])
+        ->whereRaw("LOWER(donations.status)='paid'")
+        ->selectRaw("COALESCE(schools.province,'Unknown') as province, SUM(donations.amount) as total")
+        ->groupBy('province')
+        ->orderByDesc('total')
+        ->limit(8)
+        ->get();
+
+    return response()->json($rows);
+}
+
+public function reportsTopCampaigns(Request $request)
+{
+    $dateFrom = $request->query('dateFrom');
+    $dateTo   = $request->query('dateTo');
+
+    $from = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : Carbon::now()->subDays(30)->startOfDay();
+    $to   = $dateTo   ? Carbon::parse($dateTo)->endOfDay()     : Carbon::now()->endOfDay();
+
+    $rows = DB::table('donations')
+        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->whereBetween('donations.created_at', [$from, $to])
+        ->whereRaw("LOWER(donations.status)='paid'")
+        ->selectRaw("donation_requests.request_id, donation_requests.request_title, SUM(donations.amount) as total, COUNT(*) as count")
+        ->groupBy('donation_requests.request_id', 'donation_requests.request_title')
+        ->orderByDesc('total')
+        ->limit(8)
+        ->get();
+
+    return response()->json($rows);
 }
 
 }
