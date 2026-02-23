@@ -14,7 +14,9 @@ import SchoolOverview from "../pages/SchoolOverview";
 
 import Campaign from "../pages/adminpages/Campaign";
 import Reports from "../pages/adminpages/reports";
+import MySchool from "../pages/schoolpages/myschool";
 
+import MyRequests from "../pages/schoolpages/myrequests";
 
 import Donors from "../pages/adminpages/Donors";
 import Analytics from "../pages/adminpages/analytics";
@@ -75,20 +77,22 @@ const App: React.FC = () => {
 
          
 
-  {/* ================= SCHOOL ================= */}
+ 
+          {/* Add other admin pages here */}
+        </Route>
+
+         {/* ================= SCHOOL ================= */}
   <Route path="/school" element={<SchoolLayout />}>
     <Route index element={<Navigate to="schooloverview" />} />
     <Route path="schooloverview" element={<SchoolOverview />} />
-    {/* <Route path="profile" element={<SchoolProfile />} />
-    <Route path="requests" element={<SchoolRequests />} />
-    <Route path="donations" element={<SchoolDonations />} />
+    <Route path="myschool" element={<MySchool />} />
+    <Route path="myrequests" element={<MyRequests />} />
+    {/* <Route path="donations" element={<SchoolDonations />} />
     <Route path="documents" element={<SchoolDocuments />} />
     <Route path="notifications" element={<SchoolNotifications />} />
     <Route path="settings" element={<SchoolSettings />} /> */}
   </Route>
 
-          {/* Add other admin pages here */}
-        </Route>
       {/* All other pages wrapped in Layout */}
       <Route
         path="/"

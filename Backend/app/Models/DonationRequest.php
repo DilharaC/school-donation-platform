@@ -30,4 +30,9 @@ class DonationRequest extends Model
     {
         return $this->belongsTo(School::class, 'school_id', 'school_id');
     }
+    // App/Models/DonationRequest.php
+public function evidences()
+{
+    return $this->hasMany(\App\Models\DonationRequestEvidence::class, 'request_id', 'request_id');
+}
 }

@@ -9,6 +9,11 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
+use Illuminate\Support\Facades\Auth;
+
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
+
 class SchoolController extends Controller
 {
     /**
@@ -455,25 +460,25 @@ class SchoolController extends Controller
 
 
 
-    public function overview(Request $request)
-    {
-        $user = Auth::user();
-
-        // ✅ You must have school_id on authenticated school user
-        $schoolId = $user->school_id ?? null;
+public function overview(Request $request)
+{
+    try {
+        // ✅ use school guard (because your school guard exists)
+        $user = Auth::guard('school')->user();
+        $schoolId = $user?->school_id;
 
         if (!$schoolId) {
             return response()->json(['message' => 'School not authenticated'], 401);
         }
 
         // --- school basic info ---
-        $school = DB::table('schools')
-            ->where('school_id', $schoolId)
-            ->first();
-
-        if (!$school) {
+        $schoolRow = DB::table('schools')->where('school_id', $schoolId)->first();
+        if (!$schoolRow) {
             return response()->json(['message' => 'School not found'], 404);
         }
+
+        // ✅ convert to array to avoid "Undefined property" 500
+        $school = (array) $schoolRow;
 
         // --- totals (paid only) ---
         $summary = DB::table('donation_requests')
@@ -490,7 +495,7 @@ class SchoolController extends Controller
         // --- campaign counts ---
         $activeCampaigns = DB::table('donation_requests')
             ->where('school_id', $schoolId)
-            ->where('status', 'Approved') // your system uses Approved/Pending
+            ->where('status', 'Approved')
             ->count();
 
         $pendingCampaigns = DB::table('donation_requests')
@@ -514,7 +519,6 @@ class SchoolController extends Controller
                 'donation_requests.request_title',
             ]);
 
-        // add "time_ago"
         $recentDonations->transform(function ($d) {
             $d->time_ago = $d->created_at ? Carbon::parse($d->created_at)->diffForHumans() : null;
             return $d;
@@ -535,7 +539,7 @@ class SchoolController extends Controller
                 'created_at',
             ]);
 
-        // --- trend (last 30 days): paid amount per day ---
+        // --- trend (last 30 days) ---
         $from = Carbon::now()->subDays(29)->startOfDay();
         $to   = Carbon::now()->endOfDay();
 
@@ -549,7 +553,7 @@ class SchoolController extends Controller
             ->orderBy('day')
             ->get();
 
-        $trendMap = $trendRows->pluck('total', 'day');
+        $trendMap = $trendRows->pluck('total', 'day'); // Collection
 
         $trend = [];
         $cursor = $from->copy();
@@ -557,39 +561,201 @@ class SchoolController extends Controller
             $day = $cursor->toDateString();
             $trend[] = [
                 'day' => $day,
-                'total' => (float)($trendMap[$day] ?? 0),
+                'total' => (float) ($trendMap->get($day, 0)),
             ];
             $cursor->addDay();
         }
 
-        // ✅ build safe document link
-        $documentLink = $school->documents_url ? url($school->documents_url) : null;
+        // ✅ safe doc column (try multiple possible column names)
+        $docPath =
+            $school['documents_url'] ??
+            $school['document_url'] ??
+            $school['document_link'] ??
+            $school['document_path'] ??
+            null;
+
+        $documentLink = $docPath ? url($docPath) : null;
 
         return response()->json([
             'school' => [
-                'school_id' => (int)$school->school_id,
-                'school_name' => $school->school_name,
-                'registration_no' => $school->registration_no,
-                'contact_email' => $school->contact_email,
-                'contact_phone' => $school->contact_phone,
-                'district' => $school->district,
-                'province' => $school->province,
-                'address' => $school->address,
-                'need_score' => (float)($school->need_score ?? 0),
-                'verified' => (int)($school->verified ?? 0),
-                'status' => strtolower($school->status ?? 'inactive'),
+                'school_id' => (int) ($school['school_id'] ?? 0),
+                'school_name' => $school['school_name'] ?? '',
+                'registration_no' => $school['registration_no'] ?? null,
+                'contact_email' => $school['contact_email'] ?? null,
+                'contact_phone' => $school['contact_phone'] ?? null,
+                'district' => $school['district'] ?? null,
+                'province' => $school['province'] ?? null,
+                'address' => $school['address'] ?? null,
+                'need_score' => (float) ($school['need_score'] ?? 0),
+                'verified' => (int) ($school['verified'] ?? 0),
+                'status' => strtolower($school['status'] ?? 'inactive'),
                 'document_link' => $documentLink,
             ],
             'kpis' => [
-                'total_received' => (float)($summary->total_received ?? 0),
-                'donations_count' => (int)($summary->donations_count ?? 0),
-                'last_donation_at' => $summary->last_donation_at,
-                'active_campaigns' => (int)$activeCampaigns,
-                'pending_campaigns' => (int)$pendingCampaigns,
+                'total_received' => (float) ($summary->total_received ?? 0),
+                'donations_count' => (int) ($summary->donations_count ?? 0),
+                'last_donation_at' => $summary->last_donation_at ?? null,
+                'active_campaigns' => (int) $activeCampaigns,
+                'pending_campaigns' => (int) $pendingCampaigns,
             ],
             'trend_30d' => $trend,
             'recent_donations' => $recentDonations,
             'top_campaigns' => $campaigns,
         ]);
+    } catch (\Throwable $e) {
+        Log::error('School overview error', [
+            'message' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+        ]);
+
+        return response()->json(['message' => 'Internal Server Error'], 500);
     }
+}
+public function me(Request $request)
+{
+    $user = Auth::guard('school')->user();
+    $schoolId = $user?->school_id;
+
+    if (!$schoolId) {
+        return response()->json(['message' => 'School not authenticated'], 401);
+    }
+
+    $row = DB::table('schools')->where('school_id', $schoolId)->first();
+
+    if (!$row) {
+        return response()->json(['message' => 'School not found'], 404);
+    }
+
+    // normalize + safe links
+    $row->status = strtolower($row->status ?? 'inactive');
+    $row->verified = (int)($row->verified ?? 0);
+    $row->need_score = (float)($row->need_score ?? 0);
+
+    $row->document_link = $row->documents_url ? url($row->documents_url) : null;
+    $row->logo_link = $row->logo_url ? url($row->logo_url) : null;
+
+    return response()->json(['school' => $row]);
+}
+
+public function updateMe(Request $request)
+{
+    $user = Auth::guard('school')->user();
+    $schoolId = $user?->school_id;
+
+    if (!$schoolId) {
+        return response()->json(['message' => 'School not authenticated'], 401);
+    }
+
+    // fetch current
+    $current = DB::table('schools')->where('school_id', $schoolId)->first();
+    if (!$current) {
+        return response()->json(['message' => 'School not found'], 404);
+    }
+
+    $validated = $request->validate([
+        'school_name'     => 'required|string|max:255',
+        'registration_no' => 'nullable|string|max:255',
+        'contact_email'   => 'required|email|max:255',
+        'contact_phone'   => 'nullable|string|max:20',
+
+        'alt_phone'       => 'nullable|string|max:20',
+        'principal_name'  => 'nullable|string|max:150',
+        'postal_code'     => 'nullable|string|max:10',
+        'website'         => 'nullable|url|max:255',
+
+        'district'        => 'nullable|string|max:100',
+        'province'        => 'nullable|string|max:100',
+        'address'         => 'nullable|string|max:255',
+        'contact_person'  => 'nullable|string|max:150',
+
+        // category required (Primary/Secondary)
+        'category'        => 'required|in:Primary,Secondary',
+
+        // level enum is NOT NULL in DB, so make it required
+        'level'           => 'required|in:Grade 1-5,Grade 6-9,Grade 10-13,All',
+
+        'student_count'      => 'nullable|integer|min:0',
+        'teacher_count'      => 'nullable|integer|min:0',
+        'establishment_year' => 'nullable|integer|min:1800|max:2100',
+
+        'latitude'        => 'nullable|numeric',
+        'longitude'       => 'nullable|numeric',
+
+        'bank_name'      => 'nullable|string|max:50',
+        'account_holder' => 'nullable|string|max:100',
+        'bank_account'   => 'nullable|string|max:50',
+
+        // uploads
+        'logo'     => 'nullable|file|mimes:jpg,jpeg,png|max:4096',
+        'document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+    ]);
+
+    // handle uploads (store in public/uploads)
+    $logoPath = $current->logo_url ?? null;
+    if ($request->hasFile('logo')) {
+        $file = $request->file('logo');
+        $name = time() . '_' . Str::random(8) . '_' . $file->getClientOriginalName();
+        $file->move(public_path('uploads/logos'), $name);
+        $logoPath = 'uploads/logos/' . $name;
+    }
+
+    $docPath = $current->documents_url ?? null;
+    if ($request->hasFile('document')) {
+        $file = $request->file('document');
+        $name = time() . '_' . Str::random(8) . '_' . $file->getClientOriginalName();
+        $file->move(public_path('uploads/docs'), $name);
+        $docPath = 'uploads/docs/' . $name;
+    }
+
+    DB::table('schools')->where('school_id', $schoolId)->update([
+        'school_name'     => $validated['school_name'],
+        'registration_no' => $validated['registration_no'] ?? null,
+        'contact_email'   => $validated['contact_email'],
+        'contact_phone'   => $validated['contact_phone'] ?? null,
+
+        'alt_phone'       => $validated['alt_phone'] ?? null,
+        'principal_name'  => $validated['principal_name'] ?? null,
+        'postal_code'     => $validated['postal_code'] ?? null,
+        'website'         => $validated['website'] ?? null,
+
+        'district'        => $validated['district'] ?? null,
+        'province'        => $validated['province'] ?? null,
+        'address'         => $validated['address'] ?? null,
+        'contact_person'  => $validated['contact_person'] ?? null,
+
+        'category'        => $validated['category'],
+        'level'           => $validated['level'],
+
+        'student_count'      => $validated['student_count'] ?? null,
+        'teacher_count'      => $validated['teacher_count'] ?? null,
+        'establishment_year' => $validated['establishment_year'] ?? null,
+
+        'latitude'        => $validated['latitude'] ?? null,
+        'longitude'       => $validated['longitude'] ?? null,
+
+        'bank_name'      => $validated['bank_name'] ?? null,
+        'account_holder' => $validated['account_holder'] ?? null,
+        'bank_account'   => $validated['bank_account'] ?? null,
+
+        'logo_url'       => $logoPath,
+        'documents_url'  => $docPath,
+
+        'updated_at'     => now(),
+    ]);
+
+    // Return updated
+    $row = DB::table('schools')->where('school_id', $schoolId)->first();
+    $row->status = strtolower($row->status ?? 'inactive');
+    $row->verified = (int)($row->verified ?? 0);
+    $row->need_score = (float)($row->need_score ?? 0);
+    $row->document_link = $row->documents_url ? url($row->documents_url) : null;
+    $row->logo_link = $row->logo_url ? url($row->logo_url) : null;
+
+    return response()->json(['message' => 'Profile updated', 'school' => $row]);
+}
+
+
+
+
 }

@@ -4,49 +4,63 @@ namespace App\Http\Controllers;
 
 use App\Models\DonationRequest;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use App\Models\DonationRequestEvidence;
 
 class DonationRequestController extends Controller
 {
     // Fetch projects (with pagination/search/filter)
-    public function index(Request $request)
-    {
-        $search   = $request->query('search', '');
-        $category = $request->query('category', 'All');
-        $status   = $request->query('status', null); // ✅ ADD THIS
-        $page     = (int) $request->query('page', 1);
-        $limit    = (int) $request->query('limit', 6);
+  public function index(Request $request)
+{
+    $search   = $request->query('search', '');
+    $category = $request->query('category', 'All');
+    $status   = $request->query('status', null);
+    $page     = (int) $request->query('page', 1);
+    $limit    = (int) $request->query('limit', 6);
 
-        $query = DonationRequest::with('school');
+    $query = DonationRequest::with('school');
 
-        // Search by title, description, or school name
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('request_title', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhereHas('school', function ($q2) use ($search) {
-                      $q2->where('school_name', 'like', "%{$search}%");
-                  });
-            });
-        }
+    if ($search) {
+        $query->where(function ($q) use ($search) {
+            $q->where('request_title', 'like', "%{$search}%")
+              ->orWhere('description', 'like', "%{$search}%")
+              ->orWhereHas('school', function ($q2) use ($search) {
+                  $q2->where('school_name', 'like', "%{$search}%");
+              });
+        });
+    }
 
-        // Filter by category
-        if ($category && $category !== 'All') {
-            $query->where('category', $category);
-        }
+    if ($category && $category !== 'All') {
+        $query->where('category', $category);
+    }
 
-        // ✅ Filter by status (Approved / Pending)
-        if ($status) {
-            $query->where('status', $status);
-        }
+    if ($status) {
+        $query->where('status', $status);
+    }
 
-        $total = $query->count();
+    // ✅ Latest first
+    $query->orderBy('created_at', 'desc');
 
-        $projects = $query->skip(($page - 1) * $limit)
-                          ->take($limit)
-                          ->get();
+    // ✅ Summary for ALL filtered rows (not just current page)
+    $summaryQuery = (clone $query)->getQuery(); // clone base query
+    $summary = DonationRequest::fromSub($summaryQuery, 'dr')
+        ->selectRaw('
+            COUNT(*) as total_requests,
+            SUM(CASE WHEN status = "Approved" THEN 1 ELSE 0 END) as approved_count,
+            SUM(CASE WHEN status = "Pending" THEN 1 ELSE 0 END) as pending_count,
+            COALESCE(SUM(amount_raised),0) as total_raised,
+            COALESCE(SUM(estimated_price),0) as total_target
+        ')
+        ->first();
 
-        // Map to include school_name safely
-        $projects = $projects->map(function ($project) {
+    // pagination
+    $total = (clone $query)->count();
+
+    $projects = (clone $query)
+        ->skip(($page - 1) * $limit)
+        ->take($limit)
+        ->get()
+        ->map(function ($project) {
             return [
                 'request_id' => $project->request_id,
                 'school_id' => $project->school_id,
@@ -65,40 +79,55 @@ class DonationRequestController extends Controller
             ];
         });
 
-        return response()->json([
-            'projects' => $projects,
-            'total' => $total,
-        ]);
-    }
-
+    return response()->json([
+        'projects' => $projects,
+        'total' => $total,
+        'summary' => [
+            'total_requests' => (int) ($summary->total_requests ?? 0),
+            'approved_count' => (int) ($summary->approved_count ?? 0),
+            'pending_count' => (int) ($summary->pending_count ?? 0),
+            'total_raised' => (float) ($summary->total_raised ?? 0),
+            'total_target' => (float) ($summary->total_target ?? 0),
+        ],
+    ]);
+}
     // ✅ GET single campaign detail (for View Drawer)
-    public function show($id)
-    {
-        $project = DonationRequest::with('school')->find($id);
+public function show($id)
+{
+    $project = DonationRequest::with(['school','evidences'])->find($id);
 
-        if (!$project) {
-            return response()->json(['message' => 'Donation request not found'], 404);
-        }
-
-        return response()->json([
-            'project' => [
-                'request_id' => $project->request_id,
-                'school_id' => $project->school_id,
-                'school_name' => $project->school->school_name ?? 'Unknown School',
-                'request_title' => $project->request_title,
-                'category' => $project->category,
-                'quantity' => $project->quantity,
-                'estimated_price' => $project->estimated_price,
-                'amount_raised' => $project->amount_raised,
-                'description' => $project->description,
-                'image_url' => $project->image_url,
-                'document_url' => $project->document_url,
-                'status' => $project->status,
-                'created_at' => $project->created_at,
-                'updated_at' => $project->updated_at,
-            ]
-        ]);
+    if (!$project) {
+        return response()->json(['message' => 'Donation request not found'], 404);
     }
+
+    return response()->json([
+        'project' => [
+            'request_id' => $project->request_id,
+            'school_id' => $project->school_id,
+            'school_name' => $project->school->school_name ?? 'Unknown School',
+            'request_title' => $project->request_title,
+            'category' => $project->category,
+            'quantity' => $project->quantity,
+            'estimated_price' => $project->estimated_price,
+            'amount_raised' => $project->amount_raised,
+            'description' => $project->description,
+            'image_url' => $project->image_url,
+            'document_url' => $project->document_url,
+            'status' => $project->status,
+            'created_at' => $project->created_at,
+            'updated_at' => $project->updated_at,
+
+            // ✅ add
+            'evidences' => $project->evidences->map(fn($e) => [
+                'id' => $e->id,
+                'file_url' => $e->file_url,
+                'file_type' => $e->file_type,
+                'note' => $e->note,
+                'created_at' => $e->created_at,
+            ]),
+        ]
+    ]);
+}
 
     // ✅ PUT update status (Approve / Mark Pending)
     public function updateStatus(Request $request, $id)
@@ -126,34 +155,45 @@ class DonationRequestController extends Controller
     }
 
     // Create project
-    public function create(Request $request)
-    {
-        $request->validate([
-            'school_id' => 'required|exists:schools,school_id',
-            'request_title' => 'required',
-            'category' => 'required',
-            'quantity' => 'required|integer',
-            'estimated_price' => 'required|numeric',
-            'description' => 'required'
-        ]);
+public function create(Request $request)
+{
+    $request->validate([
+        'school_id' => 'required|exists:schools,school_id',
+        'request_title' => 'required|string|max:255',
+        'category' => 'required|string|max:100',
+        'quantity' => 'required|integer|min:1',
+        'estimated_price' => 'required|numeric|min:0',
+        'description' => 'required|string',
+        'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096', // ✅ file upload
+        'document_url' => 'nullable|string',
+    ]);
 
-        $donationRequest = DonationRequest::create([
-            'school_id' => $request->school_id,
-            'request_title' => $request->request_title,
-            'category' => $request->category,
-            'quantity' => $request->quantity,
-            'estimated_price' => $request->estimated_price,
-            'description' => $request->description,
-            'image_url' => $request->image_url,
-            'document_url' => $request->document_url,
-            'status' => 'Pending'
-        ]);
+    $imageUrl = null;
 
-        return response()->json([
-            'message' => 'Donation request created',
-            'request' => $donationRequest
-        ]);
+    // ✅ store image if sent
+    if ($request->hasFile('image')) {
+        $path = $request->file('image')->store('donation_requests', 'public'); 
+        // needs: php artisan storage:link
+        $imageUrl = '/storage/' . $path;
     }
+
+    $donationRequest = DonationRequest::create([
+        'school_id' => $request->school_id,
+        'request_title' => $request->request_title,
+        'category' => $request->category,
+        'quantity' => $request->quantity,
+        'estimated_price' => $request->estimated_price,
+        'description' => $request->description,
+        'image_url' => $imageUrl, // ✅ saved path
+        'document_url' => $request->document_url ? trim($request->document_url) : null,
+        'status' => 'Pending'
+    ]);
+
+    return response()->json([
+        'message' => 'Donation request created',
+        'request' => $donationRequest
+    ]);
+}
 
     // Delete project
     public function destroy($id)
@@ -172,4 +212,151 @@ class DonationRequestController extends Controller
             'message' => 'Donation request deleted successfully'
         ]);
     }
+
+
+    public function update(Request $request, $id)
+{
+    $request->validate([
+        'school_id' => 'required|exists:schools,school_id',
+        'request_title' => 'required|string|max:255',
+        'category' => 'required|string|max:100',
+        'quantity' => 'required|integer|min:1',
+        'estimated_price' => 'required|numeric|min:0',
+        'description' => 'required|string',
+        'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
+        'document_url' => 'nullable|string',
+    ]);
+
+    $project = DonationRequest::find($id);
+
+    if (!$project) {
+        return response()->json(['message' => 'Donation request not found'], 404);
+    }
+
+    // ✅ Ownership check (IMPORTANT)
+    if ((int)$project->school_id !== (int)$request->school_id) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+
+    // ✅ Optional: prevent editing if approved
+    // (you can remove this if you want to allow editing anytime)
+    if ($project->status === 'Approved') {
+        return response()->json(['message' => 'Approved requests cannot be edited'], 422);
+    }
+
+    // ✅ If new image uploaded, delete old one + store new
+    $imageUrl = $project->image_url;
+
+    if ($request->hasFile('image')) {
+        // delete old file if it exists and is stored in /storage/
+        if ($project->image_url && str_starts_with($project->image_url, '/storage/')) {
+            $oldPath = str_replace('/storage/', '', $project->image_url);
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        $path = $request->file('image')->store('donation_requests', 'public');
+        $imageUrl = '/storage/' . $path;
+    }
+
+    $project->update([
+        'request_title' => $request->request_title,
+        'category' => $request->category,
+        'quantity' => $request->quantity,
+        'estimated_price' => $request->estimated_price,
+        'description' => $request->description,
+        'image_url' => $imageUrl,
+        'document_url' => $request->document_url ? trim($request->document_url) : null,
+        // status stays same (or you can force back to Pending)
+        // 'status' => 'Pending',
+    ]);
+
+    return response()->json([
+        'message' => 'Donation request updated successfully',
+        'project' => [
+            'request_id' => $project->request_id,
+            'school_id' => $project->school_id,
+            'request_title' => $project->request_title,
+            'category' => $project->category,
+            'quantity' => $project->quantity,
+            'estimated_price' => $project->estimated_price,
+            'description' => $project->description,
+            'image_url' => $project->image_url,
+            'document_url' => $project->document_url,
+            'status' => $project->status,
+            'updated_at' => $project->updated_at,
+        ]
+    ]);
+}
+
+
+
+
+
+
+public function uploadEvidence(Request $request, $id)
+{
+    $request->validate([
+        'files' => 'required',
+        'files.*' => 'file|mimes:jpg,jpeg,png,webp,pdf|max:8192', // 8MB
+        'note' => 'nullable|string|max:255',
+    ]);
+
+    $dr = DonationRequest::find($id);
+    if (!$dr) return response()->json(['message' => 'Request not found'], 404);
+
+    $saved = [];
+
+    foreach ($request->file('files') as $file) {
+        $path = $file->store('donation_evidences', 'public');
+        $url = '/storage/' . $path;
+
+        $type = str_contains($file->getMimeType(), 'pdf') ? 'pdf' : 'image';
+
+        $ev = DonationRequestEvidence::create([
+            'request_id' => $dr->request_id,
+            'file_url' => $url,
+            'file_type' => $type,
+            'note' => $request->note,
+        ]);
+
+        $saved[] = $ev;
+    }
+
+    return response()->json([
+        'message' => 'Evidence uploaded',
+        'evidences' => $saved
+    ]);
+}
+
+public function listEvidences($id)
+{
+    $dr = DonationRequest::find($id);
+    if (!$dr) return response()->json(['message' => 'Request not found'], 404);
+
+    $evidences = DonationRequestEvidence::where('request_id', $dr->request_id)
+        ->orderBy('id', 'desc')
+        ->get();
+
+    return response()->json(['evidences' => $evidences]);
+}
+
+
+public function deleteEvidence($evidenceId)
+{
+    $ev = DonationRequestEvidence::find($evidenceId);
+
+    if (!$ev) {
+        return response()->json(['message' => 'Evidence not found'], 404);
+    }
+
+    // delete file from storage if stored in /storage/
+    if ($ev->file_url && str_starts_with($ev->file_url, '/storage/')) {
+        $path = str_replace('/storage/', '', $ev->file_url);
+        Storage::disk('public')->delete($path);
+    }
+
+    $ev->delete();
+
+    return response()->json(['message' => 'Evidence deleted']);
+}
 }
