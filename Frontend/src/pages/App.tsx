@@ -15,8 +15,11 @@ import SchoolOverview from "../pages/SchoolOverview";
 import Campaign from "../pages/adminpages/Campaign";
 import Reports from "../pages/adminpages/reports";
 import MySchool from "../pages/schoolpages/myschool";
+import SchoolDonations from "../pages/schoolpages/donations";
 
 import MyRequests from "../pages/schoolpages/myrequests";
+import SchoolDocuments from "../pages/schoolpages/documents";
+import SchoolSettings from "../pages/schoolpages/settings";
 
 import Donors from "../pages/adminpages/Donors";
 import Analytics from "../pages/adminpages/analytics";
@@ -87,10 +90,10 @@ const App: React.FC = () => {
     <Route path="schooloverview" element={<SchoolOverview />} />
     <Route path="myschool" element={<MySchool />} />
     <Route path="myrequests" element={<MyRequests />} />
-    {/* <Route path="donations" element={<SchoolDonations />} />
+    <Route path="donations" element={<SchoolDonations />} />
     <Route path="documents" element={<SchoolDocuments />} />
-    <Route path="notifications" element={<SchoolNotifications />} />
-    <Route path="settings" element={<SchoolSettings />} /> */}
+    {/* <Route path="notifications" element={<SchoolNotifications />} /> */}
+    <Route path="settings" element={<SchoolSettings />} />
   </Route>
 
       {/* All other pages wrapped in Layout */}
