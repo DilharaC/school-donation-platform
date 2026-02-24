@@ -7,7 +7,7 @@ const REQUESTS_LIST_ENDPOINT = `${API_BASE}/my-requests`;
 const REQUEST_CREATE_ENDPOINT = `${API_BASE}/request/create`;
 const SCHOOL_ME_ENDPOINT = `${API_BASE}/school/me`;
 const REQUEST_SHOW_ENDPOINT = (id: number) => `${API_BASE}/donation_requests/${id}`;
-const REQUEST_DELETE_ENDPOINT = (id: number) => `${API_BASE}/donation_requests/${id}`;
+
 
 const REQUEST_UPDATE_ENDPOINT = (id: number) => `${API_BASE}/donation_requests/${id}/update`;
 
