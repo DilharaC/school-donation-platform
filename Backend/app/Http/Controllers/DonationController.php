@@ -297,10 +297,20 @@ public function donationsByRequest($requestId)
 
 public function listDonations(Request $request)
 {
-    $status = strtolower($request->query('status', 'all')); // paid | pending | all
-    $search = trim($request->query('search', ''));
-    $page   = max(1, (int) $request->query('page', 1));
-    $limit  = max(1, min(50, (int) $request->query('limit', 10)));
+    $status  = strtolower($request->query('status', 'all')); // paid | pending | all
+    $search  = trim($request->query('search', ''));
+    $page    = max(1, (int) $request->query('page', 1));
+    $limit   = max(1, min(50, (int) $request->query('limit', 10)));
+
+    // ✅ optional filters
+    $dateFrom = $request->query('dateFrom', null);
+    $dateTo   = $request->query('dateTo', null);
+
+    // ✅ sorting
+    $sortBy  = $request->query('sortBy', 'created_at'); // created_at | amount | status
+    $sortDir = strtolower($request->query('sortDir', 'desc')) === 'asc' ? 'asc' : 'desc';
+    $allowedSort = ['created_at', 'amount', 'status'];
+    if (!in_array($sortBy, $allowedSort)) $sortBy = 'created_at';
 
     $q = DB::table('donations')
         ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
@@ -321,11 +331,20 @@ public function listDonations(Request $request)
             'schools.province'
         );
 
-    // ✅ Case-insensitive status filter
+    // ✅ status filter (case-insensitive)
     if ($status !== 'all') {
-        $q->whereRaw('LOWER(donations.status) = ?', [$status]); // matches Paid/paid/PAID
+        $q->whereRaw('LOWER(donations.status) = ?', [$status]);
     }
 
+    // ✅ date filters
+    if ($dateFrom) {
+        $q->where('donations.created_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+    }
+    if ($dateTo) {
+        $q->where('donations.created_at', '<=', Carbon::parse($dateTo)->endOfDay());
+    }
+
+    // ✅ search
     if ($search !== '') {
         $q->where(function ($qq) use ($search) {
             $qq->where('donations.donor_name', 'like', "%{$search}%")
@@ -337,22 +356,24 @@ public function listDonations(Request $request)
         });
     }
 
+    // ✅ total before pagination
     $total = (clone $q)->count();
 
-    $rows = $q->orderBy('donations.created_at', 'desc')
-        ->skip(($page - 1) * $limit)
+    // ✅ sorting
+    $q->orderBy("donations.$sortBy", $sortDir);
+
+    // ✅ pagination
+    $rows = $q->skip(($page - 1) * $limit)
         ->take($limit)
         ->get();
 
-    // ✅ Normalize status + initials + time
+    // ✅ Normalize (initials + time + status lowercase)
     $rows->transform(function ($r) {
         $name = $r->donor_name ?: 'Anonymous';
         $parts = preg_split('/\s+/', trim($name));
 
         $r->initials = strtoupper(substr($parts[0] ?? 'A', 0, 1) . substr($parts[1] ?? '', 0, 1));
         $r->time = $r->created_at ? Carbon::parse($r->created_at)->diffForHumans() : null;
-
-        // ✅ always send lowercase status to frontend
         $r->status = strtolower($r->status ?? 'pending');
 
         return $r;
@@ -364,21 +385,6 @@ public function listDonations(Request $request)
         'page' => $page,
         'limit' => $limit,
     ]);
-    // ✅ Date filter (optional)
-$dateFrom = $request->query('dateFrom', null);
-if ($dateFrom) {
-    $q->where('donations.created_at', '>=', $dateFrom);
-}
-
-// ✅ Sorting (optional)
-$sortBy = $request->query('sortBy', 'created_at');
-$sortDir = $request->query('sortDir', 'desc');
-
-$allowedSort = ['created_at', 'amount', 'status'];
-if (!in_array($sortBy, $allowedSort)) $sortBy = 'created_at';
-$sortDir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
-
-$q->orderBy("donations.$sortBy", $sortDir);
 }
 
 
@@ -521,4 +527,168 @@ public function reportsTopCampaigns(Request $request)
     return response()->json($rows);
 }
 
+
+// ✅ School Donations (ONLY their school) - paginated + search + status + date filter + sorting
+public function schoolDonations(Request $request)
+{
+    $user = Auth::guard('school')->user();
+    $schoolId = $user?->school_id;
+
+    if (!$schoolId) {
+        return response()->json(['message' => 'School not authenticated'], 401);
+    }
+
+    $status = strtolower($request->query('status', 'all')); // paid | pending | all
+    $search = trim($request->query('search', ''));
+
+    $page   = max(1, (int) $request->query('page', 1));
+    $limit  = max(1, min(50, (int) $request->query('limit', 10)));
+
+    // optional date range
+    $dateFrom = $request->query('dateFrom', null);
+    $dateTo   = $request->query('dateTo', null);
+
+    $from = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : null;
+    $to   = $dateTo   ? Carbon::parse($dateTo)->endOfDay()     : null;
+
+    // optional sorting
+    $sortBy  = $request->query('sortBy', 'created_at'); // created_at | amount | status
+    $sortDir = strtolower($request->query('sortDir', 'desc')) === 'asc' ? 'asc' : 'desc';
+
+    $allowedSort = ['created_at', 'amount', 'status'];
+    if (!in_array($sortBy, $allowedSort)) $sortBy = 'created_at';
+
+    $q = DB::table('donations')
+        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
+        ->where('donation_requests.school_id', $schoolId)
+        ->select(
+            'donations.donation_id',
+            'donations.request_id',
+            'donations.donor_id',
+            'donations.donor_name',
+            'donations.donor_email',
+            'donations.amount',
+            'donations.status',
+            'donations.created_at',
+            'donation_requests.request_title',
+            'schools.school_name',
+            'schools.district',
+            'schools.province'
+        );
+
+    // ✅ status filter (case-insensitive)
+    if ($status !== 'all') {
+        $q->whereRaw('LOWER(donations.status) = ?', [$status]);
+    }
+
+    // ✅ date filters
+    if ($from && $to) {
+        $q->whereBetween('donations.created_at', [$from, $to]);
+    } elseif ($from) {
+        $q->where('donations.created_at', '>=', $from);
+    } elseif ($to) {
+        $q->where('donations.created_at', '<=', $to);
+    }
+
+    // ✅ search
+    if ($search !== '') {
+        $q->where(function ($qq) use ($search) {
+            $qq->where('donations.donor_name', 'like', "%{$search}%")
+               ->orWhere('donations.donor_email', 'like', "%{$search}%")
+               ->orWhere('donation_requests.request_title', 'like', "%{$search}%");
+        });
+    }
+
+    $total = (clone $q)->count();
+
+    // ✅ sorting
+    $q->orderBy("donations.$sortBy", $sortDir);
+
+    $rows = $q->skip(($page - 1) * $limit)
+        ->take($limit)
+        ->get();
+
+    // ✅ normalize status + initials + time
+    $rows->transform(function ($r) {
+        $name = $r->donor_name ?: 'Anonymous';
+        $parts = preg_split('/\s+/', trim($name));
+
+        $r->initials = strtoupper(substr($parts[0] ?? 'A', 0, 1) . substr($parts[1] ?? '', 0, 1));
+        $r->time = $r->created_at ? Carbon::parse($r->created_at)->diffForHumans() : null;
+
+        // always lowercase status for frontend
+        $r->status = strtolower($r->status ?? 'pending');
+
+        $r->amount = (float) ($r->amount ?? 0);
+
+        return $r;
+    });
+
+    return response()->json([
+        'donations' => $rows,
+        'total' => $total,
+        'page' => $page,
+        'limit' => $limit,
+    ]);
+}
+
+
+// ✅ Top Donors (ALL donations of that school - NOT paginated)
+public function schoolTopDonors(Request $request)
+{
+    $user = Auth::guard('school')->user();
+    $schoolId = $user?->school_id;
+
+    if (!$schoolId) {
+        return response()->json(['message' => 'School not authenticated'], 401);
+    }
+
+    $limit = max(1, min(20, (int) $request->query('limit', 8)));
+
+    $dateFrom = $request->query('dateFrom');
+    $dateTo   = $request->query('dateTo');
+
+    $from = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : null;
+    $to   = $dateTo   ? Carbon::parse($dateTo)->endOfDay()     : null;
+
+    $q = DB::table('donations')
+        ->join('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->where('donation_requests.school_id', $schoolId)
+        ->whereRaw("LOWER(donations.status)='paid'");
+
+    if ($from && $to) {
+        $q->whereBetween('donations.created_at', [$from, $to]);
+    } elseif ($from) {
+        $q->where('donations.created_at', '>=', $from);
+    } elseif ($to) {
+        $q->where('donations.created_at', '<=', $to);
+    }
+
+    $rows = $q->selectRaw("
+            COALESCE(NULLIF(TRIM(donations.donor_name),''), 'Anonymous') as donor_name,
+            donations.donor_email as donor_email,
+            COUNT(*) as donations_count,
+            COALESCE(SUM(donations.amount), 0) as total_donated,
+            MAX(donations.created_at) as last_donated_at
+        ")
+        ->groupBy('donor_email', 'donor_name')
+        ->orderByDesc('total_donated')
+        ->limit($limit)
+        ->get();
+
+    $rows->transform(function ($r) {
+        $name = $r->donor_name ?: 'Anonymous';
+        $parts = preg_split('/\s+/', trim($name));
+        $r->initials = strtoupper(substr($parts[0] ?? 'A', 0, 1) . substr($parts[1] ?? '', 0, 1));
+        $r->last_time = $r->last_donated_at ? Carbon::parse($r->last_donated_at)->diffForHumans() : null;
+        $r->total_donated = (float) $r->total_donated;
+        $r->donations_count = (int) $r->donations_count;
+        return $r;
+    });
+
+    return response()->json([
+        'top_donors' => $rows
+    ]);
+}
 }

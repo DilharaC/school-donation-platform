@@ -3,11 +3,16 @@ import axios from "axios";
 
 /** ---------------- API ---------------- */
 const API_BASE = "http://localhost:8000/api";
-const REQUESTS_LIST_ENDPOINT = `${API_BASE}/donation_requests`;
+const REQUESTS_LIST_ENDPOINT = `${API_BASE}/my-requests`;
 const REQUEST_CREATE_ENDPOINT = `${API_BASE}/request/create`;
 const SCHOOL_ME_ENDPOINT = `${API_BASE}/school/me`;
+const REQUEST_SHOW_ENDPOINT = (id: number) => `${API_BASE}/donation_requests/${id}`;
+
 
 const REQUEST_UPDATE_ENDPOINT = (id: number) => `${API_BASE}/donation_requests/${id}/update`;
+
+
+
 
 const EVIDENCE_LIST_ENDPOINT = (id: number) => `${API_BASE}/donation_requests/${id}/evidences`;
 const EVIDENCE_UPLOAD_ENDPOINT = (id: number) => `${API_BASE}/donation_requests/${id}/evidences`;
@@ -542,29 +547,32 @@ const MyRequests: React.FC = () => {
     }
   };
 
-  const openView = async (id: number) => {
-    setViewOpen(true);
-    setViewLoading(true);
-    setSelected(null);
-    setEvidences([]);
-    setEvidenceFiles([]);
-    setEvidenceNote("");
-    if (evidenceInputRef.current) evidenceInputRef.current.value = "";
+const openView = async (id: number) => {
+  setViewOpen(true);
+  setViewLoading(true);
+  setSelected(null);
+  setEvidences([]);
+  setEvidenceFiles([]);
+  setEvidenceNote("");
+  if (evidenceInputRef.current) evidenceInputRef.current.value = "";
 
-    try {
-      const res = await axios.get(`${REQUESTS_LIST_ENDPOINT}/${id}`, { withCredentials: true });
-      const project = res.data?.project || res.data?.data || res.data?.request;
-      if (!project) throw new Error("No project key in response");
-      setSelected(project as RequestRow);
-      await fetchEvidences(id);
-    } catch (e: any) {
-      console.error("VIEW ERROR:", e);
-      toast(e?.response?.data?.message || e?.message || "Failed to load request details", "error");
-      setViewOpen(false);
-    } finally {
-      setViewLoading(false);
-    }
-  };
+  try {
+    const res = await axios.get(REQUEST_SHOW_ENDPOINT(id), { withCredentials: true });
+    const project = res.data?.project || res.data?.data || res.data?.request;
+    if (!project) throw new Error("No project key in response");
+
+    setSelected(project as RequestRow);
+
+    // If your backend already returns evidences inside project, this still works
+    await fetchEvidences(id);
+  } catch (e: any) {
+    console.error("VIEW ERROR:", e);
+    toast(e?.response?.data?.message || e?.message || "Failed to load request details", "error");
+    setViewOpen(false);
+  } finally {
+    setViewLoading(false);
+  }
+};
 
   const openEdit = (r: RequestRow) => {
     setEditId(r.request_id);

@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Support\Facades\Auth;
 
 use Carbon\Carbon;
@@ -757,5 +757,156 @@ public function updateMe(Request $request)
 
 
 
+public function changePassword(Request $request)
+{
+    $user = Auth::guard('school')->user();
+    if (!$user) return response()->json(['message' => 'School not authenticated'], 401);
 
+    $request->validate([
+        'current_password' => 'required|string',
+        'new_password' => 'required|string|min:6',
+    ]);
+
+    $row = DB::table('schools')->where('school_id', $user->school_id)->first();
+    if (!$row) return response()->json(['message' => 'School not found'], 404);
+
+    if (!Hash::check($request->current_password, $row->password_hash)) {
+        return response()->json(['message' => 'Current password is incorrect'], 422);
+    }
+
+    DB::table('schools')->where('school_id', $user->school_id)->update([
+        'password_hash' => Hash::make($request->new_password),
+        'updated_at' => now(),
+    ]);
+
+    return response()->json(['message' => 'Password updated']);
+}
+
+
+public function getPrivacy()
+{
+    $user = Auth::guard('school')->user();
+    if (!$user) return response()->json(['message' => 'School not authenticated'], 401);
+
+    $row = DB::table('schools')->where('school_id', $user->school_id)->first();
+    if (!$row) return response()->json(['message' => 'School not found'], 404);
+
+    return response()->json([
+        'privacy' => [
+            'show_contact_public' => (int)($row->show_contact_public ?? 0),
+            'show_donations_public' => (int)($row->show_donations_public ?? 0),
+            'allow_donor_contact' => (int)($row->allow_donor_contact ?? 1),
+        ]
+    ]);
+}
+
+public function savePrivacy(Request $request)
+{
+    $user = Auth::guard('school')->user();
+    if (!$user) return response()->json(['message' => 'School not authenticated'], 401);
+
+    $data = $request->validate([
+        'show_contact_public' => 'required|integer|in:0,1',
+        'show_donations_public' => 'required|integer|in:0,1',
+        'allow_donor_contact' => 'required|integer|in:0,1',
+    ]);
+
+    DB::table('schools')->where('school_id', $user->school_id)->update([
+        'show_contact_public' => $data['show_contact_public'],
+        'show_donations_public' => $data['show_donations_public'],
+        'allow_donor_contact' => $data['allow_donor_contact'],
+        'updated_at' => now(),
+    ]);
+
+    return response()->json(['message' => 'Privacy saved']);
+}
+
+
+
+
+
+public function exportDonations()
+{
+    $user = Auth::guard('school')->user();
+    if (!$user) return response()->json(['message' => 'School not authenticated'], 401);
+
+    $schoolId = $user->school_id;
+
+    $rows = DB::table('donations')
+        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->where('donation_requests.school_id', $schoolId)
+        ->orderByDesc('donations.created_at')
+        ->get([
+            'donations.donation_id',
+            'donations.request_id',
+            'donation_requests.request_title',
+            'donations.donor_name',
+            'donations.donor_email',
+            'donations.amount',
+            'donations.status',
+            'donations.created_at',
+        ]);
+
+    $headers = [
+        "Content-Type" => "text/csv",
+        "Content-Disposition" => "attachment; filename=donations.csv",
+    ];
+
+    return new StreamedResponse(function () use ($rows) {
+        $out = fopen('php://output', 'w');
+        fputcsv($out, ['donation_id','request_id','request_title','donor_name','donor_email','amount','status','created_at']);
+        foreach ($rows as $r) {
+            fputcsv($out, [(string)$r->donation_id,(string)$r->request_id,$r->request_title,$r->donor_name,$r->donor_email,(string)$r->amount,$r->status,$r->created_at]);
+        }
+        fclose($out);
+    }, 200, $headers);
+}
+
+public function exportCampaigns()
+{
+    $user = Auth::guard('school')->user();
+    if (!$user) return response()->json(['message' => 'School not authenticated'], 401);
+
+    $rows = DB::table('donation_requests')
+        ->where('school_id', $user->school_id)
+        ->orderByDesc('created_at')
+        ->get([
+            'request_id',
+            'request_title',
+            'category',
+            'quantity',
+            'estimated_price',
+            'amount_raised',
+            'status',
+            'created_at',
+        ]);
+
+    $headers = [
+        "Content-Type" => "text/csv",
+        "Content-Disposition" => "attachment; filename=campaigns.csv",
+    ];
+
+    return new StreamedResponse(function () use ($rows) {
+        $out = fopen('php://output', 'w');
+        fputcsv($out, ['request_id','request_title','category','quantity','estimated_price','amount_raised','status','created_at']);
+        foreach ($rows as $r) {
+            fputcsv($out, [(string)$r->request_id,$r->request_title,$r->category,(string)$r->quantity,(string)$r->estimated_price,(string)$r->amount_raised,$r->status,$r->created_at]);
+        }
+        fclose($out);
+    }, 200, $headers);
+}
+
+
+public function deactivate()
+{
+    $user = Auth::guard('school')->user();
+    if (!$user) return response()->json(['message' => 'School not authenticated'], 401);
+
+    DB::table('schools')->where('school_id', $user->school_id)->update([
+        'status' => 'Inactive',
+        'updated_at' => now(),
+    ]);
+
+    return response()->json(['message' => 'Account deactivated']);
+}
 }

@@ -55,6 +55,18 @@ Route::delete('/donation_request_evidences/{id}', [DonationRequestController::cl
 Route::middleware('auth:school')->group(function () {
     Route::get('/school/me', [SchoolController::class, 'me']);
     Route::post('/school/me', [SchoolController::class, 'updateMe']); // use POST for multipart (file upload)
+     Route::get('/my-requests', [DonationRequestController::class, 'myIndex']);
+
+       // ✅ settings APIs
+    Route::post('/school/security/change-password', [SchoolController::class, 'changePassword']);
+
+    Route::get('/school/privacy', [SchoolController::class, 'getPrivacy']);
+    Route::post('/school/privacy', [SchoolController::class, 'savePrivacy']);
+
+    Route::get('/school/exports/donations', [SchoolController::class, 'exportDonations']);
+    Route::get('/school/exports/campaigns', [SchoolController::class, 'exportCampaigns']);
+
+    Route::post('/school/deactivate', [SchoolController::class, 'deactivate']);
 });
 
 Route::post('/donation_requests/{id}/update', [DonationRequestController::class, 'update']);
@@ -65,9 +77,14 @@ Route::get('/reports/top-provinces', [DonationController::class, 'reportsTopProv
 Route::get('/reports/top-campaigns', [DonationController::class, 'reportsTopCampaigns']);
 
 
+
+
+
 Route::get('/schools', [SchoolController::class, 'listSchools']);
 Route::post('/schools/bulk-update', [SchoolController::class, 'bulkUpdate']);
 
+Route::get('/school/donations', [DonationController::class, 'schoolDonations']);
+Route::get('/school/top-donors', [DonationController::class, 'schoolTopDonors']);
 
 Route::post('/donor/register', [DonorController::class, 'register']);
 Route::post('/school/register', [SchoolController::class, 'register']);
