@@ -17,9 +17,7 @@ type ModalShellProps = {
 export default function ModalShell({
   open,
   onClose,
-  titleLeft = "Support a classroom",
-  subtitleLeft = "Secure donations • Verified schools • Transparent evidence",
-  leftBullets = [],
+
   leftImageUrl,
   children,
   widthClassName = "max-w-4xl",
