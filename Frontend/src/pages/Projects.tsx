@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import {  useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import DonateModal from "../components/DonateModal";
+import DonationSuccessModal from "../components/DonationSuccessModal";
 
 interface Project {
   request_id: number;
@@ -106,10 +108,13 @@ const SkeletonCard = () => (
 
 /** ---------- Auth helpers (Donor only) ---------- */
 type AnyUser = {
-  userType?: string;   // ✅ backend sends this
+  userType?: string;
   role?: string;
   user_type?: string;
   type?: string;
+  donorName?: string;
+  email?: string;
+  full_name?: string;
   [k: string]: any;
 };
 
@@ -131,8 +136,18 @@ const getRole = (u: AnyUser | null) => {
   return String(u.userType || u.role || u.user_type || u.type || "").toLowerCase();
 };
 
+const toDonateUser = (u: AnyUser | null) => {
+  if (!u) return null;
+  return {
+    userType: (getRole(u) as any) || "donor",
+    donorName: u.donorName || u.full_name || u.name,
+    email: u.email,
+  };
+};
+
 const Projects: React.FC<ProjectsProps> = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [totalProjects, setTotalProjects] = useState(0);
@@ -152,6 +167,13 @@ const Projects: React.FC<ProjectsProps> = () => {
   const [detailErr, setDetailErr] = useState<string | null>(null);
   const [detail, setDetail] = useState<ProjectDetail | null>(null);
 
+  // ✅ Donation modal state
+  const [donateOpen, setDonateOpen] = useState(false);
+  const [donateRequestId, setDonateRequestId] = useState<number | null>(null);
+
+  // ✅ Success modal state
+  const [successOpen, setSuccessOpen] = useState(false);
+
   // ✅ Simple toast message
   const [toast, setToast] = useState<string | null>(null);
   const showToast = (msg: string) => {
@@ -170,38 +192,85 @@ const Projects: React.FC<ProjectsProps> = () => {
 
   const isDonor = getRole(currentUser) === "donor";
 
-const donateGuard = (requestId: number) => {
-  const redirectTo = `/donate/${requestId}`;
+  // ✅ Read session_id from URL for success modal
+  const sessionId = useMemo(() => {
+    const p = new URLSearchParams(location.search);
+    return p.get("session_id") || "";
+  }, [location.search]);
 
-  if (!currentUser) {
-    showToast("You need to login as a donor to donate.");
-    openDonorLoginModal(redirectTo);
-    return;
-  }
+  // ✅ If URL has donation=success -> open success modal
+  useEffect(() => {
+    const p = new URLSearchParams(location.search);
+    const flag = p.get("donation");
+    if (flag === "success" && sessionId) {
+      // close drawer + donate modal
+      setDonateOpen(false);
+      setDonateRequestId(null);
+      closeDrawer();
+      setSuccessOpen(true);
+    }
+    if (flag === "cancel") {
+      // optional: show toast
+      showToast("Payment cancelled.");
+      // clean URL
+      navigate("/projects", { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, sessionId]);
 
-  if (getRole(currentUser) !== "donor") {
-    showToast("Only donors can donate.");
-    return;
-  }
+  // ✅ Put this ABOVE donateGuard (important)
+  const openDonorLoginModal = (redirectTo?: string) => {
+    // close project drawer first
+    closeDrawer();
+    setDonateOpen(false);
+    setDonateRequestId(null);
 
-  navigate(redirectTo);
-};
-// ✅ Put this ABOVE donateGuard (important)
-const openDonorLoginModal = (redirectTo?: string) => {
-  // ✅ close project drawer first
-  closeDrawer();
+    if (redirectTo) sessionStorage.setItem("afterLoginRedirect", redirectTo);
 
-  // store where to go after login
-  if (redirectTo) sessionStorage.setItem("afterLoginRedirect", redirectTo);
+    window.dispatchEvent(
+      new CustomEvent("openLoginModal", {
+        detail: { redirectTo },
+      })
+    );
+  };
 
-  // open login modal (Layout listens to this event)
-  window.dispatchEvent(
-    new CustomEvent("openLoginModal", {
-      detail: { redirectTo },
-    })
-  );
-};
+  // ✅ Donate button guard (now opens modal, not navigate)
+  const donateGuard = (requestId: number) => {
+    // After login, return to projects and open donate modal for this request
+    const redirectTo = `/projects?openDonate=${requestId}`;
 
+    if (!currentUser) {
+      showToast("You need to login as a donor to donate.");
+      openDonorLoginModal(redirectTo);
+      return;
+    }
+
+    if (getRole(currentUser) !== "donor") {
+      showToast("Only donors can donate.");
+      return;
+    }
+
+    // ✅ open donate modal
+    closeDrawer();
+    setDonateRequestId(requestId);
+    setDonateOpen(true);
+  };
+
+  // ✅ if URL has openDonate=ID after login, open modal
+  useEffect(() => {
+    const p = new URLSearchParams(location.search);
+    const openId = p.get("openDonate");
+    if (openId && isDonor) {
+      const id = Number(openId);
+      if (Number.isFinite(id) && id > 0) {
+        setDonateRequestId(id);
+        setDonateOpen(true);
+      }
+      // clean URL so modal not reopen on refresh
+      navigate("/projects", { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, isDonor]);
 
   // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState(search);
@@ -240,6 +309,15 @@ const openDonorLoginModal = (redirectTo?: string) => {
       setLoading(false);
     }
   };
+  useEffect(() => {
+  const sync = () => setCurrentUser(readUser());
+  window.addEventListener("storage", sync);
+  window.addEventListener("auth:changed", sync as any);
+  return () => {
+    window.removeEventListener("storage", sync);
+    window.removeEventListener("auth:changed", sync as any);
+  };
+}, []);
 
   useEffect(() => {
     fetchProjects();
@@ -298,6 +376,12 @@ const openDonorLoginModal = (redirectTo?: string) => {
   const school = detail?.school;
   const schoolAddress = [school?.address, school?.district, school?.province].filter(Boolean).join(", ");
 
+  const closeSuccessModal = () => {
+    setSuccessOpen(false);
+    // ✅ remove query params
+    navigate("/projects", { replace: true });
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* ✅ Toast */}
@@ -311,6 +395,19 @@ const openDonorLoginModal = (redirectTo?: string) => {
           {toast}
         </div>
       </div>
+
+      {/* ✅ Donate modal */}
+      {donateRequestId != null && (
+        <DonateModal
+          open={donateOpen}
+          onClose={() => setDonateOpen(false)}
+          requestId={donateRequestId}
+          currentUser={toDonateUser(currentUser) as any}
+        />
+      )}
+
+      {/* ✅ Success modal */}
+      <DonationSuccessModal open={successOpen} onClose={closeSuccessModal} sessionId={sessionId} />
 
       {/* Hero */}
       <div className="relative overflow-hidden">
@@ -336,11 +433,7 @@ const openDonorLoginModal = (redirectTo?: string) => {
                 <div className="relative">
                   <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      />
+                      <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" strokeWidth="2" />
                       <path d="M16.2 16.2 21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     </svg>
                   </span>
@@ -394,10 +487,6 @@ const openDonorLoginModal = (redirectTo?: string) => {
                   </span>{" "}
                   of <span className="font-extrabold text-slate-900">{totalProjects}</span> projects
                 </div>
-
-             
-                  
-                
               </div>
             </div>
           </div>
@@ -510,10 +599,7 @@ const openDonorLoginModal = (redirectTo?: string) => {
                       </div>
 
                       <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          className="h-full rounded-full bg-rose-600 transition-[width] duration-500"
-                          style={{ width: `${percent}%` }}
-                        />
+                        <div className="h-full rounded-full bg-rose-600 transition-[width] duration-500" style={{ width: `${percent}%` }} />
                       </div>
 
                       <div className="mt-2 flex items-center justify-between text-xs">
@@ -525,12 +611,19 @@ const openDonorLoginModal = (redirectTo?: string) => {
                     </div>
 
                     <div className="mt-5 flex flex-wrap items-center gap-3">
-                      {/* Drawer open */}
                       <button
                         onClick={() => openDrawer(proj.request_id)}
                         className="inline-flex items-center justify-center rounded-full bg-rose-600 px-5 py-2.5 text-sm font-black text-white hover:bg-rose-700 shadow-sm"
                       >
                         View Project <span className="ml-2">→</span>
+                      </button>
+
+                      {/* ✅ Donate directly from card (optional) */}
+                      <button
+                        onClick={() => donateGuard(proj.request_id)}
+                        className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-black text-slate-900 hover:bg-slate-50"
+                      >
+                        Donate 💖
                       </button>
                     </div>
                   </div>
@@ -589,20 +682,17 @@ const openDonorLoginModal = (redirectTo?: string) => {
 
       {/* ================= Drawer ================= */}
       <div className={cx("fixed inset-0 z-[90]", drawerOpen ? "pointer-events-auto" : "pointer-events-none")}>
-        {/* Backdrop */}
         <div
           onClick={closeDrawer}
           className={cx("absolute inset-0 bg-slate-900/35 transition-opacity duration-300", drawerOpen ? "opacity-100" : "opacity-0")}
         />
 
-        {/* Panel */}
         <div
           className={cx(
             "absolute right-0 top-0 h-full w-full sm:w-[520px] bg-white shadow-2xl border-l border-slate-200 transition-transform duration-300",
             drawerOpen ? "translate-x-0" : "translate-x-full"
           )}
         >
-          {/* Header */}
           <div className="flex items-start justify-between gap-3 p-5 border-b border-slate-200">
             <div className="min-w-0">
               <div className="text-xs font-bold text-slate-500">Project Details</div>
@@ -621,7 +711,6 @@ const openDonorLoginModal = (redirectTo?: string) => {
             </button>
           </div>
 
-          {/* Body */}
           <div className="p-5 overflow-y-auto h-[calc(100%-76px)]">
             {detailErr && (
               <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
@@ -638,7 +727,6 @@ const openDonorLoginModal = (redirectTo?: string) => {
               </div>
             ) : detail ? (
               <div className="space-y-5">
-                {/* Image */}
                 <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
                   <img
                     src={detailImg}
@@ -658,7 +746,6 @@ const openDonorLoginModal = (redirectTo?: string) => {
                   </div>
                 </div>
 
-                {/* Funding */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="flex items-center justify-between text-sm">
                     <div className="font-semibold text-slate-700">
@@ -687,13 +774,11 @@ const openDonorLoginModal = (redirectTo?: string) => {
                   </div>
                 </div>
 
-                {/* Description */}
                 <div>
                   <div className="text-sm font-extrabold text-slate-900">Description</div>
                   <p className="mt-2 text-sm text-slate-600 whitespace-pre-line">{detail.description}</p>
                 </div>
 
-                {/* School info */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="text-sm font-extrabold text-slate-900">School</div>
                   <div className="mt-2 text-sm text-slate-700">
@@ -718,42 +803,7 @@ const openDonorLoginModal = (redirectTo?: string) => {
                   </div>
                 </div>
 
-                {/* Evidence */}
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="text-sm font-extrabold text-slate-900">Evidence</div>
-
-                  {detail.evidences?.length ? (
-                    <div className="mt-3 space-y-2">
-                      {detail.evidences.slice(0, 6).map((e) => {
-                        const url = toAbsoluteUrl(e.file_url);
-                        const isPdf = String(e.file_type).toLowerCase().includes("pdf");
-                        return (
-                          <a
-                            key={e.id}
-                            href={url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50"
-                          >
-                            <div className="min-w-0">
-                              <div className="text-sm font-bold text-slate-900 truncate">
-                                {isPdf ? "PDF Document" : "Image Evidence"}
-                              </div>
-                              <div className="text-xs text-slate-500 truncate">{e.note || url}</div>
-                            </div>
-                            <span className="text-slate-400">↗</span>
-                          </a>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="mt-2 text-sm text-slate-500">No evidence uploaded yet.</div>
-                  )}
-                </div>
-
-                {/* Actions */}
                 <div className="flex flex-wrap gap-3">
-                  {/* ✅ Donor-only donate */}
                   <button
                     onClick={() => donateGuard(detail.request_id)}
                     className="inline-flex flex-1 items-center justify-center rounded-full bg-rose-600 px-5 py-3 text-sm font-black text-white hover:bg-rose-700 shadow-sm"
@@ -773,7 +823,6 @@ const openDonorLoginModal = (redirectTo?: string) => {
                   ) : null}
                 </div>
 
-                {/* ✅ extra hint for non-donor */}
                 {!currentUser ? (
                   <div className="text-xs text-slate-500">
                     To donate, please login as a <span className="font-bold">Donor</span>.

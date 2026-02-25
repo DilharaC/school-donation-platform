@@ -1,8 +1,9 @@
-// src/components/LoginModal.tsx
+// src/components/LoginModal.tsx (FULL FIXED)
+// ✅ fixes: duplicate login logic removed, event "auth:changed" added, clean redirect after login
+
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-
 
 type User = {
   userType: "donor" | "school";
@@ -24,30 +25,36 @@ export default function LoginModal({
   open,
   onClose,
   setCurrentUser,
-  leftImageUrl = "/images/login-left.jpg", // ✅ change this path
+  leftImageUrl = "/images/login-left.jpg",
 }: {
   open: boolean;
   onClose: () => void;
   setCurrentUser: (u: any) => void;
   leftImageUrl?: string;
 }) {
+  const navigate = useNavigate();
+
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // axios defaults once
   useEffect(() => {
     axios.defaults.baseURL = "http://localhost:8000";
     axios.defaults.withCredentials = true;
   }, []);
 
+  // ESC to close
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && resetAndClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
+  // lock body scroll
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -61,10 +68,10 @@ export default function LoginModal({
     setError("");
     setLoading(false);
     setPassword("");
+    setIdentifier("");
     onClose();
   };
-  
-const navigate = useNavigate();  // ✅ ADD THIS
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -73,26 +80,31 @@ const navigate = useNavigate();  // ✅ ADD THIS
     try {
       await axios.get("/sanctum/csrf-cookie");
       const res = await axios.post<LoginResponse>("/api/login", { identifier, password });
-      localStorage.setItem("currentUser", JSON.stringify(res.data.user));
-setCurrentUser(res.data.user);
 
-const redirect = sessionStorage.getItem("afterLoginRedirect");
-if (redirect) {
-  sessionStorage.removeItem("afterLoginRedirect");
-  onClose();          // ✅ close modal first
-  navigate(redirect); // ✅ go donate page
-  return;
-}
-
-onClose();
-
-      if (res.data.success && res.data.user) {
-        setCurrentUser(res.data.user);
-        localStorage.setItem("currentUser", JSON.stringify(res.data.user));
-        resetAndClose();
-      } else {
-        setError(res.data.message || "Login failed.");
+      // ✅ validate response
+      if (!res.data?.success || !res.data?.user) {
+        setError(res.data?.message || "Login failed.");
+        return;
       }
+
+      // ✅ save user once
+      localStorage.setItem("currentUser", JSON.stringify(res.data.user));
+      setCurrentUser(res.data.user);
+
+      // ✅ IMPORTANT: update same-tab listeners (Projects / Donate modal)
+      window.dispatchEvent(new Event("auth:changed"));
+
+      // ✅ redirect after login (if set)
+      const redirect = sessionStorage.getItem("afterLoginRedirect");
+      if (redirect) {
+        sessionStorage.removeItem("afterLoginRedirect");
+        resetAndClose();     // close modal first (smooth)
+        navigate(redirect);  // go to donate page or any route
+        return;
+      }
+
+      // ✅ just close
+      resetAndClose();
     } catch (err: any) {
       setError(err.response?.data?.message || "Server error.");
     } finally {
@@ -105,13 +117,13 @@ onClose();
   return (
     <div className="fixed inset-0 z-[80]">
       {/* Backdrop */}
-  <div
-  className={cx(
-    "absolute inset-0 bg-black/25 backdrop-blur-[0.7px] transition-opacity duration-300",
-    open ? "opacity-100" : "opacity-0"
-  )}
-  onClick={resetAndClose}
-/>
+      <div
+        className={cx(
+          "absolute inset-0 bg-black/25 backdrop-blur-[0.7px] transition-opacity duration-300",
+          open ? "opacity-100" : "opacity-0"
+        )}
+        onClick={resetAndClose}
+      />
 
       {/* Dialog */}
       <div className="absolute inset-0 grid place-items-center p-4">
@@ -119,59 +131,42 @@ onClose();
           role="dialog"
           aria-modal="true"
           className={cx(
-             "w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl  grid md:grid-cols-2",
-  "transition-all duration-300 ease-out will-change-transform will-change-opacity",
-  open ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-3 scale-95"
+            "w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl grid md:grid-cols-2",
+            "transition-all duration-300 ease-out will-change-transform will-change-opacity",
+            open ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-3 scale-95"
           )}
           onClick={(e) => e.stopPropagation()}
         >
-        {/* Left image panel */}
-<div className="relative hidden md:block h-[520px]">
-  {/* Background image */}
-  <img
-    src={leftImageUrl}
-    alt="Login"
-    className="absolute inset-0 h-full w-full object-cover"
-  />
+          {/* Left image panel */}
+          <div className="relative hidden md:block h-[520px]">
+            <img src={leftImageUrl} alt="Login" className="absolute inset-0 h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-black/40" />
 
-  {/* Soft dark overlay (no red) */}
-  <div className="absolute inset-0 bg-black/40" />
+            <div className="relative p-10 text-white h-full flex flex-col">
+              <div className="text-3xl font-extrabold tracking-tight">Success starts here</div>
 
-  {/* Content */}
-  <div className="relative p-10 text-white h-full flex flex-col">
-    <div className="text-3xl font-extrabold tracking-tight">
-      Success starts here
-    </div>
-
-    <ul className="mt-6 space-y-3 text-sm font-semibold">
-      <li className="flex items-start gap-2">
-        <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20">
-          ✓
-        </span>
-        Verified schools & transparent evidence
-      </li>
-      <li className="flex items-start gap-2">
-        <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20">
-          ✓
-        </span>
-        Track donations and receipts
-      </li>
-      <li className="flex items-start gap-2">
-        <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20">
-          ✓
-        </span>
-        Help classrooms faster
-      </li>
-    </ul>
-
-   
-        
-      
-    
-  </div>
-</div>
-
-
+              <ul className="mt-6 space-y-3 text-sm font-semibold">
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20">
+                    ✓
+                  </span>
+                  Verified schools & transparent evidence
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20">
+                    ✓
+                  </span>
+                  Track donations and receipts
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20">
+                    ✓
+                  </span>
+                  Help classrooms faster
+                </li>
+              </ul>
+            </div>
+          </div>
 
           {/* Right login panel */}
           <div className="p-6 sm:p-8 md:p-10">
@@ -189,8 +184,6 @@ onClose();
                 <i className="bx bx-x text-2xl text-slate-700" />
               </button>
             </div>
-
-            {/* ✅ Removed Google / OR */}
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-3">
               {error && (
