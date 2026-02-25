@@ -91,42 +91,57 @@ class DonationRequestController extends Controller
         ]);
     }
 
-    // ✅ GET single campaign detail (for View Drawer)
-    public function show($id)
-    {
-        $project = DonationRequest::with(['school','evidences'])->find($id);
+   // ✅ GET single campaign detail (for View Drawer)
+public function show($id)
+{
+    $project = DonationRequest::with(['school','evidences'])->find($id);
 
-        if (!$project) {
-            return response()->json(['message' => 'Donation request not found'], 404);
-        }
-
-        return response()->json([
-            'project' => [
-                'request_id' => $project->request_id,
-                'school_id' => $project->school_id,
-                'school_name' => $project->school->school_name ?? 'Unknown School',
-                'request_title' => $project->request_title,
-                'category' => $project->category,
-                'quantity' => (int)$project->quantity,
-                'estimated_price' => (float)$project->estimated_price,
-                'amount_raised' => (float)$project->amount_raised,
-                'description' => $project->description,
-                'image_url' => $project->image_url,
-                'document_url' => $project->document_url,
-                'status' => $project->status,
-                'created_at' => $project->created_at,
-                'updated_at' => $project->updated_at,
-
-                'evidences' => $project->evidences->map(fn($e) => [
-                    'id' => $e->id,
-                    'file_url' => $e->file_url,
-                    'file_type' => $e->file_type,
-                    'note' => $e->note,
-                    'created_at' => $e->created_at,
-                ]),
-            ]
-        ]);
+    if (!$project) {
+        return response()->json(['message' => 'Donation request not found'], 404);
     }
+
+    $school = $project->school;
+
+    return response()->json([
+        'project' => [
+            'request_id' => $project->request_id,
+            'school_id' => $project->school_id,
+            'school_name' => $school->school_name ?? 'Unknown School',
+
+            // ✅ add school contact details
+            'school' => [
+                'school_id' => $school->school_id ?? null,
+                'school_name' => $school->school_name ?? null,
+                'contact_email' => $school->contact_email ?? null,
+                'contact_phone' => $school->contact_phone ?? null,
+                'address' => $school->address ?? null,
+                'district' => $school->district ?? null,
+                'province' => $school->province ?? null,
+                'registration_no' => $school->registration_no ?? null,
+            ],
+
+            'request_title' => $project->request_title,
+            'category' => $project->category,
+            'quantity' => (int)$project->quantity,
+            'estimated_price' => (float)$project->estimated_price,
+            'amount_raised' => (float)$project->amount_raised,
+            'description' => $project->description,
+            'image_url' => $project->image_url,
+            'document_url' => $project->document_url,
+            'status' => $project->status,
+            'created_at' => $project->created_at,
+            'updated_at' => $project->updated_at,
+
+            'evidences' => $project->evidences->map(fn($e) => [
+                'id' => $e->id,
+                'file_url' => $e->file_url,
+                'file_type' => $e->file_type,
+                'note' => $e->note,
+                'created_at' => $e->created_at,
+            ]),
+        ]
+    ]);
+}
 
     // ✅ PUT update status (Approve / Mark Pending)
     public function updateStatus(Request $request, $id)
