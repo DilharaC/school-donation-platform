@@ -45,11 +45,7 @@ const impact = [
     desc: "Students equipped with computers and tablets."
   }
 ];
-  const posts = [
-    { title: "Back to School Drive", desc: "Updates on our annual back-to-school campaign.", tag: "Campaign" },
-    { title: "Volunteer Stories", desc: "Read inspiring experiences from our volunteers.", tag: "Community" },
-  ];
-
+ 
   // Match Layout header padding (use the same values in Layout.tsx nav)
   const shellPad = "px-6 sm:px-12 lg:px-20 xl:px-32";
 
