@@ -62,8 +62,8 @@ class DonationController extends Controller
                 'quantity' => 1,
             ]],
             'mode' => 'payment',
-            'success_url' => env('FRONTEND_URL') . '/donation/success?session_id={CHECKOUT_SESSION_ID}',
-            'cancel_url' => env('FRONTEND_URL') . '/donation/failed',
+            'success_url' => env('FRONTEND_URL') . '/projects?donation=success&session_id={CHECKOUT_SESSION_ID}',
+'cancel_url'  => env('FRONTEND_URL') . '/projects?donation=cancel',
             'metadata' => ['donation_id' => $donation->donation_id],
         ]);
 
@@ -76,50 +76,55 @@ class DonationController extends Controller
     /**
      * Verify Stripe session and update donation & donation request
      */
-    public function verifySession(Request $request)
-    {
-        $sessionId = $request->query('session_id');
+public function verifySession(Request $request)
+{
+    $sessionId = $request->query('session_id');
 
-        if (!$sessionId) {
-            return response()->json(['status' => 'no_session'], 400);
+    if (!$sessionId) {
+        return response()->json(['status' => 'no_session'], 400);
+    }
+
+    try {
+        Stripe::setApiKey(env('STRIPE_SECRET'));
+        $session = StripeSession::retrieve($sessionId);
+
+        if (($session->payment_status ?? null) !== 'paid') {
+            return response()->json(['status' => 'pending']);
         }
 
-        try {
-            Stripe::setApiKey(env('STRIPE_SECRET'));
-            $session = StripeSession::retrieve($sessionId);
+        return DB::transaction(function () use ($sessionId) {
 
-            // Find donation
-            $donation = Donation::where('stripe_session_id', $sessionId)->first();
+            // 🔒 lock row to prevent double processing
+            $donation = Donation::where('stripe_session_id', $sessionId)
+                ->lockForUpdate()
+                ->first();
+
             if (!$donation) {
                 return response()->json(['status' => 'donation_not_found'], 404);
             }
 
-            // Only update if not already marked paid
-            if ($session->payment_status === 'paid' && $donation->status !== 'paid') {
-                $donation->update(['status' => 'paid']);
-
-                // Update amount_raised in donation_requests
-                $donationRequest = DonationRequest::find($donation->request_id);
-                if ($donationRequest) {
-                    $donationRequest->amount_raised = (float)$donationRequest->amount_raised + (float)$donation->amount;
-                    $donationRequest->save();
-                }
-
-                return response()->json(['status' => 'success']);
-            } elseif ($donation->status === 'paid') {
+            // ✅ If already processed, DO NOTHING
+            if (strtolower($donation->status) === 'paid') {
                 return response()->json(['status' => 'already_paid']);
-            } else {
-                return response()->json(['status' => 'pending']);
             }
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage()
-            ]);
-        }
+            // mark as paid
+            $donation->update(['status' => 'paid']);
+
+            // ✅ safe increment (no read + write race)
+            DonationRequest::where('request_id', $donation->request_id)
+                ->increment('amount_raised', (float)$donation->amount);
+
+            return response()->json(['status' => 'success']);
+        });
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage()
+        ], 500);
     }
-    
+}
 public function recentDonors()
 {
     $donors = \App\Models\Donation::where('status', 'paid')
