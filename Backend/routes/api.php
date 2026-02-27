@@ -39,7 +39,7 @@ Route::get('/donation_requests/{id}', [DonationRequestController::class, 'show']
 Route::put('/donation_requests/{id}/status', [DonationRequestController::class, 'updateStatus']);
 
 Route::get('/donation_requests/{id}/donations', [DonationController::class, 'donationsByRequest']);
-
+Route::get('/donor/my-donations', [DonationController::class, 'myDonations']);
 
 
 Route::get('/dashboard/kpis-today-weekly', [DashboardController::class, 'kpisTodayWithWeeklyChange']);
@@ -49,8 +49,9 @@ Route::get('/donation_requests/{id}/evidences', [DonationRequestController::clas
 Route::get('/donations', [DonationController::class, 'listDonations']);
 Route::post('/donation_requests/{id}/evidences', [DonationRequestController::class, 'uploadEvidence']);
 Route::delete('/donation_request_evidences/{id}', [DonationRequestController::class, 'deleteEvidence']);
-
-
+Route::get('/donations/{id}/receipt', [DonationController::class, 'receipt']);
+// routes/api.php
+Route::get('/donor/overview', [\App\Http\Controllers\DonationController::class, 'donorOverview']);
 
 Route::middleware('auth:school')->group(function () {
     Route::get('/school/me', [SchoolController::class, 'me']);
@@ -78,7 +79,8 @@ Route::get('/reports/top-campaigns', [DonationController::class, 'reportsTopCamp
 
 
 
-
+Route::get('/schools', [SchoolController::class, 'listSchools']);
+Route::get('/schools/{id}', [SchoolController::class, 'show']);
 
 Route::get('/schools', [SchoolController::class, 'listSchools']);
 Route::post('/schools/bulk-update', [SchoolController::class, 'bulkUpdate']);
@@ -93,6 +95,19 @@ Route::post('/request/create', [DonationRequestController::class, 'create']);
 Route::post('/stripe/webhook', [DonationController::class, 'stripeWebhook']);
 Route::get('/donations/verify', [DonationController::class, 'verifySession']);
 
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/donor/schools/{id}/donate', [DonationController::class, 'createSchoolDonation']);
+});
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/donor/me', [DonorController::class, 'me']);
+    Route::post('/donor/me', [DonorController::class, 'updateMe']);
+
+    Route::post('/donor/security/change-password', [DonorController::class, 'changePassword']);
+
+    Route::get('/donor/exports/donations', [DonorController::class, 'exportDonations']);
+
+    Route::post('/donor/deactivate', [DonorController::class, 'deactivate']);
+});
 // -----------------------------
 // Protected routes (must be authenticated)
 // -----------------------------

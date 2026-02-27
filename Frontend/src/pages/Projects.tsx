@@ -1,8 +1,11 @@
+// Projects.tsx (FULL) — with Need Score filter + sort
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useLocation, useNavigate } from "react-router-dom";
 import DonateModal from "../components/DonateModal";
 import DonationSuccessModal from "../components/DonationSuccessModal";
+import { ArrowRightIcon, HeartIcon } from "@heroicons/react/24/solid";
+import { FunnelIcon, ArrowsUpDownIcon } from "@heroicons/react/24/outline";
 
 interface Project {
   request_id: number;
@@ -17,6 +20,9 @@ interface Project {
   document_url?: string;
   status: string;
   school_name: string;
+
+  // ✅ NEW: from backend join (schools.need_score)
+  need_score?: number;
 }
 
 type Evidence = {
@@ -36,6 +42,7 @@ type SchoolMini = {
   district?: string | null;
   province?: string | null;
   registration_no?: string | null;
+  need_score?: number | null; // optional
 };
 
 type ProjectDetail = {
@@ -145,6 +152,24 @@ const toDonateUser = (u: AnyUser | null) => {
   };
 };
 
+/** ---------- Need helpers ---------- */
+type NeedBand = "all" | "high" | "medium" | "low";
+type SortBy = "latest" | "need_high" | "need_low";
+
+const needLabel = (score?: number) => {
+  const s = Number(score ?? 0);
+  if (s >= 70) return "High";
+  if (s >= 40) return "Medium";
+  return "Low";
+};
+
+const needPillClass = (score?: number) => {
+  const s = Number(score ?? 0);
+  if (s >= 70) return "bg-rose-50 text-rose-700 border-rose-200";
+  if (s >= 40) return "bg-amber-50 text-amber-700 border-amber-200";
+  return "bg-emerald-50 text-emerald-700 border-emerald-200";
+};
+
 const Projects: React.FC<ProjectsProps> = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -153,6 +178,11 @@ const Projects: React.FC<ProjectsProps> = () => {
   const [totalProjects, setTotalProjects] = useState(0);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
+
+  // ✅ NEW: need filter + sort
+  const [needBand, setNeedBand] = useState<NeedBand>("all");
+  const [sortBy, setSortBy] = useState<SortBy>("latest");
+
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -162,7 +192,7 @@ const Projects: React.FC<ProjectsProps> = () => {
 
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  // const [ setSelectedId] = useState<number | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailErr, setDetailErr] = useState<string | null>(null);
   const [detail, setDetail] = useState<ProjectDetail | null>(null);
@@ -185,9 +215,13 @@ const Projects: React.FC<ProjectsProps> = () => {
   // ✅ Load current user
   const [currentUser, setCurrentUser] = useState<AnyUser | null>(() => readUser());
   useEffect(() => {
-    const onStorage = () => setCurrentUser(readUser());
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    const sync = () => setCurrentUser(readUser());
+    window.addEventListener("storage", sync);
+    window.addEventListener("auth:changed", sync as any);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("auth:changed", sync as any);
+    };
   }, []);
 
   const isDonor = getRole(currentUser) === "donor";
@@ -203,16 +237,13 @@ const Projects: React.FC<ProjectsProps> = () => {
     const p = new URLSearchParams(location.search);
     const flag = p.get("donation");
     if (flag === "success" && sessionId) {
-      // close drawer + donate modal
       setDonateOpen(false);
       setDonateRequestId(null);
       closeDrawer();
       setSuccessOpen(true);
     }
     if (flag === "cancel") {
-      // optional: show toast
       showToast("Payment cancelled.");
-      // clean URL
       navigate("/projects", { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -220,23 +251,17 @@ const Projects: React.FC<ProjectsProps> = () => {
 
   // ✅ Put this ABOVE donateGuard (important)
   const openDonorLoginModal = (redirectTo?: string) => {
-    // close project drawer first
     closeDrawer();
     setDonateOpen(false);
     setDonateRequestId(null);
 
     if (redirectTo) sessionStorage.setItem("afterLoginRedirect", redirectTo);
 
-    window.dispatchEvent(
-      new CustomEvent("openLoginModal", {
-        detail: { redirectTo },
-      })
-    );
+    window.dispatchEvent(new CustomEvent("openLoginModal", { detail: { redirectTo } }));
   };
 
-  // ✅ Donate button guard (now opens modal, not navigate)
+  // ✅ Donate button guard
   const donateGuard = (requestId: number) => {
-    // After login, return to projects and open donate modal for this request
     const redirectTo = `/projects?openDonate=${requestId}`;
 
     if (!currentUser) {
@@ -250,7 +275,6 @@ const Projects: React.FC<ProjectsProps> = () => {
       return;
     }
 
-    // ✅ open donate modal
     closeDrawer();
     setDonateRequestId(requestId);
     setDonateOpen(true);
@@ -266,7 +290,6 @@ const Projects: React.FC<ProjectsProps> = () => {
         setDonateRequestId(id);
         setDonateOpen(true);
       }
-      // clean URL so modal not reopen on refresh
       navigate("/projects", { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -290,7 +313,14 @@ const Projects: React.FC<ProjectsProps> = () => {
       setErrorMsg(null);
 
       const response = await axios.get(API_URL, {
-        params: { search: debouncedSearch, category, page, limit: projectsPerPage },
+        params: {
+          search: debouncedSearch,
+          category,
+          needBand, // ✅ NEW
+          sortBy, // ✅ NEW
+          page,
+          limit: projectsPerPage,
+        },
       });
 
       const list = response.data?.projects || [];
@@ -309,20 +339,11 @@ const Projects: React.FC<ProjectsProps> = () => {
       setLoading(false);
     }
   };
-  useEffect(() => {
-  const sync = () => setCurrentUser(readUser());
-  window.addEventListener("storage", sync);
-  window.addEventListener("auth:changed", sync as any);
-  return () => {
-    window.removeEventListener("storage", sync);
-    window.removeEventListener("auth:changed", sync as any);
-  };
-}, []);
 
   useEffect(() => {
     fetchProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, category, page]);
+  }, [debouncedSearch, category, needBand, sortBy, page]);
 
   // ESC close drawer
   useEffect(() => {
@@ -342,11 +363,21 @@ const Projects: React.FC<ProjectsProps> = () => {
     setPage(1);
   };
 
+  const onPickNeed = (b: NeedBand) => {
+    setNeedBand(b);
+    setPage(1);
+  };
+
+  const onPickSort = (s: SortBy) => {
+    setSortBy(s);
+    setPage(1);
+  };
+
   const start = totalProjects === 0 ? 0 : (page - 1) * projectsPerPage + 1;
   const end = Math.min(page * projectsPerPage, totalProjects);
 
   const openDrawer = async (id: number) => {
-    setSelectedId(id);
+    // setSelectedId(id);
     setDrawerOpen(true);
     setDetail(null);
     setDetailErr(null);
@@ -365,20 +396,19 @@ const Projects: React.FC<ProjectsProps> = () => {
 
   const closeDrawer = () => {
     setDrawerOpen(false);
-    setSelectedId(null);
+    // setSelectedId(null);
     setDetail(null);
     setDetailErr(null);
     setDetailLoading(false);
   };
 
-  const detailImg = detail?.image_url ? toAbsoluteUrl(detail.image_url) : selectedId ? FALLBACK_IMG : FALLBACK_IMG;
+  const detailImg = detail?.image_url ? toAbsoluteUrl(detail.image_url) : FALLBACK_IMG;
 
   const school = detail?.school;
   const schoolAddress = [school?.address, school?.district, school?.province].filter(Boolean).join(", ");
 
   const closeSuccessModal = () => {
     setSuccessOpen(false);
-    // ✅ remove query params
     navigate("/projects", { replace: true });
   };
 
@@ -429,12 +459,22 @@ const Projects: React.FC<ProjectsProps> = () => {
                 search quickly, and track funding progress in real time.
               </p>
 
+              {/* Search */}
               <div className="mt-6">
                 <div className="relative">
                   <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                      <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" strokeWidth="2" />
-                      <path d="M16.2 16.2 21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <path
+                        d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                      <path
+                        d="M16.2 16.2 21 21"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
                     </svg>
                   </span>
                   <input
@@ -446,6 +486,38 @@ const Projects: React.FC<ProjectsProps> = () => {
                     placeholder="Search by keyword, school name, or location…"
                     className="w-full rounded-2xl border border-slate-200 bg-white px-12 py-3.5 text-sm text-slate-900 shadow-sm outline-none placeholder:text-slate-400 focus:border-rose-300 focus:ring-4 focus:ring-rose-200/50"
                   />
+                </div>
+              </div>
+
+              {/* ✅ NEW: Need + Sort controls */}
+              <div className="mt-4 flex flex-wrap gap-3">
+                <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                  <FunnelIcon className="h-4 w-4 text-slate-500" />
+                  <span className="text-xs font-bold text-slate-600">Need</span>
+                  <select
+                    value={needBand}
+                    onChange={(e) => onPickNeed(e.target.value as NeedBand)}
+                    className="bg-transparent text-sm font-extrabold text-slate-900 outline-none"
+                  >
+                    <option value="all">All</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+
+                <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                  <ArrowsUpDownIcon className="h-4 w-4 text-slate-500" />
+                  <span className="text-xs font-bold text-slate-600">Sort</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => onPickSort(e.target.value as SortBy)}
+                    className="bg-transparent text-sm font-extrabold text-slate-900 outline-none"
+                  >
+                    <option value="latest">Latest</option>
+                    <option value="need_high">Need (High → Low)</option>
+                    <option value="need_low">Need (Low → High)</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -539,6 +611,8 @@ const Projects: React.FC<ProjectsProps> = () => {
             {projects.map((proj) => {
               const percent = clampPercent(proj.amount_raised, proj.estimated_price);
               const img = proj.image_url ? toAbsoluteUrl(proj.image_url) : FALLBACK_IMG;
+              const nLabel = needLabel(proj.need_score);
+              const nCls = needPillClass(proj.need_score);
 
               return (
                 <div
@@ -573,16 +647,25 @@ const Projects: React.FC<ProjectsProps> = () => {
                         <p className="mt-1 text-sm text-slate-600 truncate">{proj.school_name}</p>
                       </div>
 
-                      <span
-                        className={cx(
-                          "rounded-full px-3 py-1 text-xs font-extrabold border",
-                          String(proj.status).toLowerCase().includes("approved")
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : "bg-amber-50 text-amber-700 border-amber-200"
-                        )}
-                      >
-                        {proj.status}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {/* ✅ Need badge */}
+                        <span className={cx("rounded-full px-3 py-1 text-xs font-extrabold border", nCls)}>
+                          Need: {nLabel}{" "}
+                          <span className="opacity-70">({Math.round(Number(proj.need_score ?? 0))})</span>
+                        </span>
+
+                        {/* Status */}
+                        <span
+                          className={cx(
+                            "rounded-full px-3 py-1 text-xs font-extrabold border",
+                            String(proj.status).toLowerCase().includes("approved")
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                          )}
+                        >
+                          {proj.status}
+                        </span>
+                      </div>
                     </div>
 
                     <p className="mt-3 text-sm text-slate-600 line-clamp-2">{proj.description}</p>
@@ -599,7 +682,10 @@ const Projects: React.FC<ProjectsProps> = () => {
                       </div>
 
                       <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-                        <div className="h-full rounded-full bg-rose-600 transition-[width] duration-500" style={{ width: `${percent}%` }} />
+                        <div
+                          className="h-full rounded-full bg-rose-600 transition-[width] duration-500"
+                          style={{ width: `${percent}%` }}
+                        />
                       </div>
 
                       <div className="mt-2 flex items-center justify-between text-xs">
@@ -610,20 +696,23 @@ const Projects: React.FC<ProjectsProps> = () => {
                       </div>
                     </div>
 
-                    <div className="mt-5 flex flex-wrap items-center gap-3">
+                    <div className="mt-6 flex flex-wrap items-center gap-4">
+                      {/* View Project Button */}
                       <button
                         onClick={() => openDrawer(proj.request_id)}
-                        className="inline-flex items-center justify-center rounded-full bg-rose-600 px-5 py-2.5 text-sm font-black text-white hover:bg-rose-700 shadow-sm"
+                        className="inline-flex items-center gap-2 rounded-full bg-rose-600 px-6 py-3 text-sm font-extrabold text-white shadow-md transition-all duration-300 hover:bg-rose-700 hover:shadow-lg active:scale-95"
                       >
-                        View Project <span className="ml-2">→</span>
+                        View Project
+                        <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                       </button>
 
-                      {/* ✅ Donate directly from card (optional) */}
+                      {/* Donate Button */}
                       <button
                         onClick={() => donateGuard(proj.request_id)}
-                        className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-black text-slate-900 hover:bg-slate-50"
+                        className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-extrabold text-slate-900 shadow-sm transition-all duration-300 hover:border-rose-500 hover:text-rose-600 hover:shadow-md active:scale-95"
                       >
-                        Donate 💖
+                        <HeartIcon className="h-4 w-4 text-rose-500" />
+                        Donate
                       </button>
                     </div>
                   </div>
@@ -684,7 +773,10 @@ const Projects: React.FC<ProjectsProps> = () => {
       <div className={cx("fixed inset-0 z-[90]", drawerOpen ? "pointer-events-auto" : "pointer-events-none")}>
         <div
           onClick={closeDrawer}
-          className={cx("absolute inset-0 bg-slate-900/35 transition-opacity duration-300", drawerOpen ? "opacity-100" : "opacity-0")}
+          className={cx(
+            "absolute inset-0 bg-slate-900/35 transition-opacity duration-300",
+            drawerOpen ? "opacity-100" : "opacity-0"
+          )}
         />
 
         <div
@@ -785,7 +877,7 @@ const Projects: React.FC<ProjectsProps> = () => {
                     <div className="font-bold text-slate-900">{school?.school_name || detail.school_name}</div>
 
                     {schoolAddress ? (
-                      <div className="mt-1 text-slate-600">📍 {schoolAddress}</div>
+                      <div className="mt-1 text-slate-600">{schoolAddress}</div>
                     ) : (
                       <div className="mt-1 text-slate-400">No address</div>
                     )}
@@ -799,6 +891,13 @@ const Projects: React.FC<ProjectsProps> = () => {
                         <span className="text-slate-500">Phone</span>
                         <span className="font-semibold text-slate-900">{school?.contact_phone || "—"}</span>
                       </div>
+                      {/* Optional: show need score if backend includes it in detail.school */}
+                      {school?.need_score != null && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Need score</span>
+                          <span className="font-semibold text-slate-900">{Math.round(Number(school.need_score))}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -808,7 +907,7 @@ const Projects: React.FC<ProjectsProps> = () => {
                     onClick={() => donateGuard(detail.request_id)}
                     className="inline-flex flex-1 items-center justify-center rounded-full bg-rose-600 px-5 py-3 text-sm font-black text-white hover:bg-rose-700 shadow-sm"
                   >
-                    Donate Now 💖
+                    Donate Now
                   </button>
 
                   {detail.document_url ? (

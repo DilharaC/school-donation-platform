@@ -9,19 +9,20 @@ class Donation extends Model
     protected $primaryKey = 'donation_id';
 
     protected $fillable = [
-        'request_id',
-        'donor_id',
-        'amount',
-        'paid_amount',
-        'recurring',
-        'donor_name',
-        'donor_email',
-        'message',
-        'anonymous',
-        'status',
-        'stripe_session_id',
-        'paid_at',
-    ];
+  'request_id',
+  'school_id',
+  'donation_type',
+  'donor_id',
+  'amount',
+  'message',
+  'recurring',
+  'anonymous',
+  'donor_name',
+  'donor_email',
+  'status',
+  'stripe_session_id',
+  'paid_at',
+];
 
     public function donor()
     {

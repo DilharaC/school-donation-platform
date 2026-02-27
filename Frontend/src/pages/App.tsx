@@ -25,7 +25,11 @@ import Donors from "../pages/adminpages/Donors";
 import Analytics from "../pages/adminpages/analytics";
 import Schools from "../pages/adminpages/schools";
 import SchoolLayout from "../schooldashboardcomponents/SchoolLayout";
-
+import DonorOverview from "./DonorOverview";
+import DonorLayout from "../donorcomponents/donorLayout";
+import MyDonations from "../pages/donorpages/mydonations";
+import DonorSettings from "../pages/donorpages/settings";
+import DonorSchools from "../pages/donorpages/schools";
 
 
 interface User {
@@ -95,6 +99,17 @@ const App: React.FC = () => {
     {/* <Route path="notifications" element={<SchoolNotifications />} /> */}
     <Route path="settings" element={<SchoolSettings />} />
   </Route>
+
+
+  <Route path="/donor" element={<DonorLayout />}>
+  <Route index element={<DonorOverview />} />
+  <Route path="overview" element={<DonorOverview />} />
+  <Route path="mydonations" element={<MyDonations />} />
+  <Route path="schools" element={<DonorSchools/>} />
+  <Route path="settings" element={<DonorSettings />} />
+
+  {/* other routes */}
+</Route>
 
       {/* All other pages wrapped in Layout */}
       <Route

@@ -16,63 +16,63 @@ class DonationController extends Controller
     /**
      * Create a donation and redirect to Stripe checkout
      */
-    public function createDonation(Request $request)
-    {
-        $request->validate([
-            'request_id' => 'required|integer',
-            'amount' => 'required|numeric|min:1',
-            'message' => 'nullable|string',
-            'recurring' => 'nullable|string',
-            'anonymous' => 'boolean',
-        ]);
+   public function createDonation(Request $request)
+{
+    $request->validate([
+        'request_id' => 'required|integer',
+        'amount' => 'required|numeric|min:1',
+        'message' => 'nullable|string',
+        'recurring' => 'nullable|string',
+        'anonymous' => 'boolean',
+    ]);
 
-        $user = Auth::user();
-        if (!$user) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
-        }
+    $user = Auth::user();
+    if (!$user) return response()->json(['message' => 'Unauthenticated'], 401);
 
-        // Determine donor ID and name
-        $donorId = $user->donor_id ?? $user->id ?? null;
-        $donorName = $user->full_name ?? $user->school_name ?? 'Anonymous';
+    $donorId = $user->donor_id ?? $user->id ?? null;
+    $donorName = $user->full_name ?? $user->school_name ?? 'Anonymous';
 
-        // Create donation in DB
-        $donation = Donation::create([
-            'request_id' => $request->request_id,
-            'donor_id' => $donorId,
-            'amount' => $request->amount,
-            'message' => $request->message ?? null,
-            'recurring' => $request->recurring ?? 'none',
-            'anonymous' => $request->anonymous ?? 0,
-            'donor_name' => $donorName,
-            'donor_email' => $user->email,
-            'status' => 'pending', // default pending until Stripe confirms
-        ]);
+    // ✅ find school_id of this request
+    $req = DonationRequest::where('request_id', (int)$request->request_id)->first();
+    if (!$req) return response()->json(['message' => 'Request not found'], 404);
 
-        // Stripe checkout
-        Stripe::setApiKey(env('STRIPE_SECRET'));
-        $session = StripeSession::create([
-            'payment_method_types' => ['card'],
-            'customer_email' => $user->email,
-            'line_items' => [[
-                'price_data' => [
-                    'currency' => 'usd',
-                    'product_data' => ['name' => 'Donation to Request #' . $donation->request_id],
-                    'unit_amount' => $donation->amount * 100,
-                ],
-                'quantity' => 1,
-            ]],
-            'mode' => 'payment',
-            'success_url' => env('FRONTEND_URL') . '/projects?donation=success&session_id={CHECKOUT_SESSION_ID}',
-'cancel_url'  => env('FRONTEND_URL') . '/projects?donation=cancel',
-            'metadata' => ['donation_id' => $donation->donation_id],
-        ]);
+    $donation = Donation::create([
+        'request_id' => (int)$request->request_id,
+        'school_id'  => (int)$req->school_id,      // ✅ IMPORTANT
+        'donation_type' => 'campaign',
+        'donor_id' => $donorId,
+        'amount' => (float)$request->amount,
+        'message' => $request->message ?? null,
+        'recurring' => $request->recurring ?? 'none',
+        'anonymous' => $request->anonymous ?? 0,
+        'donor_name' => $donorName,
+        'donor_email' => $user->email,
+        'status' => 'pending',
+    ]);
 
-        // Save Stripe session ID
-        $donation->update(['stripe_session_id' => $session->id]);
+    Stripe::setApiKey(env('STRIPE_SECRET'));
 
-        return response()->json(['checkout_url' => $session->url]);
-    }
+    $session = StripeSession::create([
+        'payment_method_types' => ['card'],
+        'customer_email' => $user->email,
+        'line_items' => [[
+            'price_data' => [
+                'currency' => 'lkr',
+                'product_data' => ['name' => 'Donation to Request #' . $donation->request_id],
+                'unit_amount' => (int) round($donation->amount * 100),
+            ],
+            'quantity' => 1,
+        ]],
+        'mode' => 'payment',
+        'success_url' => env('FRONTEND_URL') . '/projects?donation=success&session_id={CHECKOUT_SESSION_ID}',
+        'cancel_url'  => env('FRONTEND_URL') . '/projects?donation=cancel',
+        'metadata' => ['donation_id' => $donation->donation_id],
+    ]);
 
+    $donation->update(['stripe_session_id' => $session->id]);
+
+    return response()->json(['checkout_url' => $session->url]);
+}
     /**
      * Verify Stripe session and update donation & donation request
      */
@@ -94,7 +94,6 @@ public function verifySession(Request $request)
 
         return DB::transaction(function () use ($sessionId) {
 
-            // 🔒 lock row to prevent double processing
             $donation = Donation::where('stripe_session_id', $sessionId)
                 ->lockForUpdate()
                 ->first();
@@ -103,19 +102,53 @@ public function verifySession(Request $request)
                 return response()->json(['status' => 'donation_not_found'], 404);
             }
 
-            // ✅ If already processed, DO NOTHING
-            if (strtolower($donation->status) === 'paid') {
+            if (strtolower((string)$donation->status) === 'paid') {
                 return response()->json(['status' => 'already_paid']);
             }
 
-            // mark as paid
-            $donation->update(['status' => 'paid']);
+            // ✅ mark paid
+            $donation->update([
+                'status'  => 'paid',
+                'paid_at' => now(),
+            ]);
 
-            // ✅ safe increment (no read + write race)
-            DonationRequest::where('request_id', $donation->request_id)
-                ->increment('amount_raised', (float)$donation->amount);
+            // ✅ ensure we have school_id
+            $schoolId = $donation->school_id;
 
-            return response()->json(['status' => 'success']);
+            // If campaign donation but school_id was not saved (old rows), derive from request
+            if (!$schoolId && !empty($donation->request_id)) {
+                $schoolId = (int) DB::table('donation_requests')
+                    ->where('request_id', (int)$donation->request_id)
+                    ->value('school_id');
+
+                if ($schoolId) {
+                    $donation->update(['school_id' => $schoolId]); // optional backfill
+                }
+            }
+
+            if (!$schoolId) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'school_id missing (cannot credit fund)'
+                ], 500);
+            }
+
+            // ✅ 1) if has request -> update request raised
+            if (!empty($donation->request_id)) {
+                DonationRequest::where('request_id', (int)$donation->request_id)
+                    ->increment('amount_raised', (float)$donation->amount);
+            }
+
+            // ✅ 2) ALWAYS credit school fund_balance (campaign + school_fund)
+            DB::table('schools')
+                ->where('school_id', (int)$schoolId)
+                ->increment('fund_balance', (float)$donation->amount);
+
+            return response()->json([
+                'status' => 'success',
+                'school_id' => (int)$schoolId,
+                'request_id' => $donation->request_id,
+            ]);
         });
 
     } catch (\Exception $e) {
@@ -696,4 +729,308 @@ public function schoolTopDonors(Request $request)
         'top_donors' => $rows
     ]);
 }
+
+
+
+public function donorOverview(Request $request)
+{
+    $user = Auth::user();
+    if (!$user) return response()->json(['message' => 'Unauthenticated'], 401);
+
+    $donorId = $user->donor_id ?? $user->id ?? null;
+    if (!$donorId) return response()->json(['message' => 'Donor not found'], 404);
+
+    // KPI summary (paid only)
+    $base = DB::table('donations')
+        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
+        ->where('donations.donor_id', $donorId)
+        ->whereRaw("LOWER(donations.status)='paid'");
+
+    $totalDonated = (clone $base)->sum('donations.amount');
+    $donationsCount = (clone $base)->count();
+    $schoolsSupported = (clone $base)->distinct('schools.school_id')->count('schools.school_id');
+    $lastDonationAt = (clone $base)->max('donations.created_at');
+
+    // Trend last 30 days
+    $from = Carbon::now()->subDays(29)->startOfDay();
+    $to   = Carbon::now()->endOfDay();
+
+    $rows = DB::table('donations')
+        ->where('donor_id', $donorId)
+        ->whereBetween('created_at', [$from, $to])
+        ->whereRaw("LOWER(status)='paid'")
+        ->selectRaw("DATE(created_at) as day, SUM(amount) as total")
+        ->groupBy('day')
+        ->orderBy('day')
+        ->get();
+
+    $map = $rows->pluck('total', 'day');
+
+    $trend = [];
+    $cursor = $from->copy();
+    while ($cursor <= $to) {
+        $d = $cursor->toDateString();
+        $trend[] = [
+            'day' => $d,
+            'total' => (float) ($map[$d] ?? 0),
+        ];
+        $cursor->addDay();
+    }
+
+    // Recent donations
+    $recent = DB::table('donations')
+        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
+        ->where('donations.donor_id', $donorId)
+        ->whereRaw("LOWER(donations.status)='paid'")
+        ->orderByDesc('donations.created_at')
+        ->limit(8)
+        ->get([
+            'donations.donation_id',
+            'donations.amount',
+            'donations.created_at',
+            'donation_requests.request_id',
+            'donation_requests.request_title',
+            'schools.school_id',
+            'schools.school_name',
+            'schools.province',
+            'schools.district',
+        ]);
+
+    $recent->transform(function ($d) {
+        $d->time = $d->created_at ? Carbon::parse($d->created_at)->diffForHumans() : null;
+        return $d;
+    });
+
+    // Top schools supported
+    $topSchools = DB::table('donations')
+        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
+        ->where('donations.donor_id', $donorId)
+        ->whereRaw("LOWER(donations.status)='paid'")
+        ->selectRaw("
+            schools.school_id,
+            schools.school_name,
+            schools.province,
+            schools.district,
+            COALESCE(SUM(donations.amount),0) as total,
+            COUNT(donations.donation_id) as count
+        ")
+        ->groupBy('schools.school_id','schools.school_name','schools.province','schools.district')
+        ->orderByDesc('total')
+        ->limit(5)
+        ->get();
+
+    return response()->json([
+        'donor' => [
+            'donor_id' => $donorId,
+            'name' => $user->full_name ?? $user->name ?? 'Donor',
+            'email' => $user->email ?? null,
+        ],
+        'kpis' => [
+            'total_donated' => (float) $totalDonated,
+            'donations_count' => (int) $donationsCount,
+            'schools_supported' => (int) $schoolsSupported,
+            'last_donation_at' => $lastDonationAt,
+        ],
+        'trend_30d' => $trend,
+        'recent_donations' => $recent,
+        'top_schools' => $topSchools,
+    ]);
+}
+
+
+public function myDonations(Request $request)
+{
+    $user = Auth::user();
+    if (!$user) return response()->json(['message' => 'Unauthenticated'], 401);
+
+    $donorId = $user->donor_id ?? $user->id ?? null;
+    if (!$donorId) return response()->json(['message' => 'Donor not found'], 404);
+
+    $status  = strtolower($request->query('status', 'paid')); // paid|pending|all
+    $search  = trim($request->query('search', ''));
+    $page    = max(1, (int)$request->query('page', 1));
+    $limit   = max(1, min(50, (int)$request->query('limit', 10)));
+
+    $dateFrom = $request->query('dateFrom', null);
+    $dateTo   = $request->query('dateTo', null);
+
+    $sortBy  = $request->query('sortBy', 'created_at'); // created_at|amount
+    $sortDir = strtolower($request->query('sortDir', 'desc')) === 'asc' ? 'asc' : 'desc';
+    $allowedSort = ['created_at', 'amount'];
+    if (!in_array($sortBy, $allowedSort)) $sortBy = 'created_at';
+
+    $q = DB::table('donations')
+        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
+        ->where('donations.donor_id', $donorId)
+        ->select(
+            'donations.donation_id',
+            'donations.request_id',
+            'donations.amount',
+            'donations.status',
+            'donations.created_at',
+            'donation_requests.request_title',
+            'donation_requests.school_id',
+            'schools.school_name',
+            'schools.district',
+            'schools.province'
+        );
+
+    if ($status !== 'all') {
+        $q->whereRaw('LOWER(donations.status) = ?', [$status]);
+    }
+
+    if ($dateFrom) $q->where('donations.created_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+    if ($dateTo)   $q->where('donations.created_at', '<=', Carbon::parse($dateTo)->endOfDay());
+
+    if ($search !== '') {
+        $q->where(function ($qq) use ($search) {
+            $qq->where('donation_requests.request_title', 'like', "%{$search}%")
+               ->orWhere('schools.school_name', 'like', "%{$search}%")
+               ->orWhere('schools.province', 'like', "%{$search}%")
+               ->orWhere('schools.district', 'like', "%{$search}%");
+        });
+    }
+
+    $total = (clone $q)->count();
+
+    $q->orderBy("donations.$sortBy", $sortDir);
+
+    $rows = $q->skip(($page - 1) * $limit)->take($limit)->get();
+
+    $rows->transform(function ($r) {
+        $r->status = strtolower($r->status ?? 'pending');
+        $r->amount = (float)($r->amount ?? 0);
+        $r->time = $r->created_at ? Carbon::parse($r->created_at)->diffForHumans() : null;
+        return $r;
+    });
+
+    return response()->json([
+        'donations' => $rows,
+        'total' => $total,
+        'page' => $page,
+        'limit' => $limit,
+    ]);
+}
+public function receipt($id)
+{
+    $user = Auth::user();
+    if (!$user) {
+        return response()->json(['message' => 'Unauthenticated'], 401);
+    }
+
+    $donorId = $user->donor_id ?? $user->id ?? null;
+
+    $donation = DB::table('donations')
+        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
+        ->where('donations.donation_id', $id)
+        ->where('donations.donor_id', $donorId) // 🔒 important security
+        ->select(
+            'donations.donation_id',
+            'donations.amount',
+            'donations.status',
+            'donations.created_at',
+            'donation_requests.request_title',
+            'donation_requests.request_id',
+            'schools.school_name',
+            'schools.district',
+            'schools.province'
+        )
+        ->first();
+
+    if (!$donation) {
+        return response()->json(['message' => 'Receipt not found'], 404);
+    }
+
+    return response()->json([
+        'receipt' => $donation
+    ]);
+}
+
+
+
+   public function createSchoolDonation(Request $request, $schoolId)
+{
+    $request->validate([
+        'amount' => 'required|numeric|min:1',
+        'message' => 'nullable|string',
+        'recurring' => 'nullable|string',
+        'anonymous' => 'boolean',
+    ]);
+
+    $user = Auth::user();
+    if (!$user) return response()->json(['message' => 'Unauthenticated'], 401);
+
+    $school = DB::table('schools')->where('school_id', (int)$schoolId)->first();
+    if (!$school) return response()->json(['message' => 'School not found'], 404);
+
+    // ✅ pick best existing request ONLY (do not create)
+    $best = DB::table('donation_requests')
+        ->where('school_id', (int)$schoolId)
+        ->where('status', 'Approved')
+        ->whereColumn('amount_raised', '<', 'estimated_price')
+        ->orderByRaw('(estimated_price - amount_raised) DESC')
+        ->orderByDesc('created_at')
+        ->first();
+
+    $donorId = $user->donor_id ?? $user->id ?? null;
+    $donorName = $user->full_name ?? $user->name ?? 'Anonymous';
+
+   $donation = Donation::create([
+    'request_id' => $best ? (int)$best->request_id : null,
+    'school_id'  => (int)$schoolId,
+    'donation_type' => $best ? 'campaign' : 'school_fund', // ✅ FIX
+    'donor_id' => $donorId,
+    'amount' => (float)$request->amount,
+    'message' => $request->message ?? null,
+    'recurring' => $request->recurring ?? 'none',
+    'anonymous' => $request->anonymous ?? 0,
+    'donor_name' => $donorName,
+    'donor_email' => $user->email,
+    'status' => 'pending',
+]);
+
+    Stripe::setApiKey(env('STRIPE_SECRET'));
+
+    $desc = $best
+        ? "Supports request: {$best->request_title}"
+        : "Supports school fund (no active requests)";
+
+    $session = StripeSession::create([
+        'payment_method_types' => ['card'],
+        'customer_email' => $user->email,
+        'line_items' => [[
+            'price_data' => [
+                'currency' => 'lkr',
+                'product_data' => [
+                    'name' => "Donation to {$school->school_name}",
+                    'description' => $desc,
+                ],
+                'unit_amount' => (int) round(((float)$donation->amount) * 100),
+            ],
+            'quantity' => 1,
+        ]],
+        'mode' => 'payment',
+        'success_url' => env('FRONTEND_URL') . '/donor/schools?donation=success&session_id={CHECKOUT_SESSION_ID}',
+        'cancel_url'  => env('FRONTEND_URL') . '/donor/schools?donation=cancel',
+        'metadata' => [
+            'donation_id' => (string)$donation->donation_id,
+        ],
+    ]);
+
+    $donation->update(['stripe_session_id' => $session->id]);
+
+    return response()->json([
+        'checkout_url' => $session->url,
+        'request_id_used' => $best ? (int)$best->request_id : null,
+        'mode' => $best ? 'request' : 'school_fund',
+    ]);
+}
+
+
+
 }

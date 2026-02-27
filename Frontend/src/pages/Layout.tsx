@@ -25,7 +25,7 @@ const Layout: React.FC<LayoutProps> = ({ currentUser, setCurrentUser }) => {
   const headerRef = useRef<HTMLElement>(null);
   const navigate = useNavigate();
 
-  const DashboardLink = currentUser?.userType === "donor" ? "/donor-dashboard" : "/school/schooloverview";
+  const DashboardLink = currentUser?.userType === "donor" ? "/donor " : "/school/schooloverview";
 
   const primaryCta = useMemo(() => {
     if (!currentUser) return { to: "/support-school", label: "Support a School" };

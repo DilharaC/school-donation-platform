@@ -10,87 +10,110 @@ use Illuminate\Support\Facades\Auth;
 
 class DonationRequestController extends Controller
 {
-    // Fetch projects (with pagination/search/filter)
-    public function index(Request $request)
-    {
-        $search   = trim($request->query('search', ''));
-        $category = $request->query('category', 'All');
-        $status   = $request->query('status', null);
-        $page     = max(1, (int) $request->query('page', 1));
-        $limit    = max(1, min(50, (int) $request->query('limit', 6)));
+public function index(Request $request)
+{
+    $search   = trim($request->query('search', ''));
+    $category = $request->query('category', 'All');
+    $status   = $request->query('status', null);
+    $page     = max(1, (int) $request->query('page', 1));
+    $limit    = max(1, min(50, (int) $request->query('limit', 6)));
 
-        $query = DonationRequest::with('school');
+    // ✅ NEW
+    $needBand = $request->query('needBand', 'all'); // all|high|medium|low
+    $sortBy   = $request->query('sortBy', 'latest'); // latest|need_high|need_low
 
-        if ($search !== '') {
-            $query->where(function ($q) use ($search) {
-                $q->where('request_title', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhereHas('school', function ($q2) use ($search) {
-                      $q2->where('school_name', 'like', "%{$search}%");
-                  });
-            });
-        }
+    $query = DonationRequest::with('school');
 
-        if ($category && $category !== 'All') {
-            $query->where('category', $category);
-        }
-
-        if ($status) {
-            $query->where('status', $status);
-        }
-
-        // ✅ IMPORTANT: do NOT put orderBy before summary (summary must be clean)
-        // ✅ Summary for ALL filtered rows (not just current page)
-        $summary = (clone $query)->reorder()->selectRaw('
-            COUNT(*) as total_requests,
-            SUM(CASE WHEN status = "Approved" THEN 1 ELSE 0 END) as approved_count,
-            SUM(CASE WHEN status = "Pending" THEN 1 ELSE 0 END) as pending_count,
-            COALESCE(SUM(amount_raised),0) as total_raised,
-            COALESCE(SUM(estimated_price),0) as total_target
-        ')->first();
-
-        // ✅ Latest first (ONLY for list)
-        $query->orderBy('created_at', 'desc');
-
-        // pagination
-        $total = (clone $query)->count();
-
-        $projects = (clone $query)
-            ->skip(($page - 1) * $limit)
-            ->take($limit)
-            ->get()
-            ->map(function ($project) {
-                return [
-                    'request_id' => $project->request_id,
-                    'school_id' => $project->school_id,
-                    'school_name' => $project->school->school_name ?? 'Unknown School',
-                    'request_title' => $project->request_title,
-                    'category' => $project->category,
-                    'quantity' => (int)$project->quantity,
-                    'estimated_price' => (float)$project->estimated_price,
-                    'amount_raised' => (float)$project->amount_raised,
-                    'description' => $project->description,
-                    'image_url' => $project->image_url,
-                    'document_url' => $project->document_url,
-                    'status' => $project->status,
-                    'created_at' => $project->created_at,
-                    'updated_at' => $project->updated_at,
-                ];
-            });
-
-        return response()->json([
-            'projects' => $projects,
-            'total' => $total,
-            'summary' => [
-                'total_requests' => (int) ($summary->total_requests ?? 0),
-                'approved_count' => (int) ($summary->approved_count ?? 0),
-                'pending_count' => (int) ($summary->pending_count ?? 0),
-                'total_raised' => (float) ($summary->total_raised ?? 0),
-                'total_target' => (float) ($summary->total_target ?? 0),
-            ],
-        ]);
+    if ($search !== '') {
+        $query->where(function ($q) use ($search) {
+            $q->where('request_title', 'like', "%{$search}%")
+              ->orWhere('description', 'like', "%{$search}%")
+              ->orWhereHas('school', function ($q2) use ($search) {
+                  $q2->where('school_name', 'like', "%{$search}%");
+              });
+        });
     }
 
+    if ($category && $category !== 'All') {
+        $query->where('category', $category);
+    }
+
+    if ($status) {
+        $query->where('status', $status);
+    }
+
+    // ✅ NEW: Need band filter (uses related school.need_score)
+    if ($needBand === 'high') {
+        $query->whereHas('school', fn ($q) => $q->where('need_score', '>=', 70));
+    } elseif ($needBand === 'medium') {
+        $query->whereHas('school', fn ($q) => $q->whereBetween('need_score', [40, 69.9999]));
+    } elseif ($needBand === 'low') {
+        $query->whereHas('school', fn ($q) => $q->where('need_score', '<', 40));
+    }
+
+    // ✅ Summary for ALL filtered rows (not just current page)
+    $summary = (clone $query)->reorder()->selectRaw('
+        COUNT(*) as total_requests,
+        SUM(CASE WHEN status = "Approved" THEN 1 ELSE 0 END) as approved_count,
+        SUM(CASE WHEN status = "Pending" THEN 1 ELSE 0 END) as pending_count,
+        COALESCE(SUM(amount_raised),0) as total_raised,
+        COALESCE(SUM(estimated_price),0) as total_target
+    ')->first();
+
+    // ✅ Sorting
+    if ($sortBy === 'need_high' || $sortBy === 'need_low') {
+        // Join schools ONLY for ordering (safe)
+        $dir = $sortBy === 'need_high' ? 'desc' : 'asc';
+        $query->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
+              ->select('donation_requests.*') // important
+              ->orderBy('schools.need_score', $dir)
+              ->orderBy('donation_requests.created_at', 'desc'); // tie-breaker
+    } else {
+        // latest
+        $query->orderBy('created_at', 'desc');
+    }
+
+    $total = (clone $query)->count();
+
+    $projects = (clone $query)
+        ->skip(($page - 1) * $limit)
+        ->take($limit)
+        ->get()
+        ->map(function ($project) {
+            return [
+                'request_id' => $project->request_id,
+                'school_id' => $project->school_id,
+                'school_name' => $project->school->school_name ?? 'Unknown School',
+
+                // ✅ NEW
+                'need_score' => (float) ($project->school->need_score ?? 0),
+
+                'request_title' => $project->request_title,
+                'category' => $project->category,
+                'quantity' => (int)$project->quantity,
+                'estimated_price' => (float)$project->estimated_price,
+                'amount_raised' => (float)$project->amount_raised,
+                'description' => $project->description,
+                'image_url' => $project->image_url,
+                'document_url' => $project->document_url,
+                'status' => $project->status,
+                'created_at' => $project->created_at,
+                'updated_at' => $project->updated_at,
+            ];
+        });
+
+    return response()->json([
+        'projects' => $projects,
+        'total' => $total,
+        'summary' => [
+            'total_requests' => (int) ($summary->total_requests ?? 0),
+            'approved_count' => (int) ($summary->approved_count ?? 0),
+            'pending_count' => (int) ($summary->pending_count ?? 0),
+            'total_raised' => (float) ($summary->total_raised ?? 0),
+            'total_target' => (float) ($summary->total_target ?? 0),
+        ],
+    ]);
+}
    // ✅ GET single campaign detail (for View Drawer)
 public function show($id)
 {
