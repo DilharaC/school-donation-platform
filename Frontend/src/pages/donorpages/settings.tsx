@@ -8,7 +8,7 @@ const ME = `${API_BASE}/donor/me`; // GET
 const UPDATE_ME = `${API_BASE}/donor/me`; // POST (or PUT)
 const CHANGE_PASSWORD = `${API_BASE}/donor/security/change-password`; // POST
 const EXPORT_DONATIONS = `${API_BASE}/donor/exports/donations`; // GET blob
-const DEACTIVATE = `${API_BASE}/donor/deactivate`; // POST
+
 
 type Donor = {
   donor_id: number;

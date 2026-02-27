@@ -192,7 +192,7 @@ const Projects: React.FC<ProjectsProps> = () => {
 
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [ setSelectedId] = useState<number | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailErr, setDetailErr] = useState<string | null>(null);
   const [detail, setDetail] = useState<ProjectDetail | null>(null);
@@ -377,7 +377,7 @@ const Projects: React.FC<ProjectsProps> = () => {
   const end = Math.min(page * projectsPerPage, totalProjects);
 
   const openDrawer = async (id: number) => {
-    setSelectedId(id);
+    // setSelectedId(id);
     setDrawerOpen(true);
     setDetail(null);
     setDetailErr(null);
@@ -396,7 +396,7 @@ const Projects: React.FC<ProjectsProps> = () => {
 
   const closeDrawer = () => {
     setDrawerOpen(false);
-    setSelectedId(null);
+    // setSelectedId(null);
     setDetail(null);
     setDetailErr(null);
     setDetailLoading(false);
