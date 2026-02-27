@@ -192,7 +192,7 @@ const Projects: React.FC<ProjectsProps> = () => {
 
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [ setSelectedId] = useState<number | null>(null);
+  // const [ setSelectedId] = useState<number | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailErr, setDetailErr] = useState<string | null>(null);
   const [detail, setDetail] = useState<ProjectDetail | null>(null);
