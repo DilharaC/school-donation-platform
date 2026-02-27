@@ -1,4 +1,4 @@
-import  { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import axios from "axios";
 import ModalShell from "./ModalShell";
 
@@ -18,13 +18,7 @@ type Props = {
 const API_BASE = "http://localhost:8000";
 const cx = (...s: Array<string | false | null | undefined>) => s.filter(Boolean).join(" ");
 
-const clampMoney = (v: string) => {
-  const cleaned = v.replace(/[^\d.]/g, "");
-  const [a, b] = cleaned.split(".");
-  if (!a) return cleaned.startsWith(".") ? "0." : "";
-  if (b === undefined) return a;
-  return `${a}.${b.slice(0, 2)}`;
-};
+const clampLKR = (v: string) => v.replace(/[^\d]/g, ""); // numbers only
 
 export default function DonateModal({ open, onClose, requestId, currentUser }: Props) {
   const [amount, setAmount] = useState("");
@@ -40,9 +34,14 @@ export default function DonateModal({ open, onClose, requestId, currentUser }: P
     return Number.isFinite(n) ? n : 0;
   }, [amount]);
 
-  const canSubmit = donorOk && !loading && amountNum >= 1;
+  // ✅ LKR minimum
+  const MIN_LKR = 100;
 
-  const quick = [5, 10, 25, 50, 100];
+  // ✅ canSubmit should match LKR minimum
+  const canSubmit = donorOk && !loading && amountNum >= MIN_LKR;
+
+  // ✅ LKR quick amounts
+  const quick = [500, 1000, 2500, 5000, 10000];
 
   const submitDonation = async () => {
     setError("");
@@ -51,8 +50,9 @@ export default function DonateModal({ open, onClose, requestId, currentUser }: P
       setError("Please login as a donor to donate.");
       return;
     }
-    if (!amount || amountNum < 1) {
-      setError("Minimum donation is $1.");
+
+    if (!amount || amountNum < MIN_LKR) {
+      setError(`Minimum donation is LKR ${MIN_LKR}.`);
       return;
     }
 
@@ -62,7 +62,7 @@ export default function DonateModal({ open, onClose, requestId, currentUser }: P
 
       const payload = {
         request_id: requestId,
-        amount: amountNum,
+        amount: amountNum, // ✅ LKR amount
         message: message?.trim() || null,
         recurring: "none",
         anonymous: anonymous ? 1 : 0,
@@ -75,7 +75,7 @@ export default function DonateModal({ open, onClose, requestId, currentUser }: P
       });
 
       if (res.data?.checkout_url) {
-        window.location.href = res.data.checkout_url; // Stripe redirect (required)
+        window.location.href = res.data.checkout_url;
       } else {
         setError("No checkout URL returned.");
       }
@@ -104,17 +104,16 @@ export default function DonateModal({ open, onClose, requestId, currentUser }: P
         "Track donations and receipts",
         "Help classrooms faster",
       ]}
-      // optional like your screenshot (put any asset)
       leftImageUrl="/images/login-kids.png"
       widthClassName="max-w-5xl"
     >
       <div className="space-y-5">
         <div>
           <div className="text-xl font-extrabold text-slate-900">Donate to this project</div>
-          <div className="text-sm text-slate-500 mt-1">Use USD. You’ll be redirected to Stripe checkout.</div>
+          {/* ✅ fix USD text */}
+          <div className="text-sm text-slate-500 mt-1">Use LKR. You’ll be redirected to Stripe checkout.</div>
         </div>
 
-        {/* Logged user pill */}
         {donorOk ? (
           <div className="rounded-2xl bg-emerald-50 border border-emerald-100 px-4 py-3">
             <div className="text-emerald-900 font-bold truncate">
@@ -137,18 +136,22 @@ export default function DonateModal({ open, onClose, requestId, currentUser }: P
 
         {/* Amount */}
         <div>
-          <label className="block text-sm font-extrabold text-slate-900 mb-2">Amount (USD)</label>
+          <label className="block text-sm font-extrabold text-slate-900 mb-2">Amount (LKR)</label>
           <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-extrabold">
+              LKR
+            </span>
+
             <input
-              inputMode="decimal"
+              inputMode="numeric"
               value={amount}
-              onChange={(e) => setAmount(clampMoney(e.target.value))}
-              placeholder="e.g. 25"
+              onChange={(e) => setAmount(clampLKR(e.target.value))}
+              placeholder="e.g. 2500"
               className={cx(
-                "w-full rounded-2xl border px-10 py-3 font-extrabold text-slate-900 outline-none",
+                "w-full rounded-2xl border py-3 font-extrabold text-slate-900 outline-none",
+                "pl-16 pr-4", // ✅ gives space after LKR
                 "focus:ring-4 focus:ring-slate-200",
-                amountNum > 0 && amountNum < 1 ? "border-rose-200" : "border-slate-200"
+                amountNum > 0 && amountNum < MIN_LKR ? "border-rose-200" : "border-slate-200"
               )}
             />
           </div>
@@ -161,7 +164,7 @@ export default function DonateModal({ open, onClose, requestId, currentUser }: P
                 onClick={() => setAmount(String(n))}
                 className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold text-sm hover:bg-slate-50"
               >
-                ${n}
+                LKR {n}
               </button>
             ))}
             <button
@@ -173,7 +176,8 @@ export default function DonateModal({ open, onClose, requestId, currentUser }: P
             </button>
           </div>
 
-          <div className="mt-2 text-xs text-slate-500">Minimum $1</div>
+          {/* ✅ fix minimum label */}
+          <div className="mt-2 text-xs text-slate-500">Minimum LKR {MIN_LKR}</div>
         </div>
 
         {/* Anonymous */}
