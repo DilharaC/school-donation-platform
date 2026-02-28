@@ -1,12 +1,34 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import {
+  ArrowTrendingUpIcon,
+  ArrowTopRightOnSquareIcon,
+  BanknotesIcon,
+  BuildingOffice2Icon,
+  CalendarDaysIcon,
+  ChartBarIcon,
+  ClipboardDocumentListIcon,
+  HeartIcon,
+  MagnifyingGlassIcon,
+  MapPinIcon,
+  ReceiptRefundIcon,
+  Squares2X2Icon,
+  UsersIcon,
+} from "@heroicons/react/24/solid";
 
-const API_BASE = "http://localhost:8000/api";
+const API_ROOT = "http://localhost:8000";
+const API_BASE = `${API_ROOT}/api`;
 
 const cx = (...s: Array<string | false | null | undefined>) => s.filter(Boolean).join(" ");
 const formatLKR = (n: number) => `LKR ${Math.round(Number(n || 0)).toLocaleString()}`;
 const fmtDate = (iso?: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
+
+// const toAbs = (u?: string | null) => {
+//   if (!u) return null;
+//   if (u.startsWith("http://") || u.startsWith("https://")) return u;
+//   return `${API_ROOT}${u.startsWith("/") ? "" : "/"}${u}`;
+// };
 
 type TrendPoint = { day: string; total: number };
 
@@ -45,23 +67,9 @@ type OverviewRes = {
   top_schools: TopSchool[];
 };
 
-type ProjectCard = {
-  request_id: number;
-  school_id: number;
-  school_name: string;
-  need_score: number;
-  request_title: string;
-  category: string;
-  estimated_price: number;
-  amount_raised: number;
-  image_url?: string | null;
-  status: string;
-};
 
-type ProjectsRes = {
-  projects: ProjectCard[];
-};
 
+ 
 function initials(name?: string | null) {
   const s = (name || "").trim();
   if (!s) return "D";
@@ -98,16 +106,12 @@ function LineChart({
     return { x, y };
   });
 
-  const d = points
-    .map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`))
-    .join(" ");
-
+  const d = points.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(" ");
   const last = data[data.length - 1]?.y ?? 0;
 
   return (
     <div className="w-full">
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-[90px]">
-        {/* grid line */}
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-[90px] text-slate-900">
         <line x1="0" y1={h - pad} x2={w} y2={h - pad} stroke="currentColor" strokeOpacity="0.08" />
         <path d={d} fill="none" stroke="currentColor" strokeOpacity="0.9" strokeWidth="2" />
         {points.length > 0 && (
@@ -122,8 +126,58 @@ function LineChart({
 }
 
 const Card: React.FC<{ className?: string; children: React.ReactNode }> = ({ className, children }) => (
-  <div className={cx("rounded-2xl border border-slate-200 bg-white shadow-sm", className)}>{children}</div>
+  <div className={cx("rounded-3xl border border-slate-200 bg-white shadow-sm", className)}>{children}</div>
 );
+
+function KpiCard({
+  icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: React.ReactNode;
+  hint?: string;
+}) {
+  return (
+    <Card className="p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs text-slate-500 font-bold">{label}</div>
+          <div className="mt-2 text-2xl font-extrabold text-slate-900">{value}</div>
+          {hint ? <div className="mt-1 text-xs text-slate-500">{hint}</div> : null}
+        </div>
+        <div className="h-10 w-10 rounded-2xl bg-slate-50 border border-slate-200 grid place-items-center text-slate-900">
+          <div className="h-5 w-5">{icon}</div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function EmptyBlock({
+  icon,
+  title,
+  desc,
+  action,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center">
+      <div className="mx-auto h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200 grid place-items-center text-slate-700">
+        <div className="h-6 w-6">{icon}</div>
+      </div>
+      <div className="mt-4 text-slate-900 font-extrabold text-lg">{title}</div>
+      <div className="mt-1 text-slate-500 text-sm">{desc}</div>
+      {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
+    </div>
+  );
+}
 
 const DonorOverview: React.FC = () => {
   const nav = useNavigate();
@@ -131,15 +185,11 @@ const DonorOverview: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [ov, setOv] = useState<OverviewRes | null>(null);
 
-  const [recLoading, setRecLoading] = useState(true);
-  const [recommended, setRecommended] = useState<ProjectCard[]>([]);
+ 
 
   const chartData = useMemo(() => {
     const t = ov?.trend_30d || [];
-    return t.map((p) => ({
-      xLabel: p.day,
-      y: Number(p.total || 0),
-    }));
+    return t.map((p) => ({ xLabel: p.day, y: Number(p.total || 0) }));
   }, [ov]);
 
   useEffect(() => {
@@ -159,31 +209,7 @@ const DonorOverview: React.FC = () => {
       }
     };
 
-    const loadRecommended = async () => {
-      try {
-        setRecLoading(true);
-        const res = await axios.get<ProjectsRes>(`${API_BASE}/donation_requests`, {
-          withCredentials: true,
-          params: {
-            status: "Approved",
-            sortBy: "need_high",
-            needBand: "all",
-            page: 1,
-            limit: 6,
-          },
-        });
-        if (!alive) return;
-        setRecommended(res.data.projects || []);
-      } catch (e) {
-        console.error(e);
-        if (alive) setRecommended([]);
-      } finally {
-        if (alive) setRecLoading(false);
-      }
-    };
-
-    load();
-    loadRecommended();
+      load();
 
     return () => {
       alive = false;
@@ -226,8 +252,11 @@ const DonorOverview: React.FC = () => {
               {initials(donor?.name)}
             </div>
             <div>
-              <div className="text-xl font-extrabold text-slate-900">
-                Welcome back{donor?.name ? `, ${donor.name}` : ""} 👋
+              <div className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                Welcome back{donor?.name ? `, ${donor.name}` : ""}
+                <span className="inline-flex items-center justify-center h-6 w-6 rounded-xl bg-slate-50 border border-slate-200 text-slate-700">
+                  <HeartIcon className="h-4 w-4" />
+                </span>
               </div>
               <div className="text-sm text-slate-500">
                 Track your impact and find high-need campaigns to support.
@@ -237,15 +266,17 @@ const DonorOverview: React.FC = () => {
 
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => nav("/donor/projects")}
-              className="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"
+              onClick={() => nav("/projects")}
+              className="px-4 py-2 rounded-2xl bg-slate-900 text-white text-sm font-extrabold hover:opacity-95 inline-flex items-center gap-2"
             >
+              <MagnifyingGlassIcon className="h-5 w-5" />
               Browse Needs
             </button>
             <button
-              onClick={() => nav("/donor/donations")}
-              className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800 hover:bg-slate-50"
+              onClick={() => nav("/donor/mydonations")}
+              className="px-4 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-extrabold text-slate-800 hover:bg-slate-50 inline-flex items-center gap-2"
             >
+              <ClipboardDocumentListIcon className="h-5 w-5 text-slate-700" />
               My Donations
             </button>
           </div>
@@ -254,29 +285,30 @@ const DonorOverview: React.FC = () => {
 
       {/* KPI cards */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5">
-          <div className="text-xs text-slate-500">Total Donated</div>
-          <div className="mt-2 text-2xl font-extrabold text-slate-900">{formatLKR(k?.total_donated || 0)}</div>
-          <div className="mt-1 text-xs text-slate-500">Paid donations only</div>
-        </Card>
-
-        <Card className="p-5">
-          <div className="text-xs text-slate-500">Donations</div>
-          <div className="mt-2 text-2xl font-extrabold text-slate-900">{k?.donations_count ?? 0}</div>
-          <div className="mt-1 text-xs text-slate-500">Successful contributions</div>
-        </Card>
-
-        <Card className="p-5">
-          <div className="text-xs text-slate-500">Schools Supported</div>
-          <div className="mt-2 text-2xl font-extrabold text-slate-900">{k?.schools_supported ?? 0}</div>
-          <div className="mt-1 text-xs text-slate-500">Unique schools helped</div>
-        </Card>
-
-        <Card className="p-5">
-          <div className="text-xs text-slate-500">Last Donation</div>
-          <div className="mt-2 text-lg font-extrabold text-slate-900">{fmtDate(k?.last_donation_at || null)}</div>
-          <div className="mt-1 text-xs text-slate-500">Most recent paid donation</div>
-        </Card>
+        <KpiCard
+          icon={<BanknotesIcon className="h-5 w-5" />}
+          label="Total Donated"
+          value={formatLKR(k?.total_donated || 0)}
+          hint="Paid donations only"
+        />
+        <KpiCard
+          icon={<ReceiptRefundIcon className="h-5 w-5" />}
+          label="Donations"
+          value={k?.donations_count ?? 0}
+          hint="Successful contributions"
+        />
+        <KpiCard
+          icon={<BuildingOffice2Icon className="h-5 w-5" />}
+          label="Schools Supported"
+          value={k?.schools_supported ?? 0}
+          hint="Unique schools helped"
+        />
+        <KpiCard
+          icon={<CalendarDaysIcon className="h-5 w-5" />}
+          label="Last Donation"
+          value={<span className="text-lg">{fmtDate(k?.last_donation_at || null)}</span>}
+          hint="Most recent paid donation"
+        />
       </div>
 
       {/* Trend + Top Schools */}
@@ -284,20 +316,27 @@ const DonorOverview: React.FC = () => {
         <Card className="p-6 lg:col-span-2">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="font-extrabold text-slate-900">Donation trend</div>
+              <div className="font-extrabold text-slate-900 flex items-center gap-2">
+                <ChartBarIcon className="h-5 w-5 text-slate-900" />
+                Donation trend
+              </div>
               <div className="text-sm text-slate-500">Paid donations (last 30 days)</div>
             </div>
             <button
-              onClick={() => nav("/donor/donations")}
-              className="text-sm font-semibold text-slate-700 hover:text-slate-900"
+              onClick={() => nav("/donor/mydonations")}
+              className="text-sm font-extrabold text-slate-700 hover:text-slate-900 inline-flex items-center gap-1"
             >
-              View all →
+              View all <ArrowTopRightOnSquareIcon className="h-4 w-4" />
             </button>
           </div>
 
-          <div className="mt-4 text-slate-900">
+          <div className="mt-4">
             {chartData.length === 0 ? (
-              <div className="text-sm text-slate-500">No donations yet in last 30 days.</div>
+              <EmptyBlock
+                icon={<ArrowTrendingUpIcon className="h-6 w-6" />}
+                title="No trend yet"
+                desc="No paid donations in the last 30 days."
+              />
             ) : (
               <LineChart data={chartData} />
             )}
@@ -306,12 +345,15 @@ const DonorOverview: React.FC = () => {
 
         <Card className="p-6">
           <div className="flex items-center justify-between">
-            <div className="font-extrabold text-slate-900">Top schools</div>
+            <div className="font-extrabold text-slate-900 flex items-center gap-2">
+              <UsersIcon className="h-5 w-5 text-slate-900" />
+              Top schools
+            </div>
             <button
               onClick={() => nav("/donor/schools")}
-              className="text-sm font-semibold text-slate-700 hover:text-slate-900"
+              className="text-sm font-extrabold text-slate-700 hover:text-slate-900 inline-flex items-center gap-1"
             >
-              Explore →
+              Explore <ArrowTopRightOnSquareIcon className="h-4 w-4" />
             </button>
           </div>
 
@@ -320,10 +362,11 @@ const DonorOverview: React.FC = () => {
               <div className="text-sm text-slate-500">No supported schools yet.</div>
             ) : (
               ov!.top_schools.map((s) => (
-                <div key={s.school_id} className="flex items-center justify-between gap-3">
+                <div key={s.school_id} className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="font-semibold text-slate-900 truncate">{s.school_name}</div>
-                    <div className="text-xs text-slate-500 truncate">
+                    <div className="font-extrabold text-slate-900 truncate">{s.school_name}</div>
+                    <div className="text-xs text-slate-500 truncate flex items-center gap-1.5">
+                      <MapPinIcon className="h-4 w-4 text-slate-400" />
                       {s.district || "—"} • {s.province || "—"} • {s.count} donations
                     </div>
                   </div>
@@ -339,122 +382,63 @@ const DonorOverview: React.FC = () => {
       <Card className="p-6">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="font-extrabold text-slate-900">Recent donations</div>
+            <div className="font-extrabold text-slate-900 flex items-center gap-2">
+              <ClipboardDocumentListIcon className="h-5 w-5 text-slate-900" />
+              Recent donations
+            </div>
             <div className="text-sm text-slate-500">Your latest paid contributions</div>
           </div>
           <button
-            onClick={() => nav("/donor/donations")}
-            className="text-sm font-semibold text-slate-700 hover:text-slate-900"
+            onClick={() => nav("/donor/mydonations")}
+            className="text-sm font-extrabold text-slate-700 hover:text-slate-900 inline-flex items-center gap-1"
           >
-            View all →
+            View all <ArrowTopRightOnSquareIcon className="h-4 w-4" />
           </button>
         </div>
 
         <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
           {(ov?.recent_donations || []).length === 0 ? (
-            <div className="p-6 text-sm text-slate-500">
-              No donations yet. Start by browsing high-need campaigns.
-              <button
-                onClick={() => nav("/donor/projects")}
-                className="ml-2 font-semibold text-slate-900 hover:underline"
-              >
-                Browse →
-              </button>
+            <div className="p-6">
+              <EmptyBlock
+                icon={<Squares2X2Icon className="h-6 w-6" />}
+                title="No donations yet"
+                desc="Start by browsing high-need campaigns."
+                action={
+                  <button
+                    onClick={() => nav("/donor/projects")}
+                    className="px-4 py-2 rounded-2xl bg-slate-900 text-white text-sm font-extrabold hover:opacity-95 inline-flex items-center gap-2"
+                  >
+                    <MagnifyingGlassIcon className="h-5 w-5" />
+                    Browse needs
+                  </button>
+                }
+              />
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {ov!.recent_donations.map((d) => (
-                <div key={d.donation_id} className="p-4 flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="font-semibold text-slate-900 truncate">
-                      {d.request_title || "Donation"}
-                    </div>
-                    <div className="text-xs text-slate-500 truncate">
-                      {d.school_name || "School"} • {d.district || "—"} • {d.province || "—"}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-400">{d.time || fmtDate(d.created_at)}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-extrabold text-slate-900">{formatLKR(d.amount)}</div>
-                    <div className="text-[11px] text-slate-500">Paid</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </Card>
-
-      {/* Recommended (High Need) */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="font-extrabold text-slate-900">Recommended needs</div>
-            <div className="text-sm text-slate-500">Highest need_score campaigns (Approved)</div>
-          </div>
-          <button
-            onClick={() => nav("/donor/projects")}
-            className="text-sm font-semibold text-slate-700 hover:text-slate-900"
-          >
-            Browse all →
-          </button>
-        </div>
-
-        <div className="mt-4">
-          {recLoading ? (
-            <div className="text-sm text-slate-500">Loading recommendations…</div>
-          ) : recommended.length === 0 ? (
-            <div className="text-sm text-slate-500">No approved campaigns found.</div>
-          ) : (
-            <div className="grid md:grid-cols-3 gap-4">
-              {recommended.map((p) => {
-                const raised = Number(p.amount_raised || 0);
-                const target = Math.max(1, Number(p.estimated_price || 0));
-                const pct = Math.max(0, Math.min(100, Math.round((raised / target) * 100)));
-                const need = Math.round(Number(p.need_score || 0));
+              {ov!.recent_donations.map((d) => {
+                const reqId = Number(d.request_id || 0);
+                const isFund = reqId <= 0;
 
                 return (
-                  <div key={p.request_id} className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-                    <div className="h-36 bg-slate-100">
-                      {p.image_url ? (
-                        <img src={p.image_url} alt={p.request_title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">
-                          No image
-                        </div>
-                      )}
+                  <div key={d.donation_id} className="p-4 flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="font-extrabold text-slate-900 truncate flex items-center gap-2">
+                        <span className={cx("h-8 w-8 rounded-2xl border grid place-items-center", isFund ? "bg-slate-50 border-slate-200" : "bg-slate-900 border-slate-900 text-white")}>
+                          {isFund ? <BuildingOffice2Icon className="h-4 w-4 text-slate-700" /> : <HeartIcon className="h-4 w-4" />}
+                        </span>
+                        {isFund ? "Direct School Fund" : d.request_title || `Request #${reqId}`}
+                      </div>
+                      <div className="text-xs text-slate-500 truncate flex items-center gap-1.5 mt-1">
+                        <MapPinIcon className="h-4 w-4 text-slate-400" />
+                        {d.school_name || "School"} • {d.district || "—"} • {d.province || "—"}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-400">{d.time || fmtDate(d.created_at)}</div>
                     </div>
 
-                    <div className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-extrabold text-slate-900 truncate">{p.request_title}</div>
-                          <div className="text-xs text-slate-500 truncate">{p.school_name}</div>
-                        </div>
-                        <div className="shrink-0 rounded-xl px-2 py-1 text-xs font-extrabold bg-slate-900 text-white">
-                          Need {need}
-                        </div>
-                      </div>
-
-                      <div className="mt-3">
-                        <div className="flex items-center justify-between text-xs text-slate-500">
-                          <span>{formatLKR(raised)} raised</span>
-                          <span>{pct}%</span>
-                        </div>
-                        <div className="mt-2 h-2 rounded-full bg-slate-100 overflow-hidden">
-                          <div className="h-full bg-slate-900" style={{ width: `${pct}%` }} />
-                        </div>
-                        <div className="mt-2 text-xs text-slate-500">
-                          Target: <span className="font-semibold text-slate-700">{formatLKR(target)}</span> • {p.category}
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => nav(`/donor/projects?open=${p.request_id}`)}
-                        className="mt-4 w-full rounded-xl bg-slate-900 text-white py-2 text-sm font-semibold hover:bg-slate-800"
-                      >
-                        View & Donate
-                      </button>
+                    <div className="text-right">
+                      <div className="font-extrabold text-slate-900">{formatLKR(d.amount)}</div>
+                      <div className="text-[11px] text-emerald-700 font-extrabold">PAID</div>
                     </div>
                   </div>
                 );
@@ -463,6 +447,8 @@ const DonorOverview: React.FC = () => {
           )}
         </div>
       </Card>
+
+    
     </div>
   );
 };

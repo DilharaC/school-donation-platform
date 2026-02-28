@@ -10,6 +10,7 @@ use Stripe\Stripe;
 use Illuminate\Support\Facades\DB;   // ✅ ADD THIS
 use Carbon\Carbon;      
 use Stripe\Checkout\Session as StripeSession;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class DonationController extends Controller
 {
@@ -217,59 +218,44 @@ public function donationTrends()
 
     return response()->json($result);
 }
-  public function schoolsDonationMap()
+public function schoolsDonationMap()
 {
     $schools = DB::table('schools')
-        ->leftJoin('donation_requests', 'schools.school_id', '=', 'donation_requests.school_id')
-        ->leftJoin('donations', function($join) {
-            $join->on('donation_requests.request_id', '=', 'donations.request_id')
-                 ->where('donations.status', 'paid'); 
-        })
         ->select(
-            'schools.school_id',
-            'schools.school_name',
-            'schools.district',
-            'schools.province',
-            'schools.latitude',
-            'schools.longitude',
-            DB::raw('COALESCE(SUM(donations.amount), 0) as total_received'),
-            'schools.need_score' 
-        )
-        ->groupBy(
-            'schools.school_id',
-            'schools.school_name',
-            'schools.district',
-            'schools.province',
-            'schools.latitude',
-            'schools.longitude',
-            'schools.need_score' 
+            'school_id',
+            'school_name',
+            'district',
+            'province',
+            'latitude',
+            'longitude',
+            DB::raw('COALESCE(fund_balance, 0) as total_received'),
+            'need_score'
         )
         ->get();
 
     return response()->json($schools);
 }
-
 public function donorsWithActiveDonations()
 {
     $donors = DB::table('donations')
+        ->join('donors', 'donations.donor_id', '=', 'donors.donor_id')
+        ->whereRaw("LOWER(donations.status)='paid'")
         ->select(
-            'donor_id',
-            'donor_name',
-            'donor_email',
-            DB::raw('COUNT(*) as active_donations_count'),
-            DB::raw('SUM(amount) as total_donated'), 
-            DB::raw('MIN(created_at) as joined_at')  
+            'donors.donor_id',
+            'donors.full_name as donor_name',
+            'donors.email as donor_email',
+            DB::raw('COUNT(donations.donation_id) as active_donations_count'),
+            DB::raw('COALESCE(SUM(donations.amount), 0) as total_donated'),
+            DB::raw('MIN(donations.created_at) as joined_at')
         )
-        ->where('status', 'paid')
-        ->groupBy('donor_id', 'donor_name', 'donor_email')
+        ->groupBy('donors.donor_id', 'donors.full_name', 'donors.email')
         ->orderBy('joined_at', 'desc')
         ->get();
 
-    
     $donors->transform(function ($donor) {
-        $names = explode(' ', $donor->donor_name);
-        $donor->initials = strtoupper(substr($names[0], 0, 1) . (isset($names[1]) ? substr($names[1], 0, 1) : ''));
-        $donor->created_at = $donor->joined_at; 
+        $names = preg_split('/\s+/', trim($donor->donor_name ?? 'Anonymous'));
+        $donor->initials = strtoupper(substr($names[0] ?? 'A', 0, 1) . substr($names[1] ?? '', 0, 1));
+        $donor->created_at = $donor->joined_at;
         return $donor;
     });
 
@@ -281,7 +267,7 @@ public function allDonorsWithStats()
     $donors = DB::table('donors')
         ->leftJoin('donations', function($join) {
             $join->on('donors.donor_id', '=', 'donations.donor_id')
-                 ->where('donations.status', 'paid'); 
+                 ->whereRaw("LOWER(donations.status)='paid'");
         })
         ->select(
             'donors.donor_id',
@@ -302,12 +288,11 @@ public function allDonorsWithStats()
         ->orderBy('donors.created_at', 'desc')
         ->get();
 
-    
     $donors->transform(function ($donor) {
-        $names = explode(' ', $donor->full_name);
-        $donor->initials = strtoupper(
-            substr($names[0], 0, 1) . (isset($names[1]) ? substr($names[1], 0, 1) : '')
-        );
+        $names = preg_split('/\s+/', trim($donor->full_name));
+        $donor->initials = strtoupper(substr($names[0] ?? 'A', 0, 1) . substr($names[1] ?? '', 0, 1));
+        $donor->active_donations_count = (int) $donor->active_donations_count;
+        $donor->total_donated = (float) $donor->total_donated;
         return $donor;
     });
 
@@ -340,11 +325,11 @@ public function listDonations(Request $request)
     $page    = max(1, (int) $request->query('page', 1));
     $limit   = max(1, min(50, (int) $request->query('limit', 10)));
 
-    // ✅ optional filters
+    // optional filters
     $dateFrom = $request->query('dateFrom', null);
     $dateTo   = $request->query('dateTo', null);
 
-    // ✅ sorting
+    // sorting
     $sortBy  = $request->query('sortBy', 'created_at'); // created_at | amount | status
     $sortDir = strtolower($request->query('sortDir', 'desc')) === 'asc' ? 'asc' : 'desc';
     $allowedSort = ['created_at', 'amount', 'status'];
@@ -352,29 +337,41 @@ public function listDonations(Request $request)
 
     $q = DB::table('donations')
         ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
-        ->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
+        ->leftJoin('schools', function ($join) {
+            // ✅ campaign donations: schools from donation_requests
+            $join->on('schools.school_id', '=', 'donation_requests.school_id')
+                 // ✅ direct fund: schools from donations.school_id
+                 ->orOn('schools.school_id', '=', 'donations.school_id');
+        })
         ->select(
             'donations.donation_id',
             'donations.request_id',
+            'donations.school_id', // keep donation school_id too
             'donations.donor_id',
             'donations.donor_name',
             'donations.donor_email',
             'donations.amount',
             'donations.status',
             'donations.created_at',
+
+            // request info (nullable)
             'donation_requests.request_title',
-            'donation_requests.school_id',
+
+            // ✅ unified school_id for frontend
+            DB::raw('COALESCE(donation_requests.school_id, donations.school_id) as school_id'),
+
+            // ✅ school info works for campaign + direct fund
             'schools.school_name',
             'schools.district',
             'schools.province'
         );
 
-    // ✅ status filter (case-insensitive)
+    // status filter (case-insensitive)
     if ($status !== 'all') {
         $q->whereRaw('LOWER(donations.status) = ?', [$status]);
     }
 
-    // ✅ date filters
+    // date filters
     if ($dateFrom) {
         $q->where('donations.created_at', '>=', Carbon::parse($dateFrom)->startOfDay());
     }
@@ -382,7 +379,7 @@ public function listDonations(Request $request)
         $q->where('donations.created_at', '<=', Carbon::parse($dateTo)->endOfDay());
     }
 
-    // ✅ search
+    // search
     if ($search !== '') {
         $q->where(function ($qq) use ($search) {
             $qq->where('donations.donor_name', 'like', "%{$search}%")
@@ -394,18 +391,14 @@ public function listDonations(Request $request)
         });
     }
 
-    // ✅ total before pagination
     $total = (clone $q)->count();
 
-    // ✅ sorting
     $q->orderBy("donations.$sortBy", $sortDir);
 
-    // ✅ pagination
     $rows = $q->skip(($page - 1) * $limit)
         ->take($limit)
         ->get();
 
-    // ✅ Normalize (initials + time + status lowercase)
     $rows->transform(function ($r) {
         $name = $r->donor_name ?: 'Anonymous';
         $parts = preg_split('/\s+/', trim($name));
@@ -413,6 +406,10 @@ public function listDonations(Request $request)
         $r->initials = strtoupper(substr($parts[0] ?? 'A', 0, 1) . substr($parts[1] ?? '', 0, 1));
         $r->time = $r->created_at ? Carbon::parse($r->created_at)->diffForHumans() : null;
         $r->status = strtolower($r->status ?? 'pending');
+        $r->amount = (float) ($r->amount ?? 0);
+
+        // ✅ label donation type in response (optional)
+        $r->donation_type = $r->request_id ? 'campaign' : 'school_fund';
 
         return $r;
     });
@@ -424,7 +421,6 @@ public function listDonations(Request $request)
         'limit' => $limit,
     ]);
 }
-
 
 
 
@@ -778,49 +774,57 @@ public function donorOverview(Request $request)
         $cursor->addDay();
     }
 
-    // Recent donations
-    $recent = DB::table('donations')
-        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
-        ->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
-        ->where('donations.donor_id', $donorId)
-        ->whereRaw("LOWER(donations.status)='paid'")
-        ->orderByDesc('donations.created_at')
-        ->limit(8)
-        ->get([
-            'donations.donation_id',
-            'donations.amount',
-            'donations.created_at',
-            'donation_requests.request_id',
-            'donation_requests.request_title',
-            'schools.school_id',
-            'schools.school_name',
-            'schools.province',
-            'schools.district',
-        ]);
+ // Recent donations (PAID) - ✅ includes direct school fund too
+$recent = DB::table('donations')
+    ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+    ->leftJoin('schools', function ($join) {
+        $join->on('schools.school_id', '=', 'donation_requests.school_id')
+             ->orOn('schools.school_id', '=', 'donations.school_id'); // ✅ fallback for direct fund
+    })
+    ->where('donations.donor_id', $donorId)
+    ->whereRaw("LOWER(donations.status)='paid'")
+    ->orderByDesc('donations.created_at')
+    ->limit(8)
+    ->get([
+        'donations.donation_id',
+        'donations.amount',
+        'donations.created_at',
+        'donations.request_id',
+        'donation_requests.request_title',
+        'schools.school_id',
+        'schools.school_name',
+        'schools.province',
+        'schools.district',
+    ]);
 
-    $recent->transform(function ($d) {
-        $d->time = $d->created_at ? Carbon::parse($d->created_at)->diffForHumans() : null;
-        return $d;
-    });
+$recent->transform(function ($d) {
+    $d->time = $d->created_at ? Carbon::parse($d->created_at)->diffForHumans() : null;
+    return $d;
+});
 
-    // Top schools supported
-    $topSchools = DB::table('donations')
-        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
-        ->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
-        ->where('donations.donor_id', $donorId)
-        ->whereRaw("LOWER(donations.status)='paid'")
-        ->selectRaw("
-            schools.school_id,
-            schools.school_name,
-            schools.province,
-            schools.district,
-            COALESCE(SUM(donations.amount),0) as total,
-            COUNT(donations.donation_id) as count
-        ")
-        ->groupBy('schools.school_id','schools.school_name','schools.province','schools.district')
-        ->orderByDesc('total')
-        ->limit(5)
-        ->get();
+
+// Top schools supported (PAID) - ✅ includes direct school fund too
+$topSchools = DB::table('donations')
+    ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+    ->leftJoin('schools', function ($join) {
+        $join->on('schools.school_id', '=', 'donation_requests.school_id')
+             ->orOn('schools.school_id', '=', 'donations.school_id'); // ✅ fallback
+    })
+    ->where('donations.donor_id', $donorId)
+    ->whereRaw("LOWER(donations.status)='paid'")
+    ->selectRaw("
+        schools.school_id,
+        schools.school_name,
+        schools.province,
+        schools.district,
+        COALESCE(SUM(donations.amount),0) as total,
+        COUNT(donations.donation_id) as count
+    ")
+    ->whereNotNull('schools.school_id')
+    ->groupBy('schools.school_id','schools.school_name','schools.province','schools.district')
+    ->orderByDesc('total')
+    ->limit(5)
+    ->get();
 
     return response()->json([
         'donor' => [
@@ -864,19 +868,32 @@ public function myDonations(Request $request)
 
     $q = DB::table('donations')
         ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
-        ->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
+        ->leftJoin('schools', function ($join) {
+            // ✅ school from request (campaign)
+            $join->on('schools.school_id', '=', 'donation_requests.school_id')
+                 // ✅ fallback school from donations.school_id (direct fund)
+                 ->orOn('schools.school_id', '=', 'donations.school_id');
+        })
         ->where('donations.donor_id', $donorId)
         ->select(
             'donations.donation_id',
             'donations.request_id',
+            'donations.school_id',
             'donations.amount',
             'donations.status',
             'donations.created_at',
+
+            // request info (may be null)
             'donation_requests.request_title',
-            'donation_requests.school_id',
+
+            // ✅ school info (now works for direct fund too)
             'schools.school_name',
             'schools.district',
-            'schools.province'
+            'schools.province',
+
+            // ✅ optional: for UI thumbnails (if you have these columns)
+            DB::raw('schools.logo_url as school_logo_url'),
+            DB::raw('donation_requests.image_url as request_image_url')
         );
 
     if ($status !== 'all') {
@@ -1030,6 +1047,9 @@ public function receipt($id)
         'mode' => $best ? 'request' : 'school_fund',
     ]);
 }
+
+
+
 
 
 

@@ -1,14 +1,23 @@
-// DonorSchools.tsx (FULL UPDATED) — Premium drawer UI + Donate to School + Donate to Campaign (DonateModal)
-// ✅ Fixes your earlier issues:
-// - Keeps hooks INSIDE component (no top-level useState / functions)
-// - Uses DonateModal for campaign donations (request-based)
-// - Direct School Donation calls backend endpoint /api/donor/schools/:id/donate
-// - Uses correct Sanctum CSRF endpoint (NOT under /api): http://localhost:8000/sanctum/csrf-cookie
-// - Optional verify-on-return (if you return to /donor/schools?donation=success&session_id=...)
-
+// DonorSchools.tsx (FULL UPDATED) — Premium drawer UI + Donate to School + Donate to Campaign (DonateModal) + ICONS
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import DonateModal from "../../components/DonateModal";
+import {
+  ArrowPathIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
+  CheckBadgeIcon,
+  ShieldCheckIcon,
+  MapPinIcon,
+  BuildingOffice2Icon,
+  AdjustmentsHorizontalIcon,
+  ArrowsUpDownIcon,
+  FunnelIcon,
+  HeartIcon,
+  CurrencyDollarIcon,
+  ClipboardDocumentListIcon,
+  ChevronRightIcon,
+} from "@heroicons/react/24/solid";
 
 /** ---------------- API ---------------- */
 const API_ROOT = "http://localhost:8000";
@@ -51,9 +60,18 @@ const needTone = (level: string) => {
   return "bg-slate-100 text-slate-700 border-slate-200";
 };
 
-function Pill({ children, cls }: { children: React.ReactNode; cls: string }) {
+function Pill({
+  children,
+  cls,
+  icon,
+}: {
+  children: React.ReactNode;
+  cls: string;
+  icon?: React.ReactNode;
+}) {
   return (
-    <span className={cx("inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-extrabold border", cls)}>
+    <span className={cx("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold border", cls)}>
+      {icon ? <span className="h-3.5 w-3.5">{icon}</span> : null}
       {children}
     </span>
   );
@@ -86,14 +104,14 @@ type SchoolRow = {
   verified?: number;
   need_score?: number;
 
-  
   campaigns_count?: number;
   donations_count?: number;
   last_donation_at?: string | null;
 
   initials?: string;
   logo_url?: string | null;
-  fund_balance?: number;   // ✅ add
+
+  fund_balance?: number; // ✅ add
   total_received?: number; // optional
 };
 
@@ -168,11 +186,7 @@ export default function DonorSchools() {
     setDonateOpen(true);
   };
 
-  /** IMPORTANT:
-   * DonateModal requires currentUser prop in your project.
-   * Fix TS error: "Cannot find name 'currentUser'" by defining it here.
-   * OPTION A: If you store user in localStorage:
-   */
+  /** DonateModal requires currentUser */
   const currentUser = useMemo(() => {
     try {
       const raw = localStorage.getItem("currentUser");
@@ -268,7 +282,6 @@ export default function DonorSchools() {
 
     setDonateLoading(true);
     try {
-      // Sanctum CSRF cookie (NOT under /api)
       await axios.get(`${API_ROOT}/sanctum/csrf-cookie`, { withCredentials: true });
 
       const res = await axios.post(
@@ -322,7 +335,7 @@ export default function DonorSchools() {
     fetchSchools();
   };
 
-  // Optional: verify donation when coming back to this page with ?donation=success&session_id=...
+  // Optional verify-on-return
   useEffect(() => {
     const qs = new URLSearchParams(window.location.search);
     const sessionId = qs.get("session_id");
@@ -347,28 +360,40 @@ export default function DonorSchools() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-xs text-slate-500 font-bold">Donor dashboard</div>
+          <div className="text-xs text-slate-500 font-bold flex items-center gap-2">
+            <BuildingOffice2Icon className="h-4 w-4 text-slate-400" />
+            Donor dashboard
+          </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-slate-900">Schools</div>
           <div className="text-sm text-slate-600 mt-1">Donate directly to schools or support their latest requests.</div>
         </div>
 
-        <button onClick={fetchSchools} className="rounded-2xl px-4 py-2.5 font-extrabold bg-slate-900 text-white">
+        <button
+          onClick={fetchSchools}
+          className="rounded-2xl px-4 py-2.5 font-extrabold bg-slate-900 text-white hover:opacity-95 flex items-center gap-2"
+        >
+          <ArrowPathIcon className="h-5 w-5" />
           Refresh
         </button>
       </div>
 
       {/* Filters */}
       <div className="mt-4 rounded-3xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+        <div className="flex items-center gap-2 text-xs font-extrabold text-slate-600 mb-3">
+          <FunnelIcon className="h-4 w-4 text-slate-400" />
+          Filters
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
           <div className="lg:col-span-5">
             <label className="text-xs font-extrabold text-slate-600">Search</label>
             <div className="mt-1 relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔎</div>
+              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search school name / province / district..."
-                className="w-full rounded-2xl border border-slate-200 pl-9 pr-3 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+                className="w-full rounded-2xl border border-slate-200 pl-10 pr-3 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
               />
             </div>
           </div>
@@ -425,8 +450,9 @@ export default function DonorSchools() {
           <div className="lg:col-span-2 flex items-end gap-2">
             <button
               onClick={apply}
-              className="w-full rounded-2xl px-3 py-3 text-sm font-extrabold border border-slate-200 hover:bg-slate-50"
+              className="w-full rounded-2xl px-3 py-3 text-sm font-extrabold border border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-2"
             >
+              <AdjustmentsHorizontalIcon className="h-5 w-5 text-slate-700" />
               Apply
             </button>
           </div>
@@ -457,7 +483,11 @@ export default function DonorSchools() {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="text-xs font-extrabold text-slate-600">Sort</div>
+            <div className="text-xs font-extrabold text-slate-600 flex items-center gap-2">
+              <ArrowsUpDownIcon className="h-4 w-4 text-slate-400" />
+              Sort
+            </div>
+
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
@@ -491,8 +521,10 @@ export default function DonorSchools() {
           <div className="text-slate-500 text-center py-12">Loading…</div>
         ) : rows.length === 0 ? (
           <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-            <div className="text-4xl mb-3">🏫</div>
-            <div className="text-slate-900 font-extrabold text-xl">No schools found</div>
+            <div className="mx-auto h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200 grid place-items-center text-slate-700">
+              <BuildingOffice2Icon className="h-6 w-6" />
+            </div>
+            <div className="text-slate-900 font-extrabold text-xl mt-4">No schools found</div>
             <div className="text-slate-500 text-sm mt-1">Try changing filters.</div>
           </div>
         ) : (
@@ -500,9 +532,6 @@ export default function DonorSchools() {
             {rows.map((s) => {
               const verified = Number(s.verified || 0) === 1;
               const level = needLevel(s.need_score);
-              const received = Number(s.fund_balance ?? s.total_received ?? 0);
-              const goalGuess = Math.max(1, received * 1.35);
-              const p = percent(received, goalGuess);
 
               return (
                 <button
@@ -510,60 +539,91 @@ export default function DonorSchools() {
                   onClick={() => openSchool(s)}
                   className={cx(
                     "group w-full text-left rounded-3xl border border-slate-200 bg-white p-5 shadow-sm",
-                    "transition hover:-translate-y-[2px] hover:shadow-md hover:border-slate-300"
+                    "transition duration-200",
+                    "hover:-translate-y-[2px] hover:shadow-md hover:border-slate-300",
+                    "focus:outline-none focus:ring-4 focus:ring-[#0B1E3B]/10"
                   )}
                 >
                   <div className="flex items-start gap-4">
-                    <div className="shrink-0 h-14 w-14 rounded-2xl overflow-hidden bg-slate-900">
+                    {/* Logo */}
+                    <div className="shrink-0 h-14 w-14 rounded-2xl overflow-hidden bg-slate-100">
                       {toAbs(s.logo_url) ? (
                         <img src={toAbs(s.logo_url)!} alt="logo" className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full grid place-items-center text-white font-extrabold">
-                          {(s.initials || initials(s.school_name)).slice(0, 2)}
+                        <div className="w-full h-full grid place-items-center bg-[#0B1E3B]/10">
+                          <div className="h-10 w-10 rounded-2xl bg-[#0B1E3B] text-white grid place-items-center font-extrabold text-xs shadow-sm">
+                            {(s.initials || initials(s.school_name)).slice(0, 2)}
+                          </div>
                         </div>
                       )}
                     </div>
 
+                    {/* Info */}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <div className="text-base font-extrabold text-slate-900 truncate">{s.school_name}</div>
-                            {verified ? <Pill cls="bg-emerald-50 text-emerald-700 border-emerald-200">VERIFIED</Pill> : null}
-                            <Pill cls={needTone(level)}>{level.toUpperCase()} NEED</Pill>
+
+                            {verified ? (
+                              <Pill
+                                cls="bg-emerald-50 text-emerald-700 border-emerald-200"
+                                icon={<CheckBadgeIcon className="h-3.5 w-3.5" />}
+                              >
+                                VERIFIED
+                              </Pill>
+                            ) : null}
+
+                            <Pill cls={needTone(level)} icon={<FunnelIcon className="h-3.5 w-3.5" />}>
+                              {level.toUpperCase()} NEED
+                            </Pill>
                           </div>
 
-                          <div className="mt-1 text-xs text-slate-500 truncate">
+                          <div className="mt-1 text-xs text-slate-500 truncate flex items-center gap-1.5">
+                            <MapPinIcon className="h-4 w-4 text-slate-400" />
                             {s.province ? s.province : "—"}
                             {s.district ? ` • ${s.district}` : ""}
                           </div>
 
                           <div className="mt-2 text-sm text-slate-600">
-                            Need score: <b className="text-slate-900">{Number(s.need_score || 0).toFixed(1)}</b>
+                            Need score: <b className="text-[#0B1E3B]">{Number(s.need_score || 0).toFixed(1)}</b>
                           </div>
                         </div>
 
+                        {/* Campaign count */}
                         <div className="shrink-0 text-right">
-                          <div className="text-xs text-slate-500 font-bold">Campaigns</div>
-                          <div className="text-xl font-extrabold text-slate-900">{Number(s.campaigns_count || 0)}</div>
+                          <div className="text-xs text-slate-500 font-bold flex items-center justify-end gap-1">
+                            <ClipboardDocumentListIcon className="h-4 w-4 text-slate-400" />
+                            Campaigns
+                          </div>
+                          <div className="text-xl font-extrabold text-[#0B1E3B]">{Number(s.campaigns_count || 0)}</div>
                         </div>
                       </div>
 
-                      <div className="mt-4">
-                        <div className="flex items-center justify-between text-xs text-slate-500">
-                          <span>
-                            Total received <b className="text-slate-700">{formatLKR(received)}</b>
-                          </span>
-                          <span>{Number(s.donations_count || 0)} donations</span>
-                        </div>
-                        <div className="mt-2">
-                          <ProgressBar value={p} />
+                      {/* Funding summary */}
+                      <div className="mt-4 rounded-2xl bg-[#0B1E3B]/5 border border-[#0B1E3B]/10 px-4 py-3">
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
+                            <CurrencyDollarIcon className="h-4 w-4 text-slate-400" />
+                            Total received
+                          </div>
+                          <div className="text-sm font-extrabold text-[#0B1E3B]">
+                            {formatLKR(Number(s.fund_balance ?? s.total_received ?? 0))}
+                          </div>
                         </div>
                       </div>
 
+                      {/* Footer */}
                       <div className="mt-4 flex items-center justify-between">
-                        <div className="text-xs font-extrabold text-slate-700 group-hover:text-slate-900">View details →</div>
-                        <span className="rounded-xl px-3 py-2 text-xs font-extrabold bg-slate-900 text-white">Support school</span>
+                        <div className="text-xs font-extrabold text-[#0B1E3B] group-hover:underline inline-flex items-center gap-1">
+                          View details
+                          <ChevronRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-[2px]" />
+                        </div>
+
+                        <span className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold text-white bg-[#0B1E3B] hover:bg-[#08162D] transition">
+                          <HeartIcon className="h-4 w-4" />
+                          Support school
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -626,14 +686,18 @@ export default function DonorSchools() {
             <div className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b">
               <div className="p-5 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-[11px] uppercase tracking-wide text-slate-500 font-extrabold">School details</div>
+                  <div className="text-[11px] uppercase tracking-wide text-slate-500 font-extrabold flex items-center gap-2">
+                    <BuildingOffice2Icon className="h-4 w-4 text-slate-400" />
+                    School details
+                  </div>
                   <div className="text-lg font-extrabold text-slate-900 truncate">{selected?.school_name || "School"}</div>
                 </div>
 
                 <button
                   onClick={closeDrawer}
-                  className="rounded-2xl px-4 py-2 text-sm font-extrabold border border-slate-200 hover:bg-slate-50"
+                  className="rounded-2xl px-3 py-2 text-sm font-extrabold border border-slate-200 hover:bg-slate-50 flex items-center gap-2"
                 >
+                  <XMarkIcon className="h-5 w-5" />
                   Close
                 </button>
               </div>
@@ -670,16 +734,23 @@ export default function DonorSchools() {
 
                       <div className="min-w-0 flex-1">
                         <div className="text-xl font-extrabold text-slate-900">{detail.school.school_name}</div>
-                        <div className="text-sm text-slate-600">
-                          {detail.school.province || "—"} {detail.school.district ? `• ${detail.school.district}` : ""}
+                        <div className="text-sm text-slate-600 flex items-center gap-2 mt-1">
+                          <MapPinIcon className="h-4 w-4 text-slate-400" />
+                          <span>
+                            {detail.school.province || "—"} {detail.school.district ? `• ${detail.school.district}` : ""}
+                          </span>
                         </div>
                         {detail.school.address ? <div className="text-sm text-slate-600 mt-1">{detail.school.address}</div> : null}
 
                         <div className="mt-3 flex flex-wrap gap-2">
                           {Number(detail.school.verified || 0) === 1 ? (
-                            <Pill cls="bg-emerald-50 text-emerald-700 border-emerald-200">VERIFIED</Pill>
+                            <Pill cls="bg-emerald-50 text-emerald-700 border-emerald-200" icon={<CheckBadgeIcon className="h-3.5 w-3.5" />}>
+                              VERIFIED
+                            </Pill>
                           ) : null}
-                          <Pill cls={needTone(needLevel(detail.school.need_score))}>{needLevel(detail.school.need_score).toUpperCase()} NEED</Pill>
+                          <Pill cls={needTone(needLevel(detail.school.need_score))} icon={<FunnelIcon className="h-3.5 w-3.5" />}>
+                            {needLevel(detail.school.need_score).toUpperCase()} NEED
+                          </Pill>
                         </div>
                       </div>
                     </div>
@@ -705,13 +776,17 @@ export default function DonorSchools() {
                     <div className="mt-5 rounded-3xl border border-slate-200 p-5 bg-gradient-to-b from-white to-slate-50">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-base font-extrabold text-slate-900">Donate to School</div>
+                          <div className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                            <HeartIcon className="h-5 w-5 text-slate-900" />
+                            Donate to School
+                          </div>
                           <div className="text-xs text-slate-500 mt-1">
                             We’ll auto-pick the best active request (or create General Fund) and redirect to Stripe.
                           </div>
                         </div>
-                        <div className="text-[11px] font-extrabold text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-full">
-                          🔒 Stripe secure
+                        <div className="text-[11px] font-extrabold text-slate-700 bg-white border border-slate-200 px-3 py-1.5 rounded-full inline-flex items-center gap-2">
+                          <ShieldCheckIcon className="h-4 w-4 text-slate-700" />
+                          Stripe secure
                         </div>
                       </div>
 
@@ -777,7 +852,10 @@ export default function DonorSchools() {
                         <button
                           type="button"
                           onClick={() => setDonateAnonymous((v) => !v)}
-                          className={cx("relative inline-flex h-8 w-14 items-center rounded-full transition", donateAnonymous ? "bg-slate-900" : "bg-slate-300")}
+                          className={cx(
+                            "relative inline-flex h-8 w-14 items-center rounded-full transition",
+                            donateAnonymous ? "bg-slate-900" : "bg-slate-300"
+                          )}
                           aria-pressed={donateAnonymous}
                         >
                           <span className={cx("inline-block h-6 w-6 rounded-full bg-white transition translate-x-1", donateAnonymous && "translate-x-7")} />
@@ -788,18 +866,25 @@ export default function DonorSchools() {
                         onClick={donateToSchool}
                         disabled={donateLoading || donateAmountNum < MIN_LKR}
                         className={cx(
-                          "mt-3 w-full rounded-2xl py-3 font-extrabold text-white transition",
-                          donateLoading || donateAmountNum < MIN_LKR ? "bg-slate-300 cursor-not-allowed" : "bg-slate-900 hover:opacity-95"
+                          "mt-3 w-full rounded-2xl py-3 font-extrabold text-white transition flex items-center justify-center gap-2",
+                          donateLoading || donateAmountNum < MIN_LKR
+                            ? "bg-slate-300 cursor-not-allowed"
+                            : "bg-slate-900 hover:opacity-95"
                         )}
                       >
-                        {donateLoading ? "Redirecting…" : donateAmountNum < MIN_LKR ? `Enter at least LKR ${MIN_LKR}` : "Continue to payment →"}
+                        <CurrencyDollarIcon className="h-5 w-5" />
+                        {donateLoading ? "Redirecting…" : donateAmountNum < MIN_LKR ? `Enter at least LKR ${MIN_LKR}` : "Continue to payment"}
+                        <ChevronRightIcon className="h-5 w-5" />
                       </button>
                     </div>
                   </div>
 
                   {/* campaigns */}
                   <div className="rounded-3xl border border-slate-200 p-6">
-                    <div className="text-[11px] uppercase tracking-wide text-slate-500 font-extrabold">Latest requests</div>
+                    <div className="text-[11px] uppercase tracking-wide text-slate-500 font-extrabold flex items-center gap-2">
+                      <ClipboardDocumentListIcon className="h-4 w-4 text-slate-400" />
+                      Latest requests
+                    </div>
                     <div className="text-lg font-extrabold text-slate-900">Campaigns</div>
 
                     {detail.campaigns?.length ? (
@@ -829,16 +914,15 @@ export default function DonorSchools() {
                                     e.stopPropagation();
                                     openDonateForRequest(c.request_id);
                                   }}
-                                  className="shrink-0 rounded-2xl px-4 py-2 text-xs font-extrabold bg-slate-900 text-white hover:opacity-95"
+                                  className="shrink-0 rounded-2xl px-4 py-2 text-xs font-extrabold bg-slate-900 text-white hover:opacity-95 inline-flex items-center gap-2"
                                 >
+                                  <HeartIcon className="h-4 w-4" />
                                   Donate
                                 </button>
                               </div>
 
                               <div className="mt-3">
-                                <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
-                                  <div className="h-full rounded-full bg-slate-900" style={{ width: `${p}%` }} />
-                                </div>
+                                <ProgressBar value={p} />
                               </div>
                             </div>
                           );

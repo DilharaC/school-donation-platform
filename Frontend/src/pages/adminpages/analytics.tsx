@@ -272,14 +272,21 @@ const AnalyticsPage: React.FC = () => {
 
         if (!alive) return;
 
-        const safeSchools: School[] = (schoolsRes.data || []).map((s: any) => ({
-          ...s,
-          latitude: Number(s.latitude),
-          longitude: Number(s.longitude),
-          total_received: Number(s.total_received),
-          need_score: Number(s.need_score ?? 0),
-        }));
-        setSchools(safeSchools);
+const safeSchools: School[] = (schoolsRes.data || []).map((s: any) => ({
+  school_id: Number(s.school_id),
+  school_name: String(s.school_name ?? ""),
+  district: String(s.district ?? "Unknown"),
+  province: String(s.province ?? "Unknown"),
+  latitude: Number(s.latitude),
+  longitude: Number(s.longitude),
+
+  // ✅ fund_balance comes from schools table
+  // backend should return it as total_received (recommended)
+  total_received: Number(s.total_received ?? s.fund_balance ?? 0),
+
+  need_score: Number(s.need_score ?? 0),
+}));
+setSchools(safeSchools);
 
         const safeTrends: Trend[] = (trendsRes.data || []).map((t: any) => ({
           month: t.month,

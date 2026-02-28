@@ -30,7 +30,15 @@ import DonorLayout from "../donorcomponents/donorLayout";
 import MyDonations from "../pages/donorpages/mydonations";
 import DonorSettings from "../pages/donorpages/settings";
 import DonorSchools from "../pages/donorpages/schools";
-
+import MinistryLayout from "../ministrycomponents/ministryLayout";
+import MinistryOverview from "./MinistryOverview";
+import MinistrySchools from "../pages/ministrypages/schools";
+import MinistryDonors from "../pages/ministrypages/donors";
+import MinistryCampaigns from "../pages/ministrypages/campaigns";
+import MinistryDonations from "../pages/ministrypages/donations";
+import MinistryAnalytics from "../pages/ministrypages/analytics";
+import MinistryReports from "../pages/ministrypages/reports";
+// import MinistryNotifications from "../pages/ministrypages/notifications";
 
 interface User {
   userType: "donor" | "school";
@@ -111,6 +119,20 @@ const App: React.FC = () => {
   {/* other routes */}
 </Route>
 
+   
+
+<Route path="/ministry" element={<MinistryLayout />}>
+ <Route index element={<MinistryOverview />} />
+  <Route path="overview" element={<MinistryOverview />} />
+  <Route path="schools" element={<MinistrySchools />} />
+  <Route path="donors" element={<MinistryDonors />} />
+  <Route path="campaigns" element={<MinistryCampaigns />} />
+  <Route path="donations" element={<MinistryDonations />} />
+  <Route path="analytics" element={<MinistryAnalytics />} />
+  <Route path="reports" element={<MinistryReports />} />
+  {/* <Route path="notifications" element={<MinistryNotifications />} />
+  <Route path="settings" element={<MinistrySettings />} /> */}
+</Route>
       {/* All other pages wrapped in Layout */}
       <Route
         path="/"

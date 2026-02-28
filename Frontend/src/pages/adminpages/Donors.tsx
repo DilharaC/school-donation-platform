@@ -170,12 +170,12 @@ const toInitials = (name?: string) => {
 };
 
 const formatMoney = (amount: number) =>
-  new Intl.NumberFormat("en-US", {
+  new Intl.NumberFormat("en-LK", {
     style: "currency",
-    currency: "USD",
+    currency: "LKR",
     maximumFractionDigits: 0,
   }).format(Number(amount || 0));
-
+  
 const formatDate = (iso: string) => {
   try {
     return new Date(iso).toLocaleDateString();
