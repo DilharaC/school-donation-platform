@@ -8,6 +8,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DonationController;
 use App\Http\Controllers\DonationRequestController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\MinistryController;
 
 // -----------------------------
 // CSRF Route
@@ -95,9 +96,13 @@ Route::post('/request/create', [DonationRequestController::class, 'create']);
 Route::post('/stripe/webhook', [DonationController::class, 'stripeWebhook']);
 Route::get('/donations/verify', [DonationController::class, 'verifySession']);
 
-Route::middleware('auth:sanctum')->group(function () {
+
     Route::post('/donor/schools/{id}/donate', [DonationController::class, 'createSchoolDonation']);
-});
+     // ✅ Ministry donors
+    Route::get('/donors', [MinistryController::class, 'index']);
+    Route::get('/donors/{id}', [MinistryController::class, 'show']);
+    Route::get('/donors/{id}/donations', [MinistryController::class, 'donations']);
+
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/donor/me', [DonorController::class, 'me']);
     Route::post('/donor/me', [DonorController::class, 'updateMe']);
@@ -112,8 +117,19 @@ Route::middleware(['auth:sanctum'])->group(function () {
 // Protected routes (must be authenticated)
 // -----------------------------
 
+ Route::get('/ministry/campaigns', [MinistryController::class, 'index2']);
+    Route::get('/ministry/campaigns/{id}', [MinistryController::class, 'show2']);
+    Route::get('/ministry/campaigns/{id}/donations', [MinistryController::class, 'donations2']);
+    Route::get('/reports/ministry/pdf', [DonationController::class, 'ministryReportPdf']);
+
+
+
+Route::get('/ministry/overview', [MinistryController::class, 'overview']);
+// later you can protect with middleware:
+// Route::middleware('auth:sanctum')->get('/ministry/overview', [MinistryController::class, 'overview']);
 Route::middleware('auth:school')->get('/school/overview', [SchoolController::class, 'overview']);
 Route::delete('/donation_requests/{id}', [DonationRequestController::class, 'destroy']);
+
 Route::middleware(['web', 'auth:sanctum'])->group(function () {
      
     Route::post('/donations/create', [DonationController::class, 'createDonation']);

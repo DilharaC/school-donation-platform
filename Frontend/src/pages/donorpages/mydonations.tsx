@@ -1,10 +1,26 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
+import {
+  ArrowPathIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  DocumentTextIcon,
+  PhotoIcon,
+  BuildingOffice2Icon,
+  MapPinIcon,
+  ReceiptPercentIcon,
+  PrinterIcon,
+  Squares2X2Icon,
+  ListBulletIcon,
+  EyeIcon,
+} from "@heroicons/react/24/solid";
 
 const API_BASE = "http://localhost:8000/api";
-const MY_DONATIONS = `${API_BASE}/donor/my-donations`; // returns donations list (paid/pending/all)
-const REQUEST_DETAIL = (id: number) => `${API_BASE}/donation_requests/${id}`; // includes evidences
-const RECEIPT_ENDPOINT = (id: number) => `${API_BASE}/donations/${id}/receipt`; // ✅ receipt
+const MY_DONATIONS = `${API_BASE}/donor/my-donations`;
+const REQUEST_DETAIL = (id: number) => `${API_BASE}/donation_requests/${id}`;
+const RECEIPT_ENDPOINT = (id: number) => `${API_BASE}/donations/${id}/receipt`;
 
 const cx = (...s: Array<string | false | null | undefined>) => s.filter(Boolean).join(" ");
 const formatLKR = (n: number) => `LKR ${Number.isFinite(n) ? n.toLocaleString() : "0"}`;
@@ -13,7 +29,6 @@ const formatLKR = (n: number) => `LKR ${Number.isFinite(n) ? n.toLocaleString() 
 const toAbs = (u?: string | null) => {
   if (!u) return null;
   if (u.startsWith("http://") || u.startsWith("https://")) return u;
-  // your backend is on localhost:8000
   return `http://localhost:8000${u.startsWith("/") ? "" : "/"}${u}`;
 };
 
@@ -31,7 +46,6 @@ type DonationRow = {
   district?: string | null;
   province?: string | null;
 
-  // ✅ optional if your MY_DONATIONS API already returns them (nice to have)
   request_image_url?: string | null;
   school_logo_url?: string | null;
 };
@@ -65,8 +79,6 @@ type RequestDetailRes = {
       district?: string | null;
       province?: string | null;
       registration_no?: string | null;
-
-      // ✅ make sure backend returns this (or rename to your field name)
       logo_url?: string | null;
     };
     evidences: Evidence[];
@@ -87,21 +99,85 @@ type DonatedRequestRow = {
   first_donation_id?: number | null;
 };
 
+/** ---------------- Small UI helpers ---------------- */
+
+function SectionTitle({
+  title,
+  subtitle,
+  right,
+}: {
+  title: string;
+  subtitle?: string;
+  right?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <div className="text-xs font-black text-slate-500 flex items-center gap-2">
+          <Squares2X2Icon className="h-4 w-4 text-slate-400" />
+          Donor dashboard
+        </div>
+        <div className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">{title}</div>
+        {subtitle ? <div className="text-sm text-slate-600 mt-1">{subtitle}</div> : null}
+      </div>
+      {right}
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  hint,
+  icon,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-black text-slate-500">{label}</div>
+          <div className="mt-1 text-xl font-black text-slate-900">{value}</div>
+        </div>
+        {icon ? (
+          <div className="h-10 w-10 rounded-2xl bg-slate-50 border border-slate-200 grid place-items-center text-slate-700">
+            {icon}
+          </div>
+        ) : null}
+      </div>
+      {hint ? <div className="mt-2 text-xs text-slate-500">{hint}</div> : null}
+    </div>
+  );
+}
+
 function Pill({
   children,
   tone = "slate",
+  icon,
 }: {
   children: React.ReactNode;
-  tone?: "slate" | "emerald" | "amber" | "rose";
+  tone?: "slate" | "emerald" | "amber" | "rose" | "indigo";
+  icon?: React.ReactNode;
 }) {
   const map: Record<string, string> = {
     slate: "bg-slate-100 text-slate-700 border-slate-200",
     emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
     amber: "bg-amber-50 text-amber-700 border-amber-200",
     rose: "bg-rose-50 text-rose-700 border-rose-200",
+    indigo: "bg-indigo-50 text-indigo-700 border-indigo-200",
   };
   return (
-    <span className={cx("inline-flex items-center px-2.5 py-1 rounded-full text-xs font-extrabold border", map[tone])}>
+    <span
+      className={cx(
+        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold border",
+        map[tone]
+      )}
+    >
+      {icon ? <span className="h-3.5 w-3.5">{icon}</span> : null}
       {children}
     </span>
   );
@@ -114,6 +190,13 @@ const statusTone = (s: string) => {
   return "slate";
 };
 
+const statusIcon = (s: string) => {
+  const v = (s || "").toLowerCase();
+  if (v === "paid") return <CheckCircleIcon className="h-3.5 w-3.5" />;
+  if (v === "pending") return <ClockIcon className="h-3.5 w-3.5" />;
+  return null;
+};
+
 const initials = (name?: string | null) => {
   const n = (name || "School").trim();
   const parts = n.split(/\s+/);
@@ -122,6 +205,66 @@ const initials = (name?: string | null) => {
   return (a + b).toUpperCase();
 };
 
+function Segmented({
+  value,
+  onChange,
+  items,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  items: Array<{ key: string; label: string; icon?: React.ReactNode }>;
+}) {
+  return (
+    <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+      {items.map((it) => (
+        <button
+          key={it.key}
+          onClick={() => onChange(it.key)}
+          className={cx(
+            "px-4 py-2 rounded-xl text-sm font-extrabold transition flex items-center gap-2",
+            value === it.key ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-50"
+          )}
+        >
+          {it.icon ? <span className="h-4 w-4">{it.icon}</span> : null}
+          {it.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex gap-4">
+        <div className="h-12 w-12 rounded-2xl bg-slate-100 animate-pulse" />
+        <div className="flex-1">
+          <div className="h-4 w-2/3 bg-slate-100 rounded animate-pulse" />
+          <div className="mt-2 h-3 w-1/2 bg-slate-100 rounded animate-pulse" />
+          <div className="mt-4 h-3 w-1/3 bg-slate-100 rounded animate-pulse" />
+        </div>
+        <div className="w-24">
+          <div className="h-4 w-full bg-slate-100 rounded animate-pulse" />
+          <div className="mt-3 h-6 w-16 bg-slate-100 rounded-full animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+      <div className="mx-auto h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200 grid place-items-center text-slate-700">
+        {icon}
+      </div>
+      <div className="text-slate-900 font-black text-xl mt-4">{title}</div>
+      <div className="text-slate-500 text-sm mt-1">{desc}</div>
+    </div>
+  );
+}
+
+/** Drawer */
 function Drawer({
   open,
   onClose,
@@ -136,25 +279,32 @@ function Drawer({
   return (
     <div className={cx("fixed inset-0 z-[90]", open ? "" : "pointer-events-none")}>
       <div
-        className={cx("absolute inset-0 bg-black/30 transition-opacity duration-200", open ? "opacity-100" : "opacity-0")}
+        className={cx(
+          "absolute inset-0 bg-black/35 backdrop-blur-[1px] transition-opacity duration-200",
+          open ? "opacity-100" : "opacity-0"
+        )}
         onClick={onClose}
       />
       <div
         className={cx(
-          "absolute right-0 top-0 h-full w-full sm:w-[560px] bg-white shadow-2xl transition-transform duration-200",
+          "absolute right-0 top-0 h-full w-full sm:w-[640px] bg-white shadow-2xl transition-transform duration-200",
           open ? "translate-x-0" : "translate-x-full"
         )}
       >
         <div className="h-full flex flex-col">
           <div className="p-5 border-b flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-xs text-slate-500 font-bold">Donated request</div>
-              <div className="text-lg font-extrabold text-slate-900 truncate">{title}</div>
+              <div className="text-xs text-slate-500 font-black flex items-center gap-2">
+                <EyeIcon className="h-4 w-4 text-slate-400" />
+                Evidence & details
+              </div>
+              <div className="text-lg font-black text-slate-900 truncate">{title}</div>
             </div>
             <button
               onClick={onClose}
-              className="shrink-0 rounded-xl px-3 py-2 text-sm font-extrabold border border-slate-200 hover:bg-slate-50"
+              className="shrink-0 rounded-2xl px-3 py-2 text-sm font-extrabold border border-slate-200 hover:bg-slate-50 flex items-center gap-2"
             >
+              <XMarkIcon className="h-4 w-4" />
               Close
             </button>
           </div>
@@ -165,7 +315,7 @@ function Drawer({
   );
 }
 
-/** ✅ Receipt Modal */
+/** Receipt Modal */
 function ReceiptModal({
   open,
   onClose,
@@ -180,50 +330,49 @@ function ReceiptModal({
   return (
     <div className={open ? "fixed inset-0 z-[110]" : "hidden"}>
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-
       <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 relative">
-          <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-slate-800">
-            ✕
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 relative border border-slate-200">
+          <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-slate-900">
+            <XMarkIcon className="h-5 w-5" />
           </button>
 
           <div className="text-center">
-            <div className="text-xs text-slate-500 font-bold">Donation Receipt</div>
-            <div className="text-xl font-extrabold text-slate-900 mt-1">#{receipt?.donation_id || ""}</div>
+            <div className="mx-auto h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200 grid place-items-center text-slate-800">
+              <ReceiptPercentIcon className="h-6 w-6" />
+            </div>
+            <div className="text-xs text-slate-500 font-black mt-3">Donation Receipt</div>
+            <div className="text-xl font-black text-slate-900 mt-1">#{receipt?.donation_id || ""}</div>
           </div>
 
           {loading ? (
             <div className="text-center py-10 text-slate-500">Loading receipt…</div>
           ) : !receipt ? (
-            <div className="text-center py-10 text-rose-600 font-bold">Could not load receipt.</div>
+            <div className="text-center py-10 text-rose-600 font-black">Could not load receipt.</div>
           ) : (
-            <div className="mt-6 space-y-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Amount</span>
-                <span className="font-extrabold text-slate-900">{formatLKR(Number(receipt.amount) || 0)}</span>
+            <div className="mt-6 space-y-3 text-sm">
+              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 space-y-3">
+                <Row label="Amount" value={<b className="text-slate-900">{formatLKR(Number(receipt.amount) || 0)}</b>} />
+                <Row
+                  label="Status"
+                  value={
+                    <span className="font-black uppercase text-emerald-700 flex items-center gap-2 justify-end">
+                      <CheckCircleIcon className="h-4 w-4" />
+                      {String(receipt.status || "").toUpperCase()}
+                    </span>
+                  }
+                />
+                <Row label="Date" value={<span className="font-semibold">{new Date(receipt.created_at).toLocaleString()}</span>} />
               </div>
 
-              <div className="flex justify-between">
-                <span className="text-slate-500">Status</span>
-                <span className="font-extrabold uppercase text-emerald-600">{String(receipt.status || "").toUpperCase()}</span>
+              <div className="rounded-2xl border border-slate-200 p-4">
+                <div className="text-slate-500 text-xs font-black">Request</div>
+                <div className="font-black text-slate-900 mt-1">{receipt.request_title}</div>
               </div>
 
-              <div className="flex justify-between">
-                <span className="text-slate-500">Date</span>
-                <span className="font-semibold">{new Date(receipt.created_at).toLocaleString()}</span>
-              </div>
-
-              <hr />
-
-              <div>
-                <div className="text-slate-500 text-xs font-bold">Request</div>
-                <div className="font-extrabold text-slate-900">{receipt.request_title}</div>
-              </div>
-
-              <div>
-                <div className="text-slate-500 text-xs font-bold">School</div>
-                <div className="font-extrabold text-slate-900">{receipt.school_name}</div>
-                <div className="text-xs text-slate-500">
+              <div className="rounded-2xl border border-slate-200 p-4">
+                <div className="text-slate-500 text-xs font-black">School</div>
+                <div className="font-black text-slate-900 mt-1">{receipt.school_name}</div>
+                <div className="text-xs text-slate-500 mt-1">
                   {receipt.province} • {receipt.district}
                 </div>
               </div>
@@ -232,8 +381,9 @@ function ReceiptModal({
 
           <button
             onClick={() => window.print()}
-            className="mt-6 w-full bg-slate-900 text-white rounded-2xl py-3 font-extrabold hover:opacity-95"
+            className="mt-6 w-full bg-slate-900 text-white rounded-2xl py-3 font-black hover:opacity-95 flex items-center justify-center gap-2"
           >
+            <PrinterIcon className="h-5 w-5" />
             Print Receipt
           </button>
         </div>
@@ -242,7 +392,16 @@ function ReceiptModal({
   );
 }
 
-/** ✅ Avatar with request image OR school logo OR initials */
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-slate-500 font-bold">{label}</span>
+      <span className="text-right">{value}</span>
+    </div>
+  );
+}
+
+/** Avatar with request image OR school logo OR initials */
 function Avatar({
   label,
   requestId,
@@ -256,7 +415,6 @@ function Avatar({
   schoolLogo?: string | null;
   getThumb: (requestId: number) => void;
 }) {
-  // start fetching if not present
   useEffect(() => {
     if (!requestImage && !schoolLogo) getThumb(requestId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -265,63 +423,81 @@ function Avatar({
   const src = toAbs(requestImage) || toAbs(schoolLogo);
 
   return (
-    <div className="shrink-0 h-12 w-12 rounded-2xl overflow-hidden bg-slate-900">
+    <div className="shrink-0 h-12 w-12 rounded-2xl overflow-hidden bg-slate-900 ring-1 ring-black/5">
       {src ? (
         <img
           src={src}
           alt="thumb"
           className="w-full h-full object-cover"
           onError={(e) => {
-            // if image fails, hide it and show fallback initials
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }}
         />
       ) : (
-        <div className="w-full h-full text-white grid place-items-center font-extrabold">
-          {initials(label)}
-        </div>
+        <div className="w-full h-full text-white grid place-items-center font-black text-sm">{initials(label)}</div>
       )}
     </div>
   );
 }
 
+/** Simple progress bar */
+function ProgressBar({ value }: { value: number }) {
+  const v = Math.max(0, Math.min(100, value));
+  return (
+    <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+      <div className="h-full bg-slate-900 rounded-full" style={{ width: `${v}%` }} />
+    </div>
+  );
+}
+
+/** Debounce hook */
+function useDebounced<T>(value: T, delay = 400) {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return v;
+}
+
 export default function MyDonations() {
-  // ----- tab -----
   const [tab, setTab] = useState<"donations" | "requests">("requests");
 
-  // ----- shared filters -----
+  // filters (draft + applied)
+  const [draftSearch, setDraftSearch] = useState("");
+  const debouncedSearch = useDebounced(draftSearch, 350);
+
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"paid" | "pending" | "all">("paid");
 
-  // ----- donations list state -----
+  // donations list
   const [loadingDonations, setLoadingDonations] = useState(true);
   const [donations, setDonations] = useState<DonationRow[]>([]);
   const [donationsTotal, setDonationsTotal] = useState(0);
   const [donationsPage, setDonationsPage] = useState(1);
   const donationsLimit = 10;
 
-  // ----- requests (grouped) state -----
+  // requests grouped
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [requests, setRequests] = useState<DonatedRequestRow[]>([]);
   const [reqTotal, setReqTotal] = useState(0);
   const [reqPage, setReqPage] = useState(1);
   const reqLimit = 10;
 
-  // ----- error -----
   const [err, setErr] = useState<string | null>(null);
 
-  // ----- drawer -----
+  // drawer
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detail, setDetail] = useState<RequestDetailRes["project"] | null>(null);
   const [selectedReq, setSelectedReq] = useState<DonatedRequestRow | null>(null);
 
-  // ✅ receipt modal state
+  // receipt modal
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [receipt, setReceipt] = useState<any>(null);
 
-  /** ✅ thumbnails cache by request_id */
+  // thumbs cache
   const [thumbs, setThumbs] = useState<Record<number, { request_image?: string | null; school_logo?: string | null }>>(
     {}
   );
@@ -330,7 +506,7 @@ export default function MyDonations() {
   const donationsPages = useMemo(() => Math.max(1, Math.ceil(donationsTotal / donationsLimit)), [donationsTotal]);
   const reqPages = useMemo(() => Math.max(1, Math.ceil(reqTotal / reqLimit)), [reqTotal]);
 
-  /** ✅ fetch & cache request image + school logo */
+  /** Fetch & cache request image + school logo */
   const fetchThumbForRequest = async (requestId: number) => {
     if (!requestId) return;
     if (thumbs[requestId]?.request_image || thumbs[requestId]?.school_logo) return;
@@ -349,14 +525,12 @@ export default function MyDonations() {
         },
       }));
     } catch {
-      // keep empty so we fallback to initials
       setThumbs((prev) => ({ ...prev, [requestId]: { request_image: null, school_logo: null } }));
     } finally {
       inflight.current.delete(requestId);
     }
   };
 
-  // ----- fetch donations list -----
   const fetchDonations = async () => {
     setLoadingDonations(true);
     setErr(null);
@@ -385,7 +559,6 @@ export default function MyDonations() {
     }
   };
 
-  // ----- fetch donated requests (grouped) -----
   const fetchDonatedRequests = async () => {
     setLoadingRequests(true);
     setErr(null);
@@ -407,6 +580,10 @@ export default function MyDonations() {
 
       for (const d of rows) {
         const id = Number(d.request_id);
+
+        // ✅ SKIP school fund donations (no request, no evidence)
+        if (!id || id <= 0) continue;
+
         const cur = map.get(id);
 
         if (!cur) {
@@ -424,13 +601,14 @@ export default function MyDonations() {
         } else {
           cur.total_donated += Number(d.amount) || 0;
           cur.donations_count += 1;
+
           if (!cur.last_donated_at || new Date(d.created_at) > new Date(cur.last_donated_at)) {
             cur.last_donated_at = d.created_at;
             cur.first_donation_id = d.donation_id;
           }
         }
 
-        // ✅ if MY_DONATIONS returns image/logo fields, cache them too
+        // cache thumbnails (only for real requests)
         if (d.request_image_url || d.school_logo_url) {
           setThumbs((prev) => ({
             ...prev,
@@ -463,7 +641,6 @@ export default function MyDonations() {
     }
   };
 
-  // ----- drawer open (evidence) -----
   const openEvidenceDrawer = async (r: DonatedRequestRow) => {
     setSelectedReq(r);
     setDrawerOpen(true);
@@ -474,7 +651,6 @@ export default function MyDonations() {
       const res = await axios.get<RequestDetailRes>(REQUEST_DETAIL(r.request_id), { withCredentials: true });
       setDetail(res.data?.project ?? null);
 
-      // ✅ also cache thumb from drawer response
       const p = res.data?.project;
       setThumbs((prev) => ({
         ...prev,
@@ -487,7 +663,6 @@ export default function MyDonations() {
     }
   };
 
-  // ✅ open receipt
   const openReceipt = async (donationId: number) => {
     setReceiptOpen(true);
     setReceipt(null);
@@ -502,172 +677,260 @@ export default function MyDonations() {
     }
   };
 
+  // Apply on tab/page/status/search changes
   useEffect(() => {
     if (tab === "donations") fetchDonations();
     if (tab === "requests") fetchDonatedRequests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, donationsPage, reqPage, status]);
+  }, [tab, donationsPage, reqPage, status, search]);
 
-  const applyFilters = () => {
+  // Nice UX: auto-apply debounced typing (but only for text, not status)
+  useEffect(() => {
+    setSearch(debouncedSearch.trim());
     setDonationsPage(1);
     setReqPage(1);
-    if (tab === "donations") fetchDonations();
-    else fetchDonatedRequests();
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  const refresh = () => (tab === "donations" ? fetchDonations() : fetchDonatedRequests());
+
+  /** ---------------- Stats ---------------- */
+  const stats = useMemo(() => {
+    const list = tab === "donations" ? donations : [];
+    const paidCount = list.filter((d) => String(d.status).toLowerCase() === "paid").length;
+    const pendingCount = list.filter((d) => String(d.status).toLowerCase() === "pending").length;
+    const sum = list.reduce((acc, d) => acc + (Number(d.amount) || 0), 0);
+
+    const reqSum = requests.reduce((acc, r) => acc + (Number(r.total_donated) || 0), 0);
+    const reqCount = reqTotal;
+
+    return { sum, paidCount, pendingCount, reqSum, reqCount };
+  }, [donations, requests, reqTotal, tab]);
 
   return (
-    <div className="w-full px-3 sm:px-0">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="text-xs text-slate-500 font-bold">Donor dashboard</div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900">My Donations</div>
-          <div className="text-sm text-slate-600 mt-1">
-            View <b>Donations</b> separately and <b>Donated Requests</b> (open evidence drawer).
-          </div>
-        </div>
+    <div className="w-full px-3 sm:px-0 pb-10">
+      <SectionTitle
+        title="My Donations"
+        subtitle="Track your donations and open evidence for donated requests."
+        right={
+          <button
+            onClick={refresh}
+            className="rounded-2xl px-4 py-2.5 font-black bg-slate-900 text-white hover:opacity-95 flex items-center gap-2"
+          >
+            <ArrowPathIcon className="h-5 w-5" />
+            Refresh
+          </button>
+        }
+      />
 
-        <button
-          onClick={() => (tab === "donations" ? fetchDonations() : fetchDonatedRequests())}
-          className="rounded-2xl px-4 py-2.5 font-extrabold bg-slate-900 text-white hover:opacity-95"
-        >
-          Refresh
-        </button>
+      {/* Summary row */}
+      <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StatCard
+          label={tab === "donations" ? "Total (this page list)" : "Total donated (requests page)"}
+          value={formatLKR(tab === "donations" ? stats.sum : stats.reqSum)}
+          hint={tab === "donations" ? "Based on currently loaded donations list" : "Based on grouped donated requests"}
+          icon={<ReceiptPercentIcon className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Status"
+          value={
+            tab === "donations"
+              ? `${stats.paidCount} Paid • ${stats.pendingCount} Pending`
+              : status === "all"
+              ? "Paid + Pending"
+              : status === "paid"
+              ? "Paid"
+              : "Pending"
+          }
+          hint="Use filters below to change"
+          icon={<CheckCircleIcon className="h-5 w-5" />}
+        />
+        <StatCard
+          label={tab === "requests" ? "Donated requests" : "Total donations"}
+          value={tab === "requests" ? String(stats.reqCount) : String(donationsTotal)}
+          hint={tab === "requests" ? "Grouped by request" : "Across all pages"}
+          icon={<BuildingOffice2Icon className="h-5 w-5" />}
+        />
       </div>
 
-      {/* Tabs */}
-      <div className="mt-6 inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
-        <button
-          onClick={() => setTab("requests")}
-          className={cx(
-            "px-4 py-2 rounded-xl text-sm font-extrabold transition",
-            tab === "requests" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-50"
-          )}
-        >
-          Donated Requests (Evidence)
-        </button>
-        <button
-          onClick={() => setTab("donations")}
-          className={cx(
-            "px-4 py-2 rounded-xl text-sm font-extrabold transition",
-            tab === "donations" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-50"
-          )}
-        >
-          Donations List
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div className="mt-4 rounded-3xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-          <div className="lg:col-span-7">
-            <label className="text-xs font-extrabold text-slate-600">Search</label>
-            <div className="mt-1 relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔎</div>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by request title / school / district / province..."
-                className="w-full rounded-2xl border border-slate-200 pl-9 pr-3 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+      {/* Tabs + Filters */}
+      <div className="mt-5 sticky top-[10px] z-[5]">
+        <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className="p-3 sm:p-4 flex flex-col gap-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <Segmented
+                value={tab}
+                onChange={(v) => {
+                  setTab(v as any);
+                  setDonationsPage(1);
+                  setReqPage(1);
+                }}
+                items={[
+                  { key: "requests", label: "Donated Requests (Evidence)", icon: <Squares2X2Icon className="h-4 w-4" /> },
+                  { key: "donations", label: "Donations List", icon: <ListBulletIcon className="h-4 w-4" /> },
+                ]}
               />
+
+              <div className="flex items-center gap-2">
+                {status === "paid" ? <Pill tone="emerald" icon={<CheckCircleIcon className="h-3.5 w-3.5" />}>PAID</Pill> : null}
+                {status === "pending" ? <Pill tone="amber" icon={<ClockIcon className="h-3.5 w-3.5" />}>PENDING</Pill> : null}
+                {status === "all" ? <Pill tone="slate">ALL</Pill> : null}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+              <div className="lg:col-span-7">
+                <label className="text-xs font-black text-slate-600">Search</label>
+                <div className="mt-1 relative">
+                  <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={draftSearch}
+                    onChange={(e) => setDraftSearch(e.target.value)}
+                    placeholder="Search by request title / school / district / province..."
+                    className="w-full rounded-2xl border border-slate-200 pl-10 pr-10 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+                  />
+                  {draftSearch ? (
+                    <button
+                      onClick={() => setDraftSearch("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                      title="Clear"
+                    >
+                      <XMarkIcon className="h-5 w-5" />
+                    </button>
+                  ) : null}
+                </div>
+                <div className="mt-1 text-[11px] text-slate-500">
+                  Tip: typing auto-applies (debounced). Status changes apply instantly.
+                </div>
+              </div>
+
+              <div className="lg:col-span-3">
+                <label className="text-xs font-black text-slate-600">Status</label>
+                <select
+                  value={status}
+                  onChange={(e) => {
+                    setStatus(e.target.value as any);
+                    setDonationsPage(1);
+                    setReqPage(1);
+                  }}
+                  className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+                >
+                  <option value="paid">Paid</option>
+                  <option value="pending">Pending</option>
+                  <option value="all">All</option>
+                </select>
+              </div>
+
+              <div className="lg:col-span-2 flex items-end">
+                <button
+                  onClick={() => refresh()}
+                  className="w-full rounded-2xl px-3 py-3 text-sm font-black border border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-2"
+                >
+                  <ArrowPathIcon className="h-5 w-5 text-slate-700" />
+                  Apply
+                </button>
+              </div>
             </div>
           </div>
-
-          <div className="lg:col-span-3">
-            <label className="text-xs font-extrabold text-slate-600">Status</label>
-            <select
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value as any);
-                setDonationsPage(1);
-                setReqPage(1);
-              }}
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
-            >
-              <option value="paid">Paid</option>
-              <option value="pending">Pending</option>
-              <option value="all">All</option>
-            </select>
-          </div>
-
-          <div className="lg:col-span-2 flex items-end">
-            <button
-              onClick={applyFilters}
-              className="w-full rounded-2xl px-3 py-3 text-sm font-extrabold border border-slate-200 hover:bg-slate-50"
-            >
-              Apply
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* Errors */}
-      {err ? <div className="mt-4 rounded-3xl border border-rose-200 bg-rose-50 p-5 text-rose-800">{err}</div> : null}
+      {err ? (
+        <div className="mt-4 rounded-3xl border border-rose-200 bg-rose-50 p-5 text-rose-800">
+          <div className="font-black">Something went wrong</div>
+          <div className="text-sm mt-1">{err}</div>
+        </div>
+      ) : null}
 
-      {/* ---------------- Tab Content ---------------- */}
+      {/* Content */}
       <div className="mt-6">
-        {/* ====== TAB: DONATIONS LIST ====== */}
+        {/* Donations List */}
         {tab === "donations" && (
           <>
             {loadingDonations ? (
-              <div className="text-slate-500 text-center py-12">Loading…</div>
-            ) : donations.length === 0 ? (
-              <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-                <div className="text-4xl mb-3">💸</div>
-                <div className="text-slate-900 font-extrabold text-xl">No donations found</div>
-                <div className="text-slate-500 text-sm mt-1">Try changing filters.</div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <SkeletonCard key={i} />
+                ))}
               </div>
+            ) : donations.length === 0 ? (
+              <EmptyState
+                icon={<ReceiptPercentIcon className="h-6 w-6" />}
+                title="No donations found"
+                desc="Try changing filters or clearing search."
+              />
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {donations.map((d) => {
-                  const t = thumbs[d.request_id];
-                  const requestImage = d.request_image_url ?? t?.request_image ?? null;
-                  const schoolLogo = d.school_logo_url ?? t?.school_logo ?? null;
+                  const reqId = Number(d.request_id) || 0;
+                  const isDirectFund = reqId <= 0;
+
+                  const t = !isDirectFund ? thumbs[reqId] : undefined;
+
+                  const requestImage = isDirectFund ? null : d.request_image_url ?? t?.request_image ?? null;
+                  const schoolLogo = d.school_logo_url ?? (isDirectFund ? null : t?.school_logo ?? null);
+
+                  const title = isDirectFund ? "Direct School Fund" : d.request_title || `Request #${reqId}`;
+                  const schoolName = d.school_name?.trim() ? d.school_name : "School";
 
                   return (
-                    <div key={d.donation_id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div
+                      key={d.donation_id}
+                      className={cx(
+                        "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm",
+                        "transition hover:shadow-md hover:border-slate-300"
+                      )}
+                    >
                       <div className="flex items-start gap-4">
                         <Avatar
-                          label={d.school_name}
-                          requestId={d.request_id}
+                          label={schoolName}
+                          requestId={reqId}
                           requestImage={requestImage}
                           schoolLogo={schoolLogo}
-                          getThumb={fetchThumbForRequest}
+                          getThumb={(id) => {
+                            if (id > 0) fetchThumbForRequest(id);
+                          }}
                         />
 
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <div className="text-base font-extrabold text-slate-900 truncate">
-                                {d.request_title || `Request #${d.request_id}`}
+                              <div className="text-base font-black text-slate-900 truncate">{title}</div>
+
+                              <div className="mt-1 text-xs text-slate-500 truncate flex items-center gap-2">
+                                <BuildingOffice2Icon className="h-4 w-4 text-slate-400" />
+                                <span className="font-bold text-slate-700">{schoolName}</span>
+                                {(d.province || d.district) && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <MapPinIcon className="h-4 w-4 text-slate-400" />
+                                    {d.province ? d.province : ""}
+                                    {d.district ? ` • ${d.district}` : ""}
+                                  </span>
+                                )}
                               </div>
-                              <div className="mt-1 text-xs text-slate-500 truncate">
-                                <span className="font-bold text-slate-600">{d.school_name || "School"}</span>
-                                {d.province ? ` • ${d.province}` : ""}
-                                {d.district ? ` • ${d.district}` : ""}
+
+                              <div className="mt-3 flex items-center gap-2">
+                                <Pill tone={statusTone(d.status)} icon={statusIcon(d.status) || undefined}>
+                                  {String(d.status).toUpperCase()}
+                                </Pill>
+                                <Pill tone="indigo">#{d.donation_id}</Pill>
+                                {isDirectFund ? <Pill tone="slate">SCHOOL FUND</Pill> : null}
                               </div>
                             </div>
 
                             <div className="shrink-0 text-right">
-                              <div className="text-slate-900 font-extrabold">{formatLKR(Number(d.amount) || 0)}</div>
-                              <div className="mt-2 flex items-center justify-end">
-                                <Pill tone={statusTone(d.status)}>{String(d.status).toUpperCase()}</Pill>
-                              </div>
+                              <div className="text-slate-900 font-black">{formatLKR(Number(d.amount) || 0)}</div>
+                              <div className="mt-1 text-xs text-slate-500">{d.time || new Date(d.created_at).toLocaleString()}</div>
                             </div>
                           </div>
 
-                          <div className="mt-4 flex items-center justify-between gap-3">
-                            <div className="text-xs text-slate-500">
-                              <span className="font-bold text-slate-700">#{d.donation_id}</span>
-                              <span className="mx-2">•</span>
-                              <span>{d.time || new Date(d.created_at).toLocaleString()}</span>
-                            </div>
-
+                          <div className="mt-4 flex items-center justify-end gap-2">
                             <button
                               onClick={() => openReceipt(d.donation_id)}
-                              className="rounded-xl px-3 py-2 text-xs font-extrabold border border-slate-200 hover:bg-slate-50"
+                              className="rounded-2xl px-3 py-2 text-xs font-black border border-slate-200 hover:bg-slate-50 flex items-center gap-2"
                             >
-                              View Receipt →
+                              <ReceiptPercentIcon className="h-4 w-4 text-slate-700" />
+                              View Receipt
                             </button>
                           </div>
                         </div>
@@ -678,18 +941,18 @@ export default function MyDonations() {
               </div>
             )}
 
-            {/* Donations Pagination */}
+            {/* Pagination */}
             <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="text-sm text-slate-600">
-                Page <span className="font-extrabold text-slate-900">{donationsPage}</span> / {donationsPages} • Total{" "}
-                <span className="font-extrabold text-slate-900">{donationsTotal}</span>
+                Page <span className="font-black text-slate-900">{donationsPage}</span> / {donationsPages} • Total{" "}
+                <span className="font-black text-slate-900">{donationsTotal}</span>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   disabled={donationsPage <= 1}
                   onClick={() => setDonationsPage((p) => Math.max(1, p - 1))}
                   className={cx(
-                    "rounded-2xl px-4 py-2 text-sm font-extrabold border",
+                    "rounded-2xl px-4 py-2 text-sm font-black border",
                     donationsPage <= 1 ? "border-slate-200 text-slate-400" : "border-slate-200 hover:bg-slate-50"
                   )}
                 >
@@ -699,7 +962,7 @@ export default function MyDonations() {
                   disabled={donationsPage >= donationsPages}
                   onClick={() => setDonationsPage((p) => Math.min(donationsPages, p + 1))}
                   className={cx(
-                    "rounded-2xl px-4 py-2 text-sm font-extrabold border",
+                    "rounded-2xl px-4 py-2 text-sm font-black border",
                     donationsPage >= donationsPages ? "border-slate-200 text-slate-400" : "border-slate-200 hover:bg-slate-50"
                   )}
                 >
@@ -710,17 +973,17 @@ export default function MyDonations() {
           </>
         )}
 
-        {/* ====== TAB: DONATED REQUESTS (Evidence Drawer) ====== */}
+        {/* Donated Requests */}
         {tab === "requests" && (
           <>
             {loadingRequests ? (
-              <div className="text-slate-500 text-center py-12">Loading…</div>
-            ) : requests.length === 0 ? (
-              <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-                <div className="text-4xl mb-3">🎁</div>
-                <div className="text-slate-900 font-extrabold text-xl">No donated requests</div>
-                <div className="text-slate-500 text-sm mt-1">Donate to a request and it will appear here.</div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <SkeletonCard key={i} />
+                ))}
               </div>
+            ) : requests.length === 0 ? (
+              <EmptyState icon={<GiftIcon />} title="No donated requests" desc="Donate to a request and it will appear here." />
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {requests.map((r) => {
@@ -749,35 +1012,43 @@ export default function MyDonations() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <div className="text-base font-extrabold text-slate-900 truncate">{r.request_title}</div>
-                              <div className="mt-1 text-xs text-slate-500 truncate">
-                                <span className="font-bold text-slate-600">{r.school_name || "School"}</span>
-                                {r.province ? ` • ${r.province}` : ""}
-                                {r.district ? ` • ${r.district}` : ""}
+                              <div className="text-base font-black text-slate-900 truncate">{r.request_title}</div>
+
+                              <div className="mt-1 text-xs text-slate-500 truncate flex items-center gap-2">
+                                <BuildingOffice2Icon className="h-4 w-4 text-slate-400" />
+                                <span className="font-bold text-slate-700">{r.school_name || "School"}</span>
+                                {(r.province || r.district) && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <MapPinIcon className="h-4 w-4 text-slate-400" />
+                                    {r.province ? r.province : ""}
+                                    {r.district ? ` • ${r.district}` : ""}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="mt-3 flex items-center gap-2">
+                                <Pill tone="indigo">Request #{r.request_id}</Pill>
+                                <Pill tone="slate">{r.donations_count} donation{r.donations_count === 1 ? "" : "s"}</Pill>
                               </div>
                             </div>
 
                             <div className="shrink-0 text-right">
-                              <div className="text-slate-900 font-extrabold">{formatLKR(Number(r.total_donated) || 0)}</div>
-                              <div className="mt-1 text-xs text-slate-500">
-                                {r.donations_count} donation{r.donations_count === 1 ? "" : "s"}
-                              </div>
+                              <div className="text-slate-900 font-black">{formatLKR(Number(r.total_donated) || 0)}</div>
+                              {r.last_donated_at ? (
+                                <div className="mt-1 text-xs text-slate-500 flex items-center gap-1 justify-end">
+                                  <ClockIcon className="h-4 w-4 text-slate-400" />
+                                  {new Date(r.last_donated_at).toLocaleString()}
+                                </div>
+                              ) : (
+                                <div className="mt-1 text-xs text-slate-400">—</div>
+                              )}
                             </div>
                           </div>
 
-                          <div className="mt-4 flex items-center justify-between">
-                            <div className="text-xs text-slate-500">
-                              <span className="font-bold text-slate-700">Request #{r.request_id}</span>
-                              {r.last_donated_at ? (
-                                <>
-                                  <span className="mx-2">•</span>
-                                  <span>Last: {new Date(r.last_donated_at).toLocaleString()}</span>
-                                </>
-                              ) : null}
-                            </div>
-
-                            <div className="text-xs font-extrabold text-slate-700 group-hover:text-slate-900">
-                              View evidence →
+                          <div className="mt-4 flex items-center justify-end">
+                            <div className="text-xs font-black text-slate-700 group-hover:text-slate-900 flex items-center gap-2">
+                              <EyeIcon className="h-4 w-4" />
+                              View evidence
                             </div>
                           </div>
                         </div>
@@ -788,18 +1059,18 @@ export default function MyDonations() {
               </div>
             )}
 
-            {/* Requests Pagination */}
+            {/* Pagination */}
             <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="text-sm text-slate-600">
-                Page <span className="font-extrabold text-slate-900">{reqPage}</span> / {reqPages} • Total{" "}
-                <span className="font-extrabold text-slate-900">{reqTotal}</span>
+                Page <span className="font-black text-slate-900">{reqPage}</span> / {reqPages} • Total{" "}
+                <span className="font-black text-slate-900">{reqTotal}</span>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   disabled={reqPage <= 1}
                   onClick={() => setReqPage((p) => Math.max(1, p - 1))}
                   className={cx(
-                    "rounded-2xl px-4 py-2 text-sm font-extrabold border",
+                    "rounded-2xl px-4 py-2 text-sm font-black border",
                     reqPage <= 1 ? "border-slate-200 text-slate-400" : "border-slate-200 hover:bg-slate-50"
                   )}
                 >
@@ -809,7 +1080,7 @@ export default function MyDonations() {
                   disabled={reqPage >= reqPages}
                   onClick={() => setReqPage((p) => Math.min(reqPages, p + 1))}
                   className={cx(
-                    "rounded-2xl px-4 py-2 text-sm font-extrabold border",
+                    "rounded-2xl px-4 py-2 text-sm font-black border",
                     reqPage >= reqPages ? "border-slate-200 text-slate-400" : "border-slate-200 hover:bg-slate-50"
                   )}
                 >
@@ -831,46 +1102,124 @@ export default function MyDonations() {
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Request info */}
+            {/* Request summary */}
             <div className="rounded-3xl border border-slate-200 p-5">
-              <div className="text-xs text-slate-500 font-bold">Request</div>
-              <div className="mt-1 text-lg font-extrabold text-slate-900">{detail.request_title}</div>
-              {detail.description ? <div className="mt-2 text-sm text-slate-600">{detail.description}</div> : null}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs text-slate-500 font-black flex items-center gap-2">
+                    <DocumentTextIcon className="h-4 w-4 text-slate-400" />
+                    Request
+                  </div>
+                  <div className="mt-1 text-lg font-black text-slate-900">{detail.request_title}</div>
+                  {detail.category ? (
+                    <div className="mt-2">
+                      <Pill tone="indigo">{String(detail.category).toUpperCase()}</Pill>
+                    </div>
+                  ) : null}
+                </div>
+                {detail.status ? (
+                  <Pill tone={statusTone(detail.status)} icon={statusIcon(detail.status) || undefined}>
+                    {String(detail.status).toUpperCase()}
+                  </Pill>
+                ) : null}
+              </div>
+
+              {detail.description ? <div className="mt-3 text-sm text-slate-600">{detail.description}</div> : null}
 
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-2xl bg-slate-50 p-3">
-                  <div className="text-xs text-slate-500 font-bold">Goal</div>
-                  <div className="font-extrabold text-slate-900">{formatLKR(Number(detail.estimated_price) || 0)}</div>
+                <div className="rounded-2xl bg-slate-50 p-3 border border-slate-200">
+                  <div className="text-xs text-slate-500 font-black">Goal</div>
+                  <div className="font-black text-slate-900">{formatLKR(Number(detail.estimated_price) || 0)}</div>
                 </div>
-                <div className="rounded-2xl bg-slate-50 p-3">
-                  <div className="text-xs text-slate-500 font-bold">Raised</div>
-                  <div className="font-extrabold text-slate-900">{formatLKR(Number(detail.amount_raised) || 0)}</div>
+                <div className="rounded-2xl bg-slate-50 p-3 border border-slate-200">
+                  <div className="text-xs text-slate-500 font-black">Raised</div>
+                  <div className="font-black text-slate-900">{formatLKR(Number(detail.amount_raised) || 0)}</div>
                 </div>
+              </div>
+
+              <div className="mt-4">
+                {(() => {
+                  const goal = Number(detail.estimated_price) || 0;
+                  const raised = Number(detail.amount_raised) || 0;
+                  const pct = goal > 0 ? (raised / goal) * 100 : 0;
+                  return (
+                    <>
+                      <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+                        <span className="font-bold">Progress</span>
+                        <span className="font-bold">{Math.round(Math.max(0, Math.min(100, pct)))}%</span>
+                      </div>
+                      <ProgressBar value={pct} />
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
             {/* School info */}
             <div className="rounded-3xl border border-slate-200 p-5">
-              <div className="text-xs text-slate-500 font-bold">School</div>
-              <div className="mt-1 font-extrabold text-slate-900">{detail.school?.school_name || "School"}</div>
-              <div className="mt-1 text-sm text-slate-600">
-                {detail.school?.province ? `${detail.school.province}` : ""}
-                {detail.school?.district ? ` • ${detail.school.district}` : ""}
+              <div className="text-xs text-slate-500 font-black flex items-center gap-2">
+                <BuildingOffice2Icon className="h-4 w-4 text-slate-400" />
+                School
               </div>
-              {detail.school?.address ? <div className="mt-2 text-sm text-slate-600">{detail.school.address}</div> : null}
+              <div className="mt-1 font-black text-slate-900">{detail.school?.school_name || "School"}</div>
+
+              <div className="mt-2 text-sm text-slate-600 flex items-center gap-2">
+                <MapPinIcon className="h-4 w-4 text-slate-400" />
+                <span>
+                  {detail.school?.province ? `${detail.school.province}` : ""}
+                  {detail.school?.district ? ` • ${detail.school.district}` : ""}
+                </span>
+              </div>
+
+              {detail.school?.address ? (
+                <div className="mt-2 text-sm text-slate-600 flex items-start gap-2">
+                  <MapPinIcon className="h-4 w-4 text-slate-400 mt-0.5" />
+                  <span>{detail.school.address}</span>
+                </div>
+              ) : null}
+
+              {(detail.school?.contact_email || detail.school?.contact_phone) && (
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  {detail.school?.contact_email ? (
+                    <div className="rounded-2xl bg-slate-50 p-3 border border-slate-200">
+                      <div className="text-xs text-slate-500 font-black">Email</div>
+                      <div className="font-semibold text-slate-900 break-all">{detail.school.contact_email}</div>
+                    </div>
+                  ) : null}
+                  {detail.school?.contact_phone ? (
+                    <div className="rounded-2xl bg-slate-50 p-3 border border-slate-200">
+                      <div className="text-xs text-slate-500 font-black">Phone</div>
+                      <div className="font-semibold text-slate-900 break-all">{detail.school.contact_phone}</div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </div>
 
             {/* Evidence */}
             <div className="rounded-3xl border border-slate-200 p-5">
-              <div className="text-xs text-slate-500 font-bold">Evidence uploaded</div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-slate-500 font-black flex items-center gap-2">
+                    <PhotoIcon className="h-4 w-4 text-slate-400" />
+                    Evidence uploaded
+                  </div>
+                  <div className="text-sm text-slate-600 mt-1">
+                    {detail.evidences?.length ? `${detail.evidences.length} file(s)` : "No files yet"}
+                  </div>
+                </div>
+                {detail.evidences?.length ? <Pill tone="slate">OPEN</Pill> : null}
+              </div>
 
               {!detail.evidences || detail.evidences.length === 0 ? (
-                <div className="mt-3 text-sm text-slate-600">No evidence uploaded yet.</div>
+                <div className="mt-4 text-sm text-slate-600">
+                  No evidence uploaded yet.
+                  <div className="text-xs text-slate-500 mt-1">Once the school uploads proof, it will appear here.</div>
+                </div>
               ) : (
-                <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {detail.evidences.map((e) => {
-                    const isPdf =
-                      String(e.file_type).toLowerCase() === "pdf" || e.file_url.toLowerCase().endsWith(".pdf");
+                    const isPdf = String(e.file_type).toLowerCase() === "pdf" || e.file_url.toLowerCase().endsWith(".pdf");
                     const href = `http://localhost:8000${e.file_url}`;
 
                     if (isPdf) {
@@ -882,9 +1231,17 @@ export default function MyDonations() {
                           rel="noreferrer"
                           className="rounded-3xl border border-slate-200 p-4 hover:bg-slate-50 transition"
                         >
-                          <div className="font-extrabold text-slate-900">📄 PDF Evidence</div>
-                          {e.note ? <div className="text-xs text-slate-600 mt-2">{e.note}</div> : null}
-                          <div className="text-xs text-slate-500 mt-1 break-all">{e.file_url}</div>
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="font-black text-slate-900 flex items-center gap-2">
+                                <DocumentTextIcon className="h-5 w-5 text-slate-700" />
+                                PDF Evidence
+                              </div>
+                              {e.note ? <div className="text-xs text-slate-600 mt-2">{e.note}</div> : null}
+                              <div className="text-[11px] text-slate-500 mt-2 break-all">{e.file_url}</div>
+                            </div>
+                            <div className="text-xs font-black text-slate-700">Open →</div>
+                          </div>
                         </a>
                       );
                     }
@@ -901,7 +1258,10 @@ export default function MyDonations() {
                           <img src={href} alt="evidence" className="w-full h-full object-cover" />
                         </div>
                         <div className="p-4">
-                          <div className="font-extrabold text-slate-900">🖼️ Image Evidence</div>
+                          <div className="font-black text-slate-900 flex items-center gap-2">
+                            <PhotoIcon className="h-5 w-5 text-slate-700" />
+                            Image Evidence
+                          </div>
                           {e.note ? <div className="text-xs text-slate-600 mt-1">{e.note}</div> : null}
                         </div>
                       </a>
@@ -914,8 +1274,17 @@ export default function MyDonations() {
         )}
       </Drawer>
 
-      {/* ✅ Receipt Modal */}
+      {/* Receipt Modal */}
       <ReceiptModal open={receiptOpen} onClose={() => setReceiptOpen(false)} receipt={receipt} loading={receiptLoading} />
     </div>
+  );
+}
+
+/** small missing icon used in EmptyState above */
+function GiftIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor" aria-hidden="true">
+      <path d="M20 7h-1.4a3.5 3.5 0 0 0-6.6-1.3A3.5 3.5 0 0 0 5.4 7H4a2 2 0 0 0-2 2v2h10V7h2v4h10V9a2 2 0 0 0-2-2Zm-6.5-1.5A1.5 1.5 0 1 1 15 7h-2V5.5ZM9 7a1.5 1.5 0 1 1 1.5-1.5V7H9Zm3 6H2v7a2 2 0 0 0 2 2h8v-9Zm2 9h6a2 2 0 0 0 2-2v-7H14v9Z" />
+    </svg>
   );
 }

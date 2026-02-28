@@ -11,114 +11,21 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import "../css/index.css";
-
-/* ======================= Icons ======================= */
-const Users = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="22"
-    height="22"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-    <circle cx="9" cy="7" r="4" />
-    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
-
-const Heart = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="22"
-    height="22"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-  </svg>
-);
-
-const TrendingUp = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="22"
-    height="22"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-    <polyline points="16 7 22 7 22 13" />
-  </svg>
-);
-
-const DollarSign = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="22"
-    height="22"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <line x1="12" x2="12" y1="2" y2="22" />
-    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-  </svg>
-);
-
-const AlertIcon = ({ tone }: { tone: "amber" | "rose" | "blue" }) => {
-  const color =
-    tone === "amber"
-      ? "text-amber-700"
-      : tone === "rose"
-      ? "text-rose-700"
-      : "text-blue-700";
-
-  return (
-    <div
-      className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-        tone === "amber"
-          ? "bg-amber-100"
-          : tone === "rose"
-          ? "bg-rose-100"
-          : "bg-blue-100"
-      }`}
-    >
-      <svg
-        className={color}
-        xmlns="http://www.w3.org/2000/svg"
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-        <line x1="12" x2="12" y1="9" y2="13" />
-        <line x1="12" x2="12.01" y1="17" y2="17" />
-      </svg>
-    </div>
-  );
-};
+import {
+  ArrowTrendingUpIcon,
+  BanknotesIcon,
+  BellAlertIcon,
+  BuildingOffice2Icon,
+  ChartBarIcon,
+  CheckCircleIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  ExclamationTriangleIcon,
+  HeartIcon,
+  UsersIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/solid";
 
 /* ======================= Types ======================= */
 interface CardProps {
@@ -156,9 +63,7 @@ type RangeKey = "6M" | "12M" | "ALL";
 
 /* ======================= Small UI Components ======================= */
 const Card: React.FC<CardProps> = ({ children, className = "" }) => (
-  <div
-    className={`bg-white rounded-2xl shadow-sm border border-slate-200 ${className}`}
-  >
+  <div className={`bg-white rounded-2xl shadow-sm border border-slate-200 ${className}`}>
     {children}
   </div>
 );
@@ -168,9 +73,8 @@ const Skeleton: React.FC<{ className?: string }> = ({ className = "" }) => (
 );
 
 const Progress: React.FC<ProgressProps> = ({ value, className = "" }) => (
-  <div
-    className={`w-full bg-slate-100 rounded-full overflow-hidden ${className}`}
-  >
+  <div className={`w-full bg-slate-100 rounded-full overflow-hidden ${className}`}>
+    {/* ✅ keep your blue */}
     <div
       className="h-full bg-blue-600 transition-all duration-300"
       style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
@@ -179,27 +83,24 @@ const Progress: React.FC<ProgressProps> = ({ value, className = "" }) => (
 );
 
 const Avatar: React.FC<AvatarProps> = ({ children, className = "" }) => (
-  <div
-    className={`w-10 h-10 rounded-full flex items-center justify-center ${className}`}
-  >
+  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${className}`}>
     {children}
   </div>
 );
 
 const Pill: React.FC<{
-  tone?: "green" | "amber" | "blue" | "slate";
+  tone?: "green" | "amber" | "blue" | "slate" | "rose";
   children: React.ReactNode;
 }> = ({ tone = "slate", children }) => {
   const tones: Record<string, string> = {
     green: "bg-green-50 text-green-700 border-green-200",
     amber: "bg-amber-50 text-amber-700 border-amber-200",
     blue: "bg-blue-50 text-blue-700 border-blue-200",
+    rose: "bg-rose-50 text-rose-700 border-rose-200",
     slate: "bg-slate-50 text-slate-700 border-slate-200",
   };
   return (
-    <span
-      className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full border ${tones[tone]}`}
-    >
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full border ${tones[tone]}`}>
       {children}
     </span>
   );
@@ -216,7 +117,7 @@ const Button: React.FC<ButtonProps> = ({
     type={type}
     onClick={onClick}
     disabled={disabled}
-    className={`inline-flex items-center justify-center rounded-xl font-semibold transition-colors
+    className={`inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors
       focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2
       px-4 py-2 text-sm bg-blue-700 text-white hover:bg-blue-800
       disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-700 ${className}`}
@@ -236,7 +137,7 @@ const SecondaryButton: React.FC<ButtonProps> = ({
     type={type}
     onClick={onClick}
     disabled={disabled}
-    className={`inline-flex items-center justify-center rounded-xl font-semibold transition-colors
+    className={`inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors
       focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2
       px-4 py-2 text-sm bg-slate-100 text-slate-700 hover:bg-slate-200
       disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
@@ -245,28 +146,24 @@ const SecondaryButton: React.FC<ButtonProps> = ({
   </button>
 );
 
-const MiniSpark: React.FC<{ data?: { x: string; y: number }[] }> = ({
-  data,
-}) => {
+/** ✅ Sparkline with UNIQUE gradient id (prevents collisions) */
+const MiniSpark: React.FC<{ data?: { x: string; y: number }[]; gid: string }> = ({ data, gid }) => {
   if (!data || data.length < 2) return <div className="h-9" />;
   const safe = data.map((d) => ({ ...d, y: Number(d.y || 0) }));
+  const fillId = `sparkFill-${gid}`;
+
   return (
     <div className="h-9 w-24">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={safe} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
           <defs>
-            <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
+            {/* ✅ keep your blue */}
+            <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="10%" stopColor="#1d4ed8" stopOpacity={0.25} />
               <stop offset="90%" stopColor="#1d4ed8" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <Area
-            type="monotone"
-            dataKey="y"
-            stroke="#1d4ed8"
-            fill="url(#sparkFill)"
-            strokeWidth={2}
-          />
+          <Area type="monotone" dataKey="y" stroke="#1d4ed8" fill={`url(#${fillId})`} strokeWidth={2} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -274,6 +171,8 @@ const MiniSpark: React.FC<{ data?: { x: string; y: number }[] }> = ({
 };
 
 /* ======================= Helpers ======================= */
+// const cx = (...s: Array<string | false | null | undefined>) => s.filter(Boolean).join(" ");
+
 const toInitials = (name?: string) => {
   if (!name) return "?";
   return name
@@ -287,10 +186,15 @@ const toInitials = (name?: string) => {
 const fmtMoney = (n: number) => `LKR ${Number(n || 0).toLocaleString()}`;
 
 const normalizeChange = (x: any): ChangeObj => {
-  const state: ChangeState =
-    x?.state === "new" || x?.state === "zero" ? x.state : "ok";
+  const state: ChangeState = x?.state === "new" || x?.state === "zero" ? x.state : "ok";
   const pct = x?.pct === null || x?.pct === undefined ? null : Number(x.pct);
   return { pct, state };
+};
+
+const alertIcon = (tone: "amber" | "rose" | "blue") => {
+  if (tone === "amber") return <ExclamationTriangleIcon className="h-5 w-5 text-amber-700" />;
+  if (tone === "rose") return <BellAlertIcon className="h-5 w-5 text-rose-700" />;
+  return <ChartBarIcon className="h-5 w-5 text-blue-700" />;
 };
 
 /* ======================= Page ======================= */
@@ -309,31 +213,11 @@ const AdminDashboard: React.FC = () => {
 
   // Alerts
   const [alerts, setAlerts] = useState<
-    Array<{
-      id: string;
-      tone: "amber" | "rose" | "blue";
-      title: string;
-      desc: string;
-    }>
+    Array<{ id: string; tone: "amber" | "rose" | "blue"; title: string; desc: string }>
   >([
-    {
-      id: "ending",
-      tone: "amber",
-      title: "Campaign ending soon",
-      desc: "“Health Kits Drive” ends this week.",
-    },
-    {
-      id: "verify",
-      tone: "rose",
-      title: "Pending verification",
-      desc: "3 donations require confirmation.",
-    },
-    {
-      id: "low",
-      tone: "blue",
-      title: "Low funding campaign",
-      desc: "“Playground Project” is at 22%.",
-    },
+    { id: "ending", tone: "amber", title: "Campaign ending soon", desc: "“Health Kits Drive” ends this week." },
+    { id: "verify", tone: "rose", title: "Pending verification", desc: "3 donations require confirmation." },
+    { id: "low", tone: "blue", title: "Low funding campaign", desc: "“Playground Project” is at 22%." },
   ]);
 
   const rangedChart = useMemo(() => {
@@ -344,28 +228,20 @@ const AdminDashboard: React.FC = () => {
   }, [chartData, range]);
 
   const totalInRange = useMemo(() => {
-    return rangedChart.reduce(
-      (sum: number, r: any) => sum + Number(r?.donations || 0),
-      0
-    );
+    return rangedChart.reduce((sum: number, r: any) => sum + Number(r?.donations || 0), 0);
   }, [rangedChart]);
 
   const sortedTopCampaigns = useMemo(() => {
     return [...activeCampaigns].sort(
-      (a: any, b: any) =>
-        Number(b.amount_raised || 0) - Number(a.amount_raised || 0)
+      (a: any, b: any) => Number(b.amount_raised || 0) - Number(a.amount_raised || 0)
     );
   }, [activeCampaigns]);
 
   const displayedCampaigns = useMemo(() => {
-    return sortedTopCampaigns.slice(
-      (currentPage - 1) * itemsPerPage,
-      currentPage * itemsPerPage
-    );
+    return sortedTopCampaigns.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [sortedTopCampaigns, currentPage]);
 
-  const hasNextPage =
-    currentPage * itemsPerPage < sortedTopCampaigns.length;
+  const hasNextPage = currentPage * itemsPerPage < sortedTopCampaigns.length;
 
   useEffect(() => {
     let alive = true;
@@ -380,11 +256,8 @@ const AdminDashboard: React.FC = () => {
       try {
         if (!silent && alive) setLoading(true);
 
-        // ✅ KPI: today values + weekly % badge (7d vs prev 7d)
         const [campaignRes, donorsRes, chartRes, kpiRes] = await Promise.all([
-          axios.get(
-            "http://localhost:8000/api/donation_requests?status=Approved&limit=1000&page=1"
-          ),
+          axios.get("http://localhost:8000/api/donation_requests?status=Approved&limit=1000&page=1"),
           axios.get("http://localhost:8000/api/recent-donors"),
           axios.get("http://localhost:8000/api/donation-trends"),
           axios.get("http://localhost:8000/api/dashboard/kpis-today-weekly"),
@@ -404,79 +277,39 @@ const AdminDashboard: React.FC = () => {
         const trendData = Array.isArray(chartRes.data) ? chartRes.data : [];
         setChartData(trendData);
 
-        const today = kpiRes.data?.today || {
-          donors: 0,
-          raised: 0,
-          campaigns: 0,
-          avg: 0,
-        };
-
+        const today = kpiRes.data?.today || { donors: 0, raised: 0, campaigns: 0, avg: 0 };
         const change7d = kpiRes.data?.change7d || {};
-
-        const todayDonors = Number(today.donors || 0);
-        const todayRaised = Number(today.raised || 0);
-        const todayCampaigns = Number(today.campaigns || 0);
-        const todayAvg = Number(today.avg || 0);
 
         const donorsChange = normalizeChange(change7d.donors);
         const raisedChange = normalizeChange(change7d.raised);
         const campaignsChange = normalizeChange(change7d.campaigns);
         const avgChange = normalizeChange(change7d.avg);
 
-        // mini trend from donations (for spark)
+        const todayDonors = Number(today.donors || 0);
+        const todayRaised = Number(today.raised || 0);
+        const todayCampaigns = Number(today.campaigns || 0);
+        const todayAvg = Number(today.avg || 0);
+
         const chartMini = trendData.slice(-8).map((r: any, i: number) => ({
           x: r.month ?? String(i),
           y: Number(r?.donations || 0),
         }));
 
-        // UI-only mini trends
-        const donorsMini = chartMini.map((p: any) => ({
-          ...p,
-          y: Math.max(0, Math.round(p.y / 800)),
-        }));
-        const avgMini = chartMini.map((p: any) => ({
-          ...p,
-          y: Math.max(0, Math.round(p.y / 30)),
-        }));
+        const donorsMini = chartMini.map((p: any) => ({ ...p, y: Math.max(0, Math.round(p.y / 800)) }));
+        const avgMini = chartMini.map((p: any) => ({ ...p, y: Math.max(0, Math.round(p.y / 30)) }));
         const activeMini = chartMini.map((p: any, idx: number) => ({
           ...p,
           y: chartMini.length
-            ? Math.max(
-                0,
-                Math.round((idx + 1) * (todayCampaigns / chartMini.length))
-              )
+            ? Math.max(0, Math.round((idx + 1) * (todayCampaigns / chartMini.length)))
             : 0,
         }));
 
+        // ✅ use Heroicons but keep blue theme
         setStats([
-          {
-            label: "Today Donors",
-            value: todayDonors.toLocaleString(),
-            change: donorsChange,
-            icon: Users,
-            trend: donorsMini,
-          },
-          {
-            label: "Today Raised (LKR)",
-            value: todayRaised.toLocaleString(),
-            change: raisedChange,
-            icon: DollarSign,
-            trend: chartMini,
-          },
-          {
-            label: "Today Campaigns",
-            value: todayCampaigns.toLocaleString(),
-            change: campaignsChange,
-            icon: Heart,
-            trend: activeMini,
-          },
-          {
-            label: "Today Avg Donation",
-            value: Math.round(todayAvg).toLocaleString(),
-            change: avgChange,
-            icon: TrendingUp,
-            trend: avgMini,
-          },
+          { label: "Today Donors", value: todayDonors.toLocaleString(), change: donorsChange, icon: UsersIcon as any, trend: donorsMini },
+          { label: "Today Raised (LKR)", value: todayRaised.toLocaleString(), change: raisedChange, icon: BanknotesIcon as any, trend: chartMini },
+          { label: "Today Campaigns", value: todayCampaigns.toLocaleString(), change: campaignsChange, icon: HeartIcon as any, trend: activeMini },
+          { label: "Today Avg Donation", value: Math.round(todayAvg).toLocaleString(), change: avgChange, icon: ArrowTrendingUpIcon as any, trend: avgMini },
         ]);
       } catch (error) {
         console.error("Dashboard fetch error:", error);
@@ -513,8 +346,8 @@ const AdminDashboard: React.FC = () => {
                 <Skeleton className="mt-3 w-24 h-9" />
               </Card>
             ))
-          : stats.map((stat) => {
-              const Icon = stat.icon;
+          : stats.map((stat, idx) => {
+              const Icon = stat.icon as any;
 
               const pct = stat.change.pct ?? 0;
               const isUp = pct >= 0;
@@ -537,14 +370,13 @@ const AdminDashboard: React.FC = () => {
                 <Card key={stat.label} className="p-5 hover:shadow-md transition">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
+                      {/* ✅ keep your blue badge */}
                       <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
-                        <Icon />
+                        <Icon className="h-5 w-5" />
                       </div>
                       <div>
                         <p className="text-sm text-slate-500">{stat.label}</p>
-                        <p className="mt-2 text-2xl font-bold text-slate-900">
-                          {stat.value}
-                        </p>
+                        <p className="mt-2 text-2xl font-bold text-slate-900">{stat.value}</p>
                       </div>
                     </div>
 
@@ -553,14 +385,11 @@ const AdminDashboard: React.FC = () => {
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeClass}`}
                         title="Weekly change (last 7 days vs previous 7 days)"
                       >
-                        {stat.change.state === "new"
-                          ? ""
-                          : isUp
-                          ? "▲"
-                          : "▼"}{" "}
-                        {badgeText}
+                        {stat.change.state === "new" ? "" : isUp ? "▲" : "▼"} {badgeText}
                       </span>
-                      <MiniSpark data={stat.trend} />
+
+                      {/* ✅ unique gradient id */}
+                      <MiniSpark data={stat.trend} gid={`${idx}-${stat.label.replace(/\s+/g, "-")}`} />
                     </div>
                   </div>
                 </Card>
@@ -574,7 +403,8 @@ const AdminDashboard: React.FC = () => {
         <Card className="p-6 lg:col-span-4 flex flex-col h-full">
           <div className="flex items-start justify-between mb-5 gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">
+              <h3 className="text-lg font-semibold text-slate-900 inline-flex items-center gap-2">
+                <ChartBarIcon className="h-5 w-5 text-blue-700" />
                 Donations Trend
               </h3>
               <p className="text-sm text-slate-500">Monthly donation overview</p>
@@ -598,30 +428,17 @@ const AdminDashboard: React.FC = () => {
             <Skeleton className="h-[300px] w-full" />
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart
-                data={rangedChart}
-                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-              >
+              <AreaChart data={rangedChart} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
+                  {/* ✅ keep your blue */}
                   <linearGradient id="fillDonations" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#1d4ed8" stopOpacity={0.25} />
                     <stop offset="95%" stopColor="#1d4ed8" stopOpacity={0} />
                   </linearGradient>
                 </defs>
 
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="#e2e8f0"
-                  opacity={0.6}
-                />
-                <XAxis
-                  dataKey="month"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={10}
-                  stroke="#64748b"
-                />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.6} />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={10} stroke="#64748b" />
                 <YAxis
                   tickLine={false}
                   axisLine={false}
@@ -637,12 +454,10 @@ const AdminDashboard: React.FC = () => {
                     borderRadius: "12px",
                     padding: "8px 12px",
                   }}
-                  formatter={(value: any) => [
-                    `LKR ${Number(value || 0).toLocaleString()}`,
-                    "Donations",
-                  ]}
+                  formatter={(value: any) => [`LKR ${Number(value || 0).toLocaleString()}`, "Donations"]}
                 />
 
+                {/* ✅ keep your blue */}
                 <Area
                   type="monotone"
                   dataKey="donations"
@@ -660,7 +475,8 @@ const AdminDashboard: React.FC = () => {
         <Card className="p-6 lg:col-span-3 flex flex-col h-full">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">
+              <h3 className="text-lg font-semibold text-slate-900 inline-flex items-center gap-2">
+                <HeartIcon className="h-5 w-5 text-blue-700" />
                 Top Campaigns
               </h3>
               <p className="text-sm text-slate-500">Sorted by raised amount</p>
@@ -694,10 +510,9 @@ const AdminDashboard: React.FC = () => {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <h4 className="font-semibold text-slate-900 truncate">
-                            {campaign.request_title}
-                          </h4>
-                          <p className="text-sm text-slate-500 truncate mt-1">
+                          <h4 className="font-semibold text-slate-900 truncate">{campaign.request_title}</h4>
+                          <p className="text-sm text-slate-500 truncate mt-1 inline-flex items-center gap-1.5">
+                            <BuildingOffice2Icon className="h-4 w-4 text-slate-400" />
                             {campaign.school_name}
                           </p>
                         </div>
@@ -713,9 +528,7 @@ const AdminDashboard: React.FC = () => {
                           <span className="text-slate-700 font-semibold">
                             {fmtMoney(raised)} / {fmtMoney(target)}
                           </span>
-                          <span className="text-slate-500">
-                            Remaining: {fmtMoney(remaining)}
-                          </span>
+                          <span className="text-slate-500">Remaining: {fmtMoney(remaining)}</span>
                         </div>
                       </div>
                     </div>
@@ -729,6 +542,7 @@ const AdminDashboard: React.FC = () => {
                   disabled={currentPage === 1}
                   className="px-6"
                 >
+                  <ChevronLeftIcon className="h-5 w-5" />
                   Previous
                 </SecondaryButton>
 
@@ -738,6 +552,7 @@ const AdminDashboard: React.FC = () => {
                   className="px-6"
                 >
                   Next
+                  <ChevronRightIcon className="h-5 w-5" />
                 </Button>
               </div>
             </>
@@ -751,21 +566,18 @@ const AdminDashboard: React.FC = () => {
         <Card className="p-6 lg:col-span-4">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">
+              <h3 className="text-lg font-semibold text-slate-900 inline-flex items-center gap-2">
+                <UsersIcon className="h-5 w-5 text-blue-700" />
                 Recent Donations
               </h3>
               <p className="text-sm text-slate-500">Latest contributions</p>
             </div>
-           
           </div>
 
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between gap-3"
-                >
+                <div key={i} className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <Skeleton className="w-10 h-10 rounded-full" />
                     <div>
@@ -791,20 +603,16 @@ const AdminDashboard: React.FC = () => {
                 </thead>
                 <tbody>
                   {recentDonors.slice(0, 8).map((donor: any, idx: number) => (
-                    <tr
-                      key={idx}
-                      className="border-b border-slate-100 hover:bg-slate-50"
-                    >
+                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
                       <td className="py-3 pr-3">
                         <div className="flex items-center gap-3">
                           <Avatar className="bg-blue-50 text-blue-700 font-semibold text-sm">
                             {donor.initials}
                           </Avatar>
                           <div>
-                            <p className="font-semibold text-slate-900">
-                              {donor.name}
-                            </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="font-semibold text-slate-900">{donor.name}</p>
+                            <p className="text-xs text-slate-500 inline-flex items-center gap-1.5">
+                              <ClockIcon className="h-4 w-4 text-slate-400" />
                               {donor.email || donor.time}
                             </p>
                           </div>
@@ -813,24 +621,21 @@ const AdminDashboard: React.FC = () => {
                       <td className="py-3 pr-3 font-semibold text-slate-900">
                         {fmtMoney(Number(donor.amount || 0))}
                       </td>
-                      <td className="py-3 pr-3 text-slate-700">
-                        {donor.campaign || "—"}
-                      </td>
+                      <td className="py-3 pr-3 text-slate-700">{donor.campaign || "—"}</td>
                       <td className="py-3 pr-3">
-                        <Pill tone="green">Paid</Pill>
+                        <Pill tone="green">
+                          <CheckCircleIcon className="h-4 w-4" />
+                          Paid
+                        </Pill>
                       </td>
-                      <td className="py-3 text-slate-700">
-                        {donor.date || donor.time || "—"}
-                      </td>
+                      <td className="py-3 text-slate-700">{donor.date || donor.time || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
 
               {recentDonors.length === 0 && (
-                <div className="text-center py-10 text-slate-500">
-                  No recent donations found.
-                </div>
+                <div className="text-center py-10 text-slate-500">No recent donations found.</div>
               )}
             </div>
           )}
@@ -839,7 +644,8 @@ const AdminDashboard: React.FC = () => {
         {/* Alerts */}
         <Card className="p-6 lg:col-span-3">
           <div className="mb-4">
-            <h3 className="text-lg font-semibold text-slate-900">
+            <h3 className="text-lg font-semibold text-slate-900 inline-flex items-center gap-2">
+              <BellAlertIcon className="h-5 w-5 text-blue-700" />
               Alerts & Tasks
             </h3>
             <p className="text-sm text-slate-500">Things to review</p>
@@ -862,22 +668,22 @@ const AdminDashboard: React.FC = () => {
                       : "bg-blue-50 border-blue-200"
                   }`}
                 >
-                  <AlertIcon tone={a.tone} />
+                  <div className="w-9 h-9 rounded-xl bg-white/60 border border-white/40 grid place-items-center">
+                    {alertIcon(a.tone)}
+                  </div>
+
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-slate-900">
-                      {a.title}
-                    </p>
+                    <p className="text-sm font-semibold text-slate-900">{a.title}</p>
                     <p className="text-sm text-slate-600 mt-1">{a.desc}</p>
                   </div>
+
                   <button
                     className="text-slate-500 hover:text-slate-700 font-semibold"
-                    onClick={() =>
-                      setAlerts((prev) => prev.filter((x) => x.id !== a.id))
-                    }
+                    onClick={() => setAlerts((prev) => prev.filter((x) => x.id !== a.id))}
                     aria-label="Dismiss alert"
                     title="Dismiss"
                   >
-                    ✕
+                    <XMarkIcon className="h-5 w-5" />
                   </button>
                 </div>
               ))

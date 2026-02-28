@@ -1,11 +1,11 @@
-// src/components/DonorLayout.tsx
+// src/components/MinistryLayout.tsx
 import React, { useMemo, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import "../css/index.css";
 
-/** =======================
- *  Icons (same style as Admin)
- *  ======================= */
+// =======================
+// SVG Icons (same style)
+// =======================
 const Search = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="11" cy="11" r="8" />
@@ -29,9 +29,42 @@ const LayoutDashboard = () => (
   </svg>
 );
 
+const Users = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
+
 const Heart = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+  </svg>
+);
+
+const TrendingUp = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+    <polyline points="16 7 22 7 22 13" />
+  </svg>
+);
+
+// const Settings = () => (
+//   <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+//     <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+//     <circle cx="12" cy="12" r="3" />
+//   </svg>
+// );
+
+const FileText = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+    <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+    <path d="M10 9H8" />
+    <path d="M16 13H8" />
+    <path d="M16 17H8" />
   </svg>
 );
 
@@ -52,91 +85,64 @@ const School = () => (
   </svg>
 );
 
-const Settings = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-    <circle cx="12" cy="12" r="3" />
-  </svg>
-);
-
+// =======================
+// Ministry Sidebar items
+// (edit paths to match your router)
+// =======================
 type NavItem = { icon: React.FC; label: string; to: string };
 
-/** ✅ Donor sidebar items (edit routes to match your router) */
-const donorNavItems: NavItem[] = [
-  { icon: LayoutDashboard, label: "Dashboard", to: "/donor" },
+const navItems: NavItem[] = [
+  { icon: LayoutDashboard, label: "Overview", to: "/ministry/overview" },
+  { icon: School, label: "Schools", to: "/ministry/schools" },
+  { icon: Users, label: "Donors", to: "/ministry/donors" },
+  { icon: Heart, label: "Campaigns", to: "/ministry/campaigns" },
+  { icon: DollarSign, label: "Donations", to: "/ministry/donations" },
+  { icon: TrendingUp, label: "Analytics", to: "/ministry/analytics" },
+  { icon: FileText, label: "Reports", to: "/ministry/reports" },
+  { icon: Bell, label: "Notifications", to: "/ministry/notifications" },
  
-  { icon: DollarSign, label: "My Donations", to: "/donor/mydonations" },
-  { icon: School, label: "Schools", to: "/donor/schools" },
-  
-  { icon: Bell, label: "Notifications", to: "/donor/notifications" },
-  { icon: Settings, label: "Settings", to: "/donor/settings" },
 ];
 
-const cx = (...s: Array<string | false | null | undefined>) => s.filter(Boolean).join(" ");
-
-const initialsFrom = (name?: string) => {
-  const s = (name || "").trim();
-  if (!s) return "D";
-  const parts = s.split(/\s+/).filter(Boolean);
-  const a = parts[0]?.[0] || "D";
-  const b = parts.length > 1 ? parts[parts.length - 1]?.[0] : "";
-  return (a + b).toUpperCase();
-};
-
-const DonorLayout: React.FC = () => {
+const MinistryLayout: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const navigate = useNavigate();
 
-  // You can replace these with real user data (context/props/api)
-  const donorName = "Donor";
-  const donorEmail = "donor@example.com";
-
-  const title = useMemo(() => "Hello Donor!", []);
-
-  const onLogout = () => {
-    // TODO: call your logout API if you have one, then redirect
-    setMenuOpen(false);
-    navigate("/login");
-  };
+  const title = useMemo(() => "Hello Ministry!", []);
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
-      {/* Sidebar */}
+      {/* ================= Sidebar ================= */}
       <aside className="w-64 bg-slate-900 text-slate-100 flex flex-col fixed inset-y-0 left-0">
         {/* Brand */}
         <div className="px-6 py-5 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-600/20 flex items-center justify-center">
-              <Heart />
+              <School />
             </div>
             <div>
-              <p className="font-semibold leading-5">Donor</p>
-              <p className="text-sm text-slate-300">Portal</p>
+              <p className="font-semibold leading-5">Ministry</p>
+              <p className="text-sm text-slate-300">Dashboard</p>
             </div>
           </div>
         </div>
 
         {/* Nav */}
         <nav className="px-3 py-4 space-y-1 flex-1">
-          {donorNavItems.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon;
+
             return (
               <NavLink
                 key={item.label}
                 to={item.to}
-                end={item.to === "/donor"}
+                end={item.to === "/ministry"}
                 className={({ isActive }) =>
-                  cx(
-                    "w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition",
-                    isActive
-                      ? "bg-slate-800 text-white"
-                      : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
-                  )
+                  `w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition
+                  ${isActive ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800/60 hover:text-white"}`
                 }
               >
                 {({ isActive }) => (
                   <>
-                    <span className={isActive ? "text-blue-400" : "text-slate-400"}>
+                    <span className={`${isActive ? "text-blue-400" : "text-slate-400"}`}>
                       <Icon />
                     </span>
                     {item.label}
@@ -151,36 +157,26 @@ const DonorLayout: React.FC = () => {
         <div className="p-4 border-t border-slate-800">
           <p className="text-xs text-slate-400 mb-3">Quick Actions</p>
           <div className="space-y-2">
-            <button
-              onClick={() => navigate("/donor/schools")}
-              className="w-full bg-slate-800 hover:bg-slate-700 text-white rounded-xl py-2 text-sm"
-            >
-              Browse Projects
+            <button className="w-full bg-slate-800 hover:bg-slate-700 text-white rounded-xl py-2 text-sm">
+              + Add School
             </button>
-            <button
-              onClick={() => navigate("/donor/mydonations")}
-              className="w-full bg-slate-800 hover:bg-slate-700 text-white rounded-xl py-2 text-sm"
-            >
-              View My Donations
+            <button className="w-full bg-slate-800 hover:bg-slate-700 text-white rounded-xl py-2 text-sm">
+              + Create Notice
             </button>
-            <button
-              onClick={() => navigate("/donor/settings")}
-              className="w-full bg-slate-800 hover:bg-slate-700 text-white rounded-xl py-2 text-sm"
-            >
-              Account Settings
+            <button className="w-full bg-slate-800 hover:bg-slate-700 text-white rounded-xl py-2 text-sm">
+              Export Report
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Main */}
+      {/* ================= Main ================= */}
       <div className="flex-1 flex flex-col overflow-hidden ml-64">
         {/* Topbar */}
         <header className="bg-white border-b border-slate-200">
           <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-              <p className="text-xs text-slate-500 mt-0.5">Support schools with verified needs</p>
             </div>
 
             <div className="flex items-center gap-3">
@@ -191,7 +187,7 @@ const DonorLayout: React.FC = () => {
                 </span>
                 <input
                   className="bg-transparent outline-none text-sm w-full text-slate-700"
-                  placeholder="Search schools, requests..."
+                  placeholder="Search schools, reports..."
                 />
               </div>
 
@@ -212,37 +208,30 @@ const DonorLayout: React.FC = () => {
                   aria-label="Account menu"
                 >
                   <div className="text-right hidden sm:block">
-                    <p className="text-sm font-semibold text-slate-900">{donorName}</p>
-                    <p className="text-xs text-slate-500">{donorEmail}</p>
+                    <p className="text-sm font-semibold text-slate-900">Ministry</p>
+                    <p className="text-xs text-slate-500">Officer</p>
                   </div>
                   <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-semibold">
-                    {initialsFrom(donorName)}
+                    M
                   </div>
                 </button>
 
                 {menuOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 shadow-lg rounded-xl overflow-hidden z-50">
+                  <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 shadow-lg rounded-xl overflow-hidden z-50">
                     <div className="px-4 py-3 border-b border-slate-100">
-                      <p className="text-sm font-semibold text-slate-900">{donorName}</p>
-                      <p className="text-xs text-slate-500">{donorEmail}</p>
+                      <p className="text-sm font-semibold text-slate-900">Ministry Account</p>
+                      <p className="text-xs text-slate-500">Signed in</p>
                     </div>
 
-
-                    <button
-                      onClick={() => {
-                        setMenuOpen(false);
-                        navigate("/donor/settings");
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 text-slate-700"
-                    >
+                    <button className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 text-slate-700">
+                      Profile
+                    </button>
+                    <button className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 text-slate-700">
                       Settings
                     </button>
 
                     <div className="border-t border-slate-100" />
-                    <button
-                      onClick={onLogout}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 text-rose-600"
-                    >
+                    <button className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 text-rose-600">
                       Log out
                     </button>
                   </div>
@@ -263,4 +252,4 @@ const DonorLayout: React.FC = () => {
   );
 };
 
-export default DonorLayout;
+export default MinistryLayout;
