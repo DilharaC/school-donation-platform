@@ -10,6 +10,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Support\Facades\Auth;
+use App\Services\LedgerService;
+use App\Notifications\SchoolVerifiedNotification;
+use App\Notifications\SchoolStatusChangedNotification;
+
+
+
+
+
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -120,6 +128,45 @@ class SchoolController extends Controller
             'message' => 'School registered successfully!',
             'school'  => $school,
         ], 201);
+        // ✅ LEDGER: school registered
+app(LedgerService::class)->record(
+    'SCHOOL_REGISTERED',
+    'school',
+    (int)$school->school_id,
+    [
+        'school_id' => (int)$school->school_id,
+        'school_name' => $school->school_name,
+        'registration_no' => $school->registration_no,
+        'contact_email' => $school->contact_email,
+        'district' => $school->district,
+        'province' => $school->province,
+        'documents_url' => $school->documents_url,
+        'need_score' => (float)$school->need_score,
+        'verified' => (int)$school->verified,
+        'status' => (string)$school->status,
+        'at' => now()->toDateTimeString(),
+    ]
+);
+
+// ✅ ADMIN NOTIFICATION (no admin table)
+DB::table('notifications')->insert([
+    'id' => (string) Str::uuid(),
+    'type' => 'admin',
+    'notifiable_type' => 'admin',
+    'notifiable_id' => 1,
+    'data' => json_encode([
+        'title' => 'New school registered',
+        'body'  => 'A new school registered and needs verification.',
+        'school_id' => (int)$school->school_id,
+        'school_name' => $school->school_name,
+        'registration_no' => $school->registration_no,
+        'document_link' => $school->documents_url ? url($school->documents_url) : null,
+        'time' => now()->toDateTimeString(),
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+    'read_at' => null,
+    'created_at' => now(),
+    'updated_at' => now(),
+]);
     }
 
     /**
@@ -398,59 +445,125 @@ $donationSummary = DB::table('donations')
      * ✅ Bulk update
      */
     public function bulkUpdate(Request $request)
-    {
-        $data = $request->validate([
-            'school_ids' => 'required|array|min:1',
-            'school_ids.*' => 'integer',
-            'status' => 'nullable|string',
-            'verified' => 'nullable|integer|in:0,1',
-        ]);
+{
+    $data = $request->validate([
+        'school_ids' => 'required|array|min:1',
+        'school_ids.*' => 'integer',
+        'status' => 'nullable|string',
+        'verified' => 'nullable|integer|in:0,1',
+    ]);
 
-        $ids = $data['school_ids'];
+    $ids = $data['school_ids'];
 
-        if (array_key_exists('verified', $data) && (int)$data['verified'] === 1) {
-            $missing = DB::table('schools')
-                ->whereIn('school_id', $ids)
-                ->where(function ($qq) {
-                    $qq->whereNull('registration_no')
-                        ->orWhere('registration_no', '')
-                        ->orWhereNull('documents_url')
-                        ->orWhere('documents_url', '');
-                })
-                ->count();
-
-            if ($missing > 0) {
-                return response()->json([
-                    'message' => 'Some schools missing registration_no or document. Cannot verify.'
-                ], 422);
-            }
-        }
-
-        $update = [];
-
-        if (isset($data['status'])) {
-            $st = strtolower($data['status']);
-            $update['status'] = $st === 'active' ? 'Active' : ($st === 'inactive' ? 'Inactive' : $data['status']);
-        }
-        if (array_key_exists('verified', $data)) {
-            $update['verified'] = (int)$data['verified'];
-        }
-
-        if (empty($update)) {
-            return response()->json(['message' => 'No fields to update'], 422);
-        }
-
-        $affected = DB::table('schools')
+    // ✅ If verifying, ensure required fields exist
+    if (array_key_exists('verified', $data) && (int)$data['verified'] === 1) {
+        $missing = DB::table('schools')
             ->whereIn('school_id', $ids)
-            ->update($update);
+            ->where(function ($qq) {
+                $qq->whereNull('registration_no')
+                    ->orWhere('registration_no', '')
+                    ->orWhereNull('documents_url')
+                    ->orWhere('documents_url', '');
+            })
+            ->count();
 
-        return response()->json([
-            'message' => 'Bulk update completed',
-            'affected' => $affected,
-        ]);
+        if ($missing > 0) {
+            return response()->json([
+                'message' => 'Some schools missing registration_no or document. Cannot verify.'
+            ], 422);
+        }
     }
 
+    // ✅ read BEFORE update (so we can detect changes)
+    $before = DB::table('schools')
+        ->whereIn('school_id', $ids)
+        ->get(['school_id', 'verified', 'status', 'school_name']);
 
+    $update = [];
+
+    if (isset($data['status'])) {
+        $st = strtolower($data['status']);
+        $update['status'] = $st === 'active' ? 'Active' : ($st === 'inactive' ? 'Inactive' : $data['status']);
+    }
+
+    if (array_key_exists('verified', $data)) {
+        $update['verified'] = (int)$data['verified'];
+    }
+
+    if (empty($update)) {
+        return response()->json(['message' => 'No fields to update'], 422);
+    }
+
+    // ✅ Update
+    $affected = DB::table('schools')
+        ->whereIn('school_id', $ids)
+        ->update($update);
+
+    // ✅ read AFTER update
+    $after = DB::table('schools')
+        ->whereIn('school_id', $ids)
+        ->get(['school_id', 'verified', 'status', 'school_name']);
+
+    $afterMap = $after->keyBy('school_id');
+
+    // ✅ ledger + notifications per school that actually changed
+    foreach ($before as $b) {
+        $a = $afterMap->get($b->school_id);
+        if (!$a) continue;
+
+        $changedVerified = ((int)($b->verified ?? 0) !== (int)($a->verified ?? 0));
+        $changedStatus   = (strtolower((string)($b->status ?? '')) !== strtolower((string)($a->status ?? '')));
+
+        // if no meaningful change, skip
+        if (!$changedVerified && !$changedStatus) continue;
+
+        // ✅ LEDGER entry
+        app(LedgerService::class)->record(
+            'SCHOOL_UPDATED_BY_ADMIN',
+            'school',
+            (int)$a->school_id,
+            [
+                'school_id'   => (int)$a->school_id,
+                'school_name' => $a->school_name ?? null,
+                'before' => [
+                    'verified' => (int)($b->verified ?? 0),
+                    'status'   => (string)($b->status ?? null),
+                ],
+                'after' => [
+                    'verified' => (int)($a->verified ?? 0),
+                    'status'   => (string)($a->status ?? null),
+                ],
+                'changed' => [
+                    'verified' => $changedVerified,
+                    'status'   => $changedStatus,
+                ],
+                'at' => now()->toDateTimeString(),
+            ]
+        );
+
+        // ✅ NOTIFY the school
+        $schoolModel = \App\Models\School::where('school_id', (int)$a->school_id)->first();
+        if ($schoolModel) {
+            if ($changedVerified && (int)$a->verified === 1) {
+                $schoolModel->notify(new SchoolVerifiedNotification([
+                    'school_id' => (int)$a->school_id,
+                ]));
+            }
+
+            if ($changedStatus) {
+                $schoolModel->notify(new SchoolStatusChangedNotification([
+                    'school_id' => (int)$a->school_id,
+                    'status'    => strtolower((string)$a->status),
+                ]));
+            }
+        }
+    }
+
+    return response()->json([
+        'message' => 'Bulk update completed',
+        'affected' => $affected,
+    ]);
+}
 
 
 
@@ -614,65 +727,85 @@ public function me(Request $request)
         return response()->json(['school' => $row]);
     }
 
-    public function updateMe(Request $request)
-    {
-        $user = Auth::guard('school')->user();
-        $schoolId = $user?->school_id;
+   public function updateMe(Request $request)
+{
+    $user = Auth::guard('school')->user();
+    $schoolId = $user?->school_id;
 
-        if (!$schoolId) return response()->json(['message' => 'School not authenticated'], 401);
+    if (!$schoolId) {
+        return response()->json(['message' => 'School not authenticated'], 401);
+    }
 
-        $current = DB::table('schools')->where('school_id', $schoolId)->first();
-        if (!$current) return response()->json(['message' => 'School not found'], 404);
+    $current = DB::table('schools')->where('school_id', $schoolId)->first();
+    if (!$current) {
+        return response()->json(['message' => 'School not found'], 404);
+    }
 
-        $validated = $request->validate([
-            'school_name'     => 'required|string|max:255',
-            'registration_no' => 'nullable|string|max:255',
-            'contact_email'   => 'required|email|max:255',
-            'contact_phone'   => 'nullable|string|max:20',
+    // ✅ BEFORE snapshot (take after $current is loaded)
+    $before = [
+        'school_name'     => $current->school_name ?? null,
+        'registration_no' => $current->registration_no ?? null,
+        'contact_email'   => $current->contact_email ?? null,
+        'contact_phone'   => $current->contact_phone ?? null,
+        'district'        => $current->district ?? null,
+        'province'        => $current->province ?? null,
+        'address'         => $current->address ?? null,
+        'logo_url'        => $current->logo_url ?? null,
+        'documents_url'   => $current->documents_url ?? null,
+    ];
 
-            'alt_phone'       => 'nullable|string|max:20',
-            'principal_name'  => 'nullable|string|max:150',
-            'postal_code'     => 'nullable|string|max:10',
-            'website'         => 'nullable|url|max:255',
+    $validated = $request->validate([
+        'school_name'     => 'required|string|max:255',
+        'registration_no' => 'nullable|string|max:255',
+        'contact_email'   => 'required|email|max:255',
+        'contact_phone'   => 'nullable|string|max:20',
 
-            'district'        => 'nullable|string|max:100',
-            'province'        => 'nullable|string|max:100',
-            'address'         => 'nullable|string|max:255',
-            'contact_person'  => 'nullable|string|max:150',
+        'alt_phone'       => 'nullable|string|max:20',
+        'principal_name'  => 'nullable|string|max:150',
+        'postal_code'     => 'nullable|string|max:10',
+        'website'         => 'nullable|url|max:255',
 
-            'category'        => 'required|in:Primary,Secondary',
-            'level'           => 'required|in:Grade 1-5,Grade 6-9,Grade 10-13,All',
+        'district'        => 'nullable|string|max:100',
+        'province'        => 'nullable|string|max:100',
+        'address'         => 'nullable|string|max:255',
+        'contact_person'  => 'nullable|string|max:150',
 
-            'student_count'      => 'nullable|integer|min:0',
-            'teacher_count'      => 'nullable|integer|min:0',
-            'establishment_year' => 'nullable|integer|min:1800|max:2100',
+        'category'        => 'required|in:Primary,Secondary',
+        'level'           => 'required|in:Grade 1-5,Grade 6-9,Grade 10-13,All',
 
-            'latitude'        => 'nullable|numeric',
-            'longitude'       => 'nullable|numeric',
+        'student_count'      => 'nullable|integer|min:0',
+        'teacher_count'      => 'nullable|integer|min:0',
+        'establishment_year' => 'nullable|integer|min:1800|max:2100',
 
-            'bank_name'      => 'nullable|string|max:50',
-            'account_holder' => 'nullable|string|max:100',
-            'bank_account'   => 'nullable|string|max:50',
+        'latitude'        => 'nullable|numeric',
+        'longitude'       => 'nullable|numeric',
 
-            'logo'     => 'nullable|file|mimes:jpg,jpeg,png|max:4096',
-            'document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
-        ]);
+        'bank_name'      => 'nullable|string|max:50',
+        'account_holder' => 'nullable|string|max:100',
+        'bank_account'   => 'nullable|string|max:50',
 
-        $logoPath = $current->logo_url ?? null;
-        if ($request->hasFile('logo')) {
-            $file = $request->file('logo');
-            $name = time() . '_' . Str::random(8) . '_' . $file->getClientOriginalName();
-            $file->move(public_path('uploads/logos'), $name);
-            $logoPath = 'uploads/logos/' . $name;
-        }
+        'logo'     => 'nullable|file|mimes:jpg,jpeg,png|max:4096',
+        'document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+    ]);
 
-        $docPath = $current->documents_url ?? null;
-        if ($request->hasFile('document')) {
-            $file = $request->file('document');
-            $name = time() . '_' . Str::random(8) . '_' . $file->getClientOriginalName();
-            $file->move(public_path('uploads/docs'), $name);
-            $docPath = 'uploads/docs/' . $name;
-        }
+    // prepare upload paths
+    $logoPath = $current->logo_url ?? null;
+    if ($request->hasFile('logo')) {
+        $file = $request->file('logo');
+        $name = time() . '_' . Str::random(8) . '_' . $file->getClientOriginalName();
+        $file->move(public_path('uploads/logos'), $name);
+        $logoPath = 'uploads/logos/' . $name;
+    }
+
+    $docPath = $current->documents_url ?? null;
+    if ($request->hasFile('document')) {
+        $file = $request->file('document');
+        $name = time() . '_' . Str::random(8) . '_' . $file->getClientOriginalName();
+        $file->move(public_path('uploads/docs'), $name);
+        $docPath = 'uploads/docs/' . $name;
+    }
+
+    return DB::transaction(function () use ($schoolId, $validated, $logoPath, $docPath, $before) {
 
         DB::table('schools')->where('school_id', $schoolId)->update([
             'school_name'     => $validated['school_name'],
@@ -710,15 +843,64 @@ public function me(Request $request)
         ]);
 
         $row = DB::table('schools')->where('school_id', $schoolId)->first();
+
+        // normalize for frontend
         $row->status = strtolower($row->status ?? 'inactive');
         $row->verified = (int)($row->verified ?? 0);
         $row->need_score = (float)($row->need_score ?? 0);
         $row->document_link = $row->documents_url ? url($row->documents_url) : null;
         $row->logo_link = $row->logo_url ? url($row->logo_url) : null;
 
-        return response()->json(['message' => 'Profile updated', 'school' => $row]);
-    }
+        // ✅ AFTER snapshot
+        $after = [
+            'school_name'     => $row->school_name ?? null,
+            'registration_no' => $row->registration_no ?? null,
+            'contact_email'   => $row->contact_email ?? null,
+            'contact_phone'   => $row->contact_phone ?? null,
+            'district'        => $row->district ?? null,
+            'province'        => $row->province ?? null,
+            'address'         => $row->address ?? null,
+            'logo_url'        => $row->logo_url ?? null,
+            'documents_url'   => $row->documents_url ?? null,
+        ];
 
+        // optional: skip if nothing changed
+        if ($before != $after) {
+            // ✅ LEDGER
+            app(LedgerService::class)->record(
+                'SCHOOL_PROFILE_UPDATED',
+                'school',
+                (int)$schoolId,
+                [
+                    'school_id' => (int)$schoolId,
+                    'before' => $before,
+                    'after'  => $after,
+                    'at' => now()->toDateTimeString(),
+                ]
+            );
+
+            // ✅ ADMIN NOTIFICATION (DB insert style)
+            DB::table('notifications')->insert([
+                'id' => (string) Str::uuid(),
+                'type' => 'admin',
+                'notifiable_type' => 'admin',
+                'notifiable_id' => 1,
+                'data' => json_encode([
+                    'title' => 'School profile updated',
+                    'body'  => ($row->school_name ?? 'A school') . ' updated profile details.',
+                    'school_id' => (int)$schoolId,
+                    'school_name' => $row->school_name ?? null,
+                    'time' => now()->toDateTimeString(),
+                ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                'read_at' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return response()->json(['message' => 'Profile updated', 'school' => $row]);
+    });
+}
 
 public function changePassword(Request $request)
 {

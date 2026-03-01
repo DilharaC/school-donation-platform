@@ -9,6 +9,8 @@ use App\Http\Controllers\DonationController;
 use App\Http\Controllers\DonationRequestController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MinistryController;
+use App\Http\Controllers\LedgerController;
+use App\Http\Controllers\NotificationController;
 
 // -----------------------------
 // CSRF Route
@@ -30,6 +32,19 @@ Route::get('/donation-trends', [DonationController::class, 'donationTrends']);
 Route::get('/analytics/schools-map', [DonationController::class, 'schoolsDonationMap']);
 Route::get('/registered-donors', [DonorController::class, 'allDonors']);
 // routes/api.php
+
+
+
+
+Route::get('/notifications', [NotificationController::class, 'index']);
+Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
+Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']); // optional
+
+
+Route::get('/admin/ledger', [LedgerController::class, 'index']);   // list + filters + pagination
+Route::get('/admin/ledger/{id}', [LedgerController::class, 'show']); // optional: view one entry
 Route::get('/donors-active', [DonationController::class, 'donorsWithActiveDonations']);
 
 Route::get('/all-donors', [DonationController::class, 'allDonorsWithStats']);
@@ -64,6 +79,7 @@ Route::middleware('auth:school')->group(function () {
 
     Route::get('/school/privacy', [SchoolController::class, 'getPrivacy']);
     Route::post('/school/privacy', [SchoolController::class, 'savePrivacy']);
+     Route::delete('/my-requests/{id}', [DonationRequestController::class, 'destroy']);
 
     Route::get('/school/exports/donations', [SchoolController::class, 'exportDonations']);
     Route::get('/school/exports/campaigns', [SchoolController::class, 'exportCampaigns']);

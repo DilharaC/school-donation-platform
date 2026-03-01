@@ -68,7 +68,7 @@ const donorNavItems: NavItem[] = [
   { icon: DollarSign, label: "My Donations", to: "/donor/mydonations" },
   { icon: School, label: "Schools", to: "/donor/schools" },
   
-  { icon: Bell, label: "Notifications", to: "/donor/notifications" },
+  { icon: Bell, label: "Notifications", to: "/donor/donornotifications" },
   { icon: Settings, label: "Settings", to: "/donor/settings" },
 ];
 

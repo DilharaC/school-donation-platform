@@ -4,9 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User as Authenticatable; // ✅ important
+use Illuminate\Notifications\Notifiable;
 
 class Donor extends Authenticatable
 {
+     use Notifiable;
+
+   
     protected $table = 'donors';        // Table name
     protected $primaryKey = 'donor_id'; // Primary key
 

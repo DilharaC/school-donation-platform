@@ -11,6 +11,12 @@ use Illuminate\Support\Facades\DB;   // ✅ ADD THIS
 use Carbon\Carbon;      
 use Stripe\Checkout\Session as StripeSession;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\LedgerService;
+use App\Models\Donor;
+use App\Models\School;
+use App\Notifications\DonationPaidDonorNotification;
+use App\Notifications\DonationPaidSchoolNotification;
+
 
 class DonationController extends Controller
 {
@@ -103,7 +109,7 @@ public function verifySession(Request $request)
                 return response()->json(['status' => 'donation_not_found'], 404);
             }
 
-            if (strtolower((string)$donation->status) === 'paid') {
+            if (strtolower((string) $donation->status) === 'paid') {
                 return response()->json(['status' => 'already_paid']);
             }
 
@@ -114,12 +120,12 @@ public function verifySession(Request $request)
             ]);
 
             // ✅ ensure we have school_id
-            $schoolId = $donation->school_id;
+            $schoolId = (int) ($donation->school_id ?? 0);
 
             // If campaign donation but school_id was not saved (old rows), derive from request
             if (!$schoolId && !empty($donation->request_id)) {
                 $schoolId = (int) DB::table('donation_requests')
-                    ->where('request_id', (int)$donation->request_id)
+                    ->where('request_id', (int) $donation->request_id)
                     ->value('school_id');
 
                 if ($schoolId) {
@@ -136,19 +142,88 @@ public function verifySession(Request $request)
 
             // ✅ 1) if has request -> update request raised
             if (!empty($donation->request_id)) {
-                DonationRequest::where('request_id', (int)$donation->request_id)
-                    ->increment('amount_raised', (float)$donation->amount);
+                DonationRequest::where('request_id', (int) $donation->request_id)
+                    ->increment('amount_raised', (float) $donation->amount);
             }
 
             // ✅ 2) ALWAYS credit school fund_balance (campaign + school_fund)
             DB::table('schools')
-                ->where('school_id', (int)$schoolId)
-                ->increment('fund_balance', (float)$donation->amount);
+                ->where('school_id', $schoolId)
+                ->increment('fund_balance', (float) $donation->amount);
+
+            // ===========================
+            // ✅ LEDGER ENTRY (blockchain-like)
+            // ===========================
+            app(LedgerService::class)->record(
+                'DONATION_PAID',
+                'donation',
+                (int) $donation->donation_id,
+                [
+                    'donation_id'    => (int) $donation->donation_id,
+                    'donation_type'  => $donation->donation_type ?? ($donation->request_id ? 'campaign' : 'school_fund'),
+                    'amount'         => (float) $donation->amount,
+                    'status'         => 'paid',
+                    'paid_at'        => now()->toDateTimeString(),
+                    'donor_id'       => $donation->donor_id ? (int) $donation->donor_id : null,
+                    'donor_name'     => $donation->donor_name ?: 'Anonymous',
+                    'donor_email'    => $donation->donor_email ?? null,
+                    'school_id'      => (int) $schoolId,
+                    'request_id'     => $donation->request_id ? (int) $donation->request_id : null,
+                    'stripe_session' => (string) $donation->stripe_session_id,
+                ]
+            );
+                           // ✅ SEND EMAILS HERE
+\App\Services\NotificationMailer::sendDonationEmails([
+    'donor_id'   => $donation->donor_id,
+    'school_id'  => $donation->school_id,
+    'request_id' => $donation->request_id,
+    'amount'     => $donation->amount,
+    'status'     => 'paid',
+
+    // optional custom donor text
+    'subject_donor' => 'Donation sent successfully 🎉',
+    'title_donor'   => 'Thank you for your donation!',
+    'message_donor' => 'Your donation was sent successfully.',
+
+    // optional custom school text
+    'subject_school' => 'New donation received 🎉',
+    'title_school'   => 'You received a donation!',
+    // message_school can be omitted; it will auto-generate using donor name + request title
+]);
+
+
+            // ===========================
+            // ✅ NOTIFICATIONS (DB)
+            // ===========================
+
+            // Notify donor (if exists)
+            if (!empty($donation->donor_id)) {
+                $donor = Donor::where('donor_id', (int) $donation->donor_id)->first();
+                if ($donor) {
+                    $donor->notify(new DonationPaidDonorNotification([
+                        'donation_id' => (int) $donation->donation_id,
+                        'amount'      => (float) $donation->amount,
+                        'school_id'   => (int) $schoolId,
+                        'request_id'  => $donation->request_id ? (int) $donation->request_id : null,
+                    ]));
+                }
+            }
+
+            // Notify school
+            $school = School::where('school_id', (int) $schoolId)->first();
+            if ($school) {
+                $school->notify(new DonationPaidSchoolNotification([
+                    'donation_id' => (int) $donation->donation_id,
+                    'amount'      => (float) $donation->amount,
+                    'donor_name'  => $donation->donor_name ?: 'Anonymous',
+                    'request_id'  => $donation->request_id ? (int) $donation->request_id : null,
+                ]));
+            }
 
             return response()->json([
                 'status' => 'success',
-                'school_id' => (int)$schoolId,
-                'request_id' => $donation->request_id,
+                'school_id' => (int) $schoolId,
+                'request_id' => $donation->request_id ? (int) $donation->request_id : null,
             ]);
         });
 
@@ -578,14 +653,12 @@ public function schoolDonations(Request $request)
     $page   = max(1, (int) $request->query('page', 1));
     $limit  = max(1, min(50, (int) $request->query('limit', 10)));
 
-    // optional date range
     $dateFrom = $request->query('dateFrom', null);
     $dateTo   = $request->query('dateTo', null);
 
     $from = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : null;
     $to   = $dateTo   ? Carbon::parse($dateTo)->endOfDay()     : null;
 
-    // optional sorting
     $sortBy  = $request->query('sortBy', 'created_at'); // created_at | amount | status
     $sortDir = strtolower($request->query('sortDir', 'desc')) === 'asc' ? 'asc' : 'desc';
 
@@ -594,29 +667,40 @@ public function schoolDonations(Request $request)
 
     $q = DB::table('donations')
         ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
-        ->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
-        ->where('donation_requests.school_id', $schoolId)
+        ->leftJoin('schools', function ($join) {
+            // campaign: school from request
+            $join->on('schools.school_id', '=', 'donation_requests.school_id')
+                 // direct fund: school from donations.school_id
+                 ->orOn('schools.school_id', '=', 'donations.school_id');
+        })
+        // ✅ IMPORTANT: include both types for this school
+        ->where(function ($w) use ($schoolId) {
+            $w->where('donation_requests.school_id', $schoolId)
+              ->orWhere('donations.school_id', $schoolId);
+        })
         ->select(
             'donations.donation_id',
             'donations.request_id',
+            'donations.school_id',
             'donations.donor_id',
             'donations.donor_name',
             'donations.donor_email',
             'donations.amount',
             'donations.status',
             'donations.created_at',
-            'donation_requests.request_title',
+
+            // ✅ if no request, show "School Fund"
+            DB::raw("COALESCE(donation_requests.request_title, 'School Fund') as request_title"),
+
             'schools.school_name',
             'schools.district',
             'schools.province'
         );
 
-    // ✅ status filter (case-insensitive)
     if ($status !== 'all') {
         $q->whereRaw('LOWER(donations.status) = ?', [$status]);
     }
 
-    // ✅ date filters
     if ($from && $to) {
         $q->whereBetween('donations.created_at', [$from, $to]);
     } elseif ($from) {
@@ -625,36 +709,32 @@ public function schoolDonations(Request $request)
         $q->where('donations.created_at', '<=', $to);
     }
 
-    // ✅ search
     if ($search !== '') {
         $q->where(function ($qq) use ($search) {
             $qq->where('donations.donor_name', 'like', "%{$search}%")
                ->orWhere('donations.donor_email', 'like', "%{$search}%")
-               ->orWhere('donation_requests.request_title', 'like', "%{$search}%");
+               ->orWhere('donation_requests.request_title', 'like', "%{$search}%")
+               ->orWhere('schools.school_name', 'like', "%{$search}%");
         });
     }
 
     $total = (clone $q)->count();
 
-    // ✅ sorting
     $q->orderBy("donations.$sortBy", $sortDir);
 
-    $rows = $q->skip(($page - 1) * $limit)
-        ->take($limit)
-        ->get();
+    $rows = $q->skip(($page - 1) * $limit)->take($limit)->get();
 
-    // ✅ normalize status + initials + time
     $rows->transform(function ($r) {
         $name = $r->donor_name ?: 'Anonymous';
         $parts = preg_split('/\s+/', trim($name));
 
         $r->initials = strtoupper(substr($parts[0] ?? 'A', 0, 1) . substr($parts[1] ?? '', 0, 1));
         $r->time = $r->created_at ? Carbon::parse($r->created_at)->diffForHumans() : null;
-
-        // always lowercase status for frontend
         $r->status = strtolower($r->status ?? 'pending');
-
         $r->amount = (float) ($r->amount ?? 0);
+
+        // optional label
+        $r->donation_type = $r->request_id ? 'campaign' : 'school_fund';
 
         return $r;
     });
@@ -687,9 +767,13 @@ public function schoolTopDonors(Request $request)
     $to   = $dateTo   ? Carbon::parse($dateTo)->endOfDay()     : null;
 
     $q = DB::table('donations')
-        ->join('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
-        ->where('donation_requests.school_id', $schoolId)
-        ->whereRaw("LOWER(donations.status)='paid'");
+        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->whereRaw("LOWER(donations.status)='paid'")
+        // ✅ include BOTH campaign + direct fund for this school
+        ->where(function ($w) use ($schoolId) {
+            $w->where('donation_requests.school_id', $schoolId)
+              ->orWhere('donations.school_id', $schoolId);
+        });
 
     if ($from && $to) {
         $q->whereBetween('donations.created_at', [$from, $to]);
@@ -721,9 +805,7 @@ public function schoolTopDonors(Request $request)
         return $r;
     });
 
-    return response()->json([
-        'top_donors' => $rows
-    ]);
+    return response()->json(['top_donors' => $rows]);
 }
 
 
