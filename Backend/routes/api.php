@@ -95,7 +95,7 @@ Route::get('/reports/top-provinces', [DonationController::class, 'reportsTopProv
 Route::get('/reports/top-campaigns', [DonationController::class, 'reportsTopCampaigns']);
 
 
-
+Route::post('/schools/register', [SchoolController::class, 'register']);
 Route::get('/schools', [SchoolController::class, 'listSchools']);
 Route::get('/schools/{id}', [SchoolController::class, 'show']);
 
@@ -112,6 +112,7 @@ Route::post('/request/create', [DonationRequestController::class, 'create']);
 Route::post('/stripe/webhook', [DonationController::class, 'stripeWebhook']);
 Route::get('/donations/verify', [DonationController::class, 'verifySession']);
 
+Route::get('/admin/donation_requests', [DonationRequestController::class, 'adminIndex']);
 
     Route::post('/donor/schools/{id}/donate', [DonationController::class, 'createSchoolDonation']);
      // ✅ Ministry donors

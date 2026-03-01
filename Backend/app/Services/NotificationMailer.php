@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\SystemNotificationMail;
+use Illuminate\Support\Str;
 
 class NotificationMailer
 {
@@ -70,5 +71,86 @@ class NotificationMailer
 
             Mail::to($school->contact_email)->send(new SystemNotificationMail($payloadSchool));
         }
+    }
+     public static function sendSchoolActivated(int $schoolId, int $adminId = 1): void
+    {
+        $school = DB::table('schools')
+            ->where('school_id', $schoolId)
+            ->first(['school_id', 'school_name', 'contact_email']);
+
+        if (!$school || empty($school->contact_email)) return;
+
+        $payload = [
+            'subject'     => 'Your school account is activated ✅',
+            'title'       => 'Account Activated',
+            'message'     => "Hi {$school->school_name}, your school account has been activated by the admin. You can now log in and start using the system.",
+            'school_name' => $school->school_name,
+            'status'      => 'active',
+            'created_at'  => now()->toDateTimeString(),
+        ];
+
+        // Email
+        Mail::to($school->contact_email)->send(new SystemNotificationMail($payload));
+
+        // In-app notification row (optional but recommended)
+        DB::table('notifications')->insert([
+            'id'              => (string) Str::uuid(),
+            'type'            => 'school.activated',
+            'notifiable_type' => 'App\\Models\\School',
+            'notifiable_id'   => (int) $school->school_id,
+            'data'            => json_encode([
+                'title'      => $payload['title'],
+                'message'    => $payload['message'],
+                'school_id'  => (int) $school->school_id,
+                'school_name'=> $school->school_name,
+                'status'     => 'active',
+                'admin_id'   => $adminId,
+                'created_at' => $payload['created_at'],
+            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'read_at'         => null,
+            'created_at'      => now(),
+            'updated_at'      => now(),
+        ]);
+    }
+
+    public static function sendSchoolVerified(int $schoolId, int $adminId = 1): void
+    {
+        $school = DB::table('schools')
+            ->where('school_id', $schoolId)
+            ->first(['school_id', 'school_name', 'contact_email']);
+
+        if (!$school || empty($school->contact_email)) return;
+
+        $payload = [
+            'subject'     => 'Your school is verified 🎉',
+            'title'       => 'School Verified',
+            'message'     => "Great news! {$school->school_name} has been verified by the admin. Your profile will now show as verified.",
+            'school_name' => $school->school_name,
+            'status'      => 'verified',
+            'created_at'  => now()->toDateTimeString(),
+        ];
+
+        // Email
+        Mail::to($school->contact_email)->send(new SystemNotificationMail($payload));
+
+        // In-app notification row (optional but recommended)
+        DB::table('notifications')->insert([
+            'id'              => (string) Str::uuid(),
+            'type'            => 'school.verified',
+            'notifiable_type' => 'App\\Models\\School',
+            'notifiable_id'   => (int) $school->school_id,
+            'data'            => json_encode([
+                'title'      => $payload['title'],
+                'message'    => $payload['message'],
+                'school_id'  => (int) $school->school_id,
+                'school_name'=> $school->school_name,
+                'status'     => 'verified',
+                'admin_id'   => $adminId,
+                'created_at' => $payload['created_at'],
+            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'read_at'         => null,
+            'created_at'      => now(),
+            'updated_at'      => now(),
+        ]);
     }
 }

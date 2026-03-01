@@ -20,15 +20,16 @@ public function index(Request $request)
 {
     $search   = trim($request->query('search', ''));
     $category = $request->query('category', 'All');
-    $status   = $request->query('status', null);
     $page     = max(1, (int) $request->query('page', 1));
     $limit    = max(1, min(50, (int) $request->query('limit', 6)));
 
-    // ✅ NEW
     $needBand = $request->query('needBand', 'all'); // all|high|medium|low
     $sortBy   = $request->query('sortBy', 'latest'); // latest|need_high|need_low
 
     $query = DonationRequest::with('school');
+
+    // ✅ PUBLIC ONLY
+    $query->where('status', 'Approved');
 
     if ($search !== '') {
         $query->where(function ($q) use ($search) {
@@ -44,11 +45,6 @@ public function index(Request $request)
         $query->where('category', $category);
     }
 
-    if ($status) {
-        $query->where('status', $status);
-    }
-
-    // ✅ NEW: Need band filter (uses related school.need_score)
     if ($needBand === 'high') {
         $query->whereHas('school', fn ($q) => $q->where('need_score', '>=', 70));
     } elseif ($needBand === 'medium') {
@@ -57,7 +53,6 @@ public function index(Request $request)
         $query->whereHas('school', fn ($q) => $q->where('need_score', '<', 40));
     }
 
-    // ✅ Summary for ALL filtered rows (not just current page)
     $summary = (clone $query)->reorder()->selectRaw('
         COUNT(*) as total_requests,
         SUM(CASE WHEN status = "Approved" THEN 1 ELSE 0 END) as approved_count,
@@ -66,20 +61,18 @@ public function index(Request $request)
         COALESCE(SUM(estimated_price),0) as total_target
     ')->first();
 
-    // ✅ Sorting
     if ($sortBy === 'need_high' || $sortBy === 'need_low') {
-        // Join schools ONLY for ordering (safe)
         $dir = $sortBy === 'need_high' ? 'desc' : 'asc';
         $query->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
-              ->select('donation_requests.*') // important
+              ->select('donation_requests.*')
               ->orderBy('schools.need_score', $dir)
-              ->orderBy('donation_requests.created_at', 'desc'); // tie-breaker
+              ->orderBy('donation_requests.created_at', 'desc');
     } else {
-        // latest
-        $query->orderBy('created_at', 'desc');
+        $query->orderBy('donation_requests.created_at', 'desc');
     }
 
-    $total = (clone $query)->count();
+    // ✅ avoid duplicates when join exists
+    $total = (clone $query)->distinct('donation_requests.request_id')->count('donation_requests.request_id');
 
     $projects = (clone $query)
         ->skip(($page - 1) * $limit)
@@ -90,10 +83,7 @@ public function index(Request $request)
                 'request_id' => $project->request_id,
                 'school_id' => $project->school_id,
                 'school_name' => $project->school->school_name ?? 'Unknown School',
-
-                // ✅ NEW
                 'need_score' => (float) ($project->school->need_score ?? 0),
-
                 'request_title' => $project->request_title,
                 'category' => $project->category,
                 'quantity' => (int)$project->quantity,
@@ -110,7 +100,104 @@ public function index(Request $request)
 
     return response()->json([
         'projects' => $projects,
-        'total' => $total,
+        'total' => (int)$total,
+        'summary' => [
+            'total_requests' => (int) ($summary->total_requests ?? 0),
+            'approved_count' => (int) ($summary->approved_count ?? 0),
+            'pending_count' => (int) ($summary->pending_count ?? 0),
+            'total_raised' => (float) ($summary->total_raised ?? 0),
+            'total_target' => (float) ($summary->total_target ?? 0),
+        ],
+    ]);
+}
+public function adminIndex(Request $request)
+{
+    $search   = trim($request->query('search', ''));
+    $category = $request->query('category', 'All');
+    $status   = $request->query('status', null); // ✅ admin can filter status
+    $page     = max(1, (int) $request->query('page', 1));
+    $limit    = max(1, min(50, (int) $request->query('limit', 10)));
+
+    $needBand = $request->query('needBand', 'all');
+    $sortBy   = $request->query('sortBy', 'latest');
+
+    $query = DonationRequest::with('school');
+
+    // ✅ ADMIN: show ALL (no forced Approved)
+
+    if ($search !== '') {
+        $query->where(function ($q) use ($search) {
+            $q->where('request_title', 'like', "%{$search}%")
+              ->orWhere('description', 'like', "%{$search}%")
+              ->orWhereHas('school', function ($q2) use ($search) {
+                  $q2->where('school_name', 'like', "%{$search}%");
+              });
+        });
+    }
+
+    if ($category && $category !== 'All') {
+        $query->where('category', $category);
+    }
+
+    if ($status && $status !== 'All') {
+        $query->where('status', $status);
+    }
+
+    if ($needBand === 'high') {
+        $query->whereHas('school', fn ($q) => $q->where('need_score', '>=', 70));
+    } elseif ($needBand === 'medium') {
+        $query->whereHas('school', fn ($q) => $q->whereBetween('need_score', [40, 69.9999]));
+    } elseif ($needBand === 'low') {
+        $query->whereHas('school', fn ($q) => $q->where('need_score', '<', 40));
+    }
+
+    $summary = (clone $query)->reorder()->selectRaw('
+        COUNT(*) as total_requests,
+        SUM(CASE WHEN status = "Approved" THEN 1 ELSE 0 END) as approved_count,
+        SUM(CASE WHEN status = "Pending" THEN 1 ELSE 0 END) as pending_count,
+        COALESCE(SUM(amount_raised),0) as total_raised,
+        COALESCE(SUM(estimated_price),0) as total_target
+    ')->first();
+
+    if ($sortBy === 'need_high' || $sortBy === 'need_low') {
+        $dir = $sortBy === 'need_high' ? 'desc' : 'asc';
+        $query->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
+              ->select('donation_requests.*')
+              ->orderBy('schools.need_score', $dir)
+              ->orderBy('donation_requests.created_at', 'desc');
+    } else {
+        $query->orderBy('donation_requests.created_at', 'desc');
+    }
+
+    $total = (clone $query)->distinct('donation_requests.request_id')->count('donation_requests.request_id');
+
+    $projects = (clone $query)
+        ->skip(($page - 1) * $limit)
+        ->take($limit)
+        ->get()
+        ->map(function ($project) {
+            return [
+                'request_id' => $project->request_id,
+                'school_id' => $project->school_id,
+                'school_name' => $project->school->school_name ?? 'Unknown School',
+                'need_score' => (float) ($project->school->need_score ?? 0),
+                'request_title' => $project->request_title,
+                'category' => $project->category,
+                'quantity' => (int)$project->quantity,
+                'estimated_price' => (float)$project->estimated_price,
+                'amount_raised' => (float)$project->amount_raised,
+                'description' => $project->description,
+                'image_url' => $project->image_url,
+                'document_url' => $project->document_url,
+                'status' => $project->status,
+                'created_at' => $project->created_at,
+                'updated_at' => $project->updated_at,
+            ];
+        });
+
+    return response()->json([
+        'projects' => $projects,
+        'total' => (int)$total,
         'summary' => [
             'total_requests' => (int) ($summary->total_requests ?? 0),
             'approved_count' => (int) ($summary->approved_count ?? 0),
@@ -172,42 +259,57 @@ public function show($id)
     ]);
 }
 
-    // ✅ PUT update status (Approve / Mark Pending)
-    public function updateStatus(Request $request, $id)
-    {
-        $request->validate([
-            'status' => 'required|in:Approved,Pending',
-        ]);
+   public function updateStatus(Request $request, $id)
+{
+    $request->validate([
+        'status' => 'required|in:Approved,Pending',
+    ]);
 
-        $project = DonationRequest::find($id);
+    $project = DonationRequest::where('request_id', (int)$id)->first();
 
-        if (!$project) {
-            return response()->json(['message' => 'Donation request not found'], 404);
-        }
+    if (!$project) {
+        return response()->json(['message' => 'Donation request not found'], 404);
+    }
 
-        $project->status = $request->status;
-        $project->save();
-        app(\App\Services\LedgerService::class)->record(
-    'REQUEST_STATUS_UPDATED',
-    'donation_request',
-    (int)$project->request_id,
-    [
-        'request_id' => (int)$project->request_id,
-        'school_id' => (int)$project->school_id,
-        'from' => $old,
-        'to' => $project->status,
-        'at' => now()->toDateTimeString(),
-    ]
-);
+    // ✅ define old status FIRST
+    $old = $project->status;
 
+    // ✅ if same status, no need update
+    if ($old === $request->status) {
         return response()->json([
-            'message' => 'Status updated successfully',
+            'message' => 'Status already set',
             'project' => [
-                'request_id' => $project->request_id,
+                'request_id' => (int)$project->request_id,
                 'status' => $project->status,
             ]
         ]);
     }
+
+    $project->status = $request->status;
+    $project->save();
+
+    // ✅ Ledger
+    app(\App\Services\LedgerService::class)->record(
+        'REQUEST_STATUS_UPDATED',
+        'donation_request',
+        (int)$project->request_id,
+        [
+            'request_id' => (int)$project->request_id,
+            'school_id'  => (int)$project->school_id,
+            'from'       => $old,
+            'to'         => $project->status,
+            'at'         => now()->toDateTimeString(),
+        ]
+    );
+
+    return response()->json([
+        'message' => 'Status updated successfully',
+        'project' => [
+            'request_id' => (int)$project->request_id,
+            'status' => $project->status,
+        ]
+    ]);
+}
 
     // Create project
   public function create(Request $request)
