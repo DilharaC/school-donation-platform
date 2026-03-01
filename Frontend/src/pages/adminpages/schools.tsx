@@ -731,7 +731,7 @@ const SchoolsPage: React.FC = () => {
                 </div>
 
                 <div className="text-xs text-slate-500 w-full">
-                  Note: Bulk update needs backend endpoint: <span className="font-mono">POST /api/schools/bulk-update</span>
+                
                 </div>
               </div>
             )}

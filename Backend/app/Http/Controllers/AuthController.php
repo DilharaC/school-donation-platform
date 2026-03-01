@@ -22,11 +22,11 @@ class AuthController extends Controller
 {
     $request->validate([
         'identifier' => 'required|string',
-        'password' => 'required|string',
+        'password'   => 'required|string',
     ]);
 
     $identifier = trim($request->identifier);
-    $password = $request->password;
+    $password   = $request->password;
 
     $user = null;
     $type = null;
@@ -41,7 +41,21 @@ class AuthController extends Controller
     // 2) School login ONLY by registration_no
     if (!$user) {
         $school = School::where('registration_no', $identifier)->first();
+
         if ($school) {
+            // ✅ Allow ONLY active schools
+            $isActive =
+                (isset($school->is_active) && (int)$school->is_active === 1) ||
+                (isset($school->status) && strtolower((string)$school->status) === 'active') ||
+                (isset($school->verified) && (int)$school->verified === 1);
+
+            if (!$isActive) {
+                return response()->json([
+                    "success" => false,
+                    "message" => "School account is not active. Please wait for admin approval."
+                ], 403);
+            }
+
             $user = $school;
             $type = "school";
         }
@@ -80,7 +94,6 @@ class AuthController extends Controller
         ]
     ]);
 }
-
     public function logout(Request $request)
     {
         Auth::guard('web')->logout();

@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Services\LedgerService;
 use App\Notifications\SchoolVerifiedNotification;
 use App\Notifications\SchoolStatusChangedNotification;
-
+use App\Services\NotificationMailer;
 
 
 
@@ -27,33 +27,35 @@ class SchoolController extends Controller
     /**
      * ✅ Register School (with optional document upload)
      */
-     public function register(Request $request)
-    {
-        $validated = $request->validate([
-            'school_name'     => 'required|string|max:255',
-            'registration_no' => 'required|string|unique:schools,registration_no',
-            'contact_email'   => 'required|email|unique:schools,contact_email',
-            'password'        => 'required|min:6',
+    public function register(Request $request)
+{
+    $validated = $request->validate([
+        'school_name'     => 'required|string|max:255',
+        'registration_no' => 'required|string|unique:schools,registration_no',
+        'contact_email'   => 'required|email|unique:schools,contact_email',
+        'password'        => 'required|min:6',
 
-            'student_count'   => 'required|integer',
-            'facilities'      => 'required|integer',
-            'area_type'       => 'required|string|max:50',
-            'performance'     => 'required|integer',
-            'prev_donations'  => 'required|integer',
+        'student_count'   => 'required|integer',
+        'facilities'      => 'required|integer',
+        'area_type'       => 'required|string|max:50',
+        'performance'     => 'required|integer',
+        'prev_donations'  => 'required|integer',
 
-            'category'        => 'nullable|string',
-            'district'        => 'nullable|string|max:100',
-            'province'        => 'nullable|string|max:100',
-            'contact_person'  => 'nullable|string|max:150',
-            'address'         => 'nullable|string|max:255',
-            'contact_phone'   => 'nullable|string|max:20',
+        'category'        => 'nullable|string|max:100',
+        'district'        => 'nullable|string|max:100',
+        'province'        => 'nullable|string|max:100',
+        'contact_person'  => 'nullable|string|max:150',
+        'address'         => 'nullable|string|max:255',
+        'contact_phone'   => 'nullable|string|max:20',
 
-            'bank_name'       => 'nullable|string|max:50',
-            'account_holder'  => 'nullable|string|max:100',
-            'bank_account'    => 'nullable|string|max:50',
+        'bank_name'       => 'nullable|string|max:50',
+        'account_holder'  => 'nullable|string|max:100',
+        'bank_account'    => 'nullable|string|max:50',
 
-            'document'        => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
-        ]);
+        'document'        => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+    ]);
+
+    return DB::transaction(function () use ($request, $validated) {
 
         // ✅ store file into /public/uploads/docs
         $docPath = null;
@@ -92,83 +94,80 @@ class SchoolController extends Controller
             'need_score'      => 0,
             'verified'        => 0,
             'status'          => 'Inactive',
-
             'documents_url'   => $docPath,
-
-            // if you have fund_balance column
-            // 'fund_balance' => 0,
         ]);
 
-        // Step 2: Call Flask API to calculate need_score
+        // ✅ Call Flask API to calculate need_score
         try {
-            $response = Http::withHeaders(['Content-Type' => 'application/json'])
+            $response = Http::timeout(5)->withHeaders(['Content-Type' => 'application/json'])
                 ->post('http://127.0.0.1:5000/calculate_need', [
-                    'student_count'  => $school->student_count,
-                    'facilities'     => $school->facilities,
-                    'area_type'      => $school->area_type,
-                    'performance'    => $school->performance,
-                    'prev_donations' => $school->prev_donations,
+                    'student_count'  => (int) $school->student_count,
+                    'facilities'     => (int) $school->facilities,
+                    'area_type'      => (string) $school->area_type,
+                    'performance'    => (int) $school->performance,
+                    'prev_donations' => (float) $school->prev_donations,
                 ]);
 
             Log::info('Flask API raw response: ' . $response->body());
 
-            if ($response->successful() && isset($response->json()['need_score'])) {
-                $needScore = (float) $response->json()['need_score'];
-                $school->need_score = $needScore;
+            $json = $response->json();
+            if ($response->successful() && isset($json['need_score'])) {
+                $school->need_score = (float) $json['need_score'];
                 $school->save();
             } else {
-                Log::error('Flask API returned invalid data: ' . $response->body());
+                Log::error('Flask API invalid: ' . $response->body());
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Flask API call failed: ' . $e->getMessage());
         }
+
+        // ✅ LEDGER: school registered (NOW it runs)
+        app(LedgerService::class)->record(
+            'SCHOOL_REGISTERED',
+            'school',
+            (int) $school->school_id,
+            [
+                'school_id' => (int)$school->school_id,
+                'school_name' => $school->school_name,
+                'registration_no' => $school->registration_no,
+                'contact_email' => $school->contact_email,
+                'district' => $school->district,
+                'province' => $school->province,
+                'documents_url' => $school->documents_url,
+                'need_score' => (float)$school->need_score,
+                'verified' => (int)$school->verified,
+                'status' => (string)$school->status,
+                'at' => now()->toDateTimeString(),
+            ]
+        );
+
+        // ✅ ADMIN notification
+        DB::table('notifications')->insert([
+            'id' => (string) Str::uuid(),
+            'type' => 'admin',
+            'notifiable_type' => 'admin',
+            'notifiable_id' => 1,
+            'data' => json_encode([
+                'title' => 'New school registered',
+                'body'  => 'A new school registered and needs verification.',
+                'school_id' => (int)$school->school_id,
+                'school_name' => $school->school_name,
+                'registration_no' => $school->registration_no,
+                'document_link' => $school->documents_url ? url($school->documents_url) : null,
+                'time' => now()->toDateTimeString(),
+            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'read_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         return response()->json([
             'success' => true,
             'message' => 'School registered successfully!',
             'school'  => $school,
         ], 201);
-        // ✅ LEDGER: school registered
-app(LedgerService::class)->record(
-    'SCHOOL_REGISTERED',
-    'school',
-    (int)$school->school_id,
-    [
-        'school_id' => (int)$school->school_id,
-        'school_name' => $school->school_name,
-        'registration_no' => $school->registration_no,
-        'contact_email' => $school->contact_email,
-        'district' => $school->district,
-        'province' => $school->province,
-        'documents_url' => $school->documents_url,
-        'need_score' => (float)$school->need_score,
-        'verified' => (int)$school->verified,
-        'status' => (string)$school->status,
-        'at' => now()->toDateTimeString(),
-    ]
-);
-
-// ✅ ADMIN NOTIFICATION (no admin table)
-DB::table('notifications')->insert([
-    'id' => (string) Str::uuid(),
-    'type' => 'admin',
-    'notifiable_type' => 'admin',
-    'notifiable_id' => 1,
-    'data' => json_encode([
-        'title' => 'New school registered',
-        'body'  => 'A new school registered and needs verification.',
-        'school_id' => (int)$school->school_id,
-        'school_name' => $school->school_name,
-        'registration_no' => $school->registration_no,
-        'document_link' => $school->documents_url ? url($school->documents_url) : null,
-        'time' => now()->toDateTimeString(),
-    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-    'read_at' => null,
-    'created_at' => now(),
-    'updated_at' => now(),
-]);
-    }
-
+    });
+}
     /**
      * ✅ Schools map summary (optional)
      */
@@ -444,7 +443,7 @@ $donationSummary = DB::table('donations')
     /**
      * ✅ Bulk update
      */
-    public function bulkUpdate(Request $request)
+  public function bulkUpdate(Request $request)
 {
     $data = $request->validate([
         'school_ids' => 'required|array|min:1',
@@ -506,13 +505,22 @@ $donationSummary = DB::table('donations')
 
     $afterMap = $after->keyBy('school_id');
 
+    // if you have real admin auth, use it; otherwise keep 1
+    $adminId = 1;
+
     // ✅ ledger + notifications per school that actually changed
     foreach ($before as $b) {
         $a = $afterMap->get($b->school_id);
         if (!$a) continue;
 
-        $changedVerified = ((int)($b->verified ?? 0) !== (int)($a->verified ?? 0));
-        $changedStatus   = (strtolower((string)($b->status ?? '')) !== strtolower((string)($a->status ?? '')));
+        $oldVerified = (int)($b->verified ?? 0);
+        $newVerified = (int)($a->verified ?? 0);
+
+        $oldStatus = strtolower((string)($b->status ?? ''));
+        $newStatus = strtolower((string)($a->status ?? ''));
+
+        $changedVerified = ($oldVerified !== $newVerified);
+        $changedStatus   = ($oldStatus !== $newStatus);
 
         // if no meaningful change, skip
         if (!$changedVerified && !$changedStatus) continue;
@@ -526,11 +534,11 @@ $donationSummary = DB::table('donations')
                 'school_id'   => (int)$a->school_id,
                 'school_name' => $a->school_name ?? null,
                 'before' => [
-                    'verified' => (int)($b->verified ?? 0),
+                    'verified' => $oldVerified,
                     'status'   => (string)($b->status ?? null),
                 ],
                 'after' => [
-                    'verified' => (int)($a->verified ?? 0),
+                    'verified' => $newVerified,
                     'status'   => (string)($a->status ?? null),
                 ],
                 'changed' => [
@@ -541,20 +549,31 @@ $donationSummary = DB::table('donations')
             ]
         );
 
-        // ✅ NOTIFY the school
+        // ✅ NOTIFY the school (DB notifications via Laravel notify())
         $schoolModel = \App\Models\School::where('school_id', (int)$a->school_id)->first();
-        if ($schoolModel) {
-            if ($changedVerified && (int)$a->verified === 1) {
-                $schoolModel->notify(new SchoolVerifiedNotification([
-                    'school_id' => (int)$a->school_id,
-                ]));
-            }
 
-            if ($changedStatus) {
-                $schoolModel->notify(new SchoolStatusChangedNotification([
-                    'school_id' => (int)$a->school_id,
-                    'status'    => strtolower((string)$a->status),
-                ]));
+        // -------- Verified -> 1 --------
+        if ($schoolModel && $changedVerified && $newVerified === 1) {
+            // existing notification
+            $schoolModel->notify(new SchoolVerifiedNotification([
+                'school_id' => (int)$a->school_id,
+            ]));
+
+            // ✅ NEW: send email + insert notification row (optional) using your mail blade
+            NotificationMailer::sendSchoolVerified((int)$a->school_id, $adminId);
+        }
+
+        // -------- Status change --------
+        if ($schoolModel && $changedStatus) {
+            // existing notification
+            $schoolModel->notify(new SchoolStatusChangedNotification([
+                'school_id' => (int)$a->school_id,
+                'status'    => $newStatus,
+            ]));
+
+            // ✅ NEW: only when it becomes active
+            if ($newStatus === 'active') {
+                NotificationMailer::sendSchoolActivated((int)$a->school_id, $adminId);
             }
         }
     }
@@ -564,7 +583,6 @@ $donationSummary = DB::table('donations')
         'affected' => $affected,
     ]);
 }
-
 
 
  public function overview(Request $request)

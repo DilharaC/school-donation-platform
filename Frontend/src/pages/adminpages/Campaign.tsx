@@ -6,7 +6,7 @@ import axios from "axios";
    API (edit endpoints here)
 ======================= */
 const API = {
-  list: "http://localhost:8000/api/donation_requests",
+list: "http://localhost:8000/api/admin/donation_requests",
   delete: (id: number) => `http://localhost:8000/api/donation_requests/${id}`,
 
   // Optional (recommended):

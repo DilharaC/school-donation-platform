@@ -6,9 +6,9 @@ import Donations from "../pages/adminpages/donations";
 import Home from "./Home";
 import Projects from "./Projects";
 import Login from "./Login";
-import DonationForm from "./DonationForm";
-import DonationSuccess from "./DonationSuccess";
-import DonationFailed from "./DonationFailed";
+// import DonationForm from "./DonationForm";
+// import DonationSuccess from "./DonationSuccess";
+// import DonationFailed from "./DonationFailed";
 import AdminDashboard from "../pages/AdminDashboard";
 import SchoolOverview from "../pages/SchoolOverview";
 
@@ -43,6 +43,8 @@ import AdminAuditTrail from "../pages/adminpages/audit";
 import Notifications from "../pages/adminpages/notifications";
 import DonorNotifications from "../pages/donorpages/donornotifications";
 import SchoolNotifications from "../pages/schoolpages/schoolnotifications";
+import SchoolRegister from "./SchoolRegister";
+
 // import MinistryNotifications from "../pages/ministrypages/notifications";
 
 interface User {
@@ -129,7 +131,7 @@ const App: React.FC = () => {
   {/* other routes */}
 </Route>
 
-   
+
 
 <Route path="/ministry" element={<MinistryLayout />}>
  <Route index element={<MinistryOverview />} />
@@ -149,11 +151,12 @@ const App: React.FC = () => {
         element={<Layout currentUser={currentUser} setCurrentUser={setCurrentUser} />}
       >
         <Route index element={<Home />} />
-        
+           <Route path="SchoolRegister" element={<SchoolRegister />} />
         <Route path="projects" element={<Projects />} />
-        <Route path="donate/:requestId" element={<DonationForm currentUser={currentUser} />} />
+        
+        {/* <Route path="donate/:requestId" element={<DonationForm currentUser={currentUser} />} />
         <Route path="donation/success" element={<DonationSuccess />} />
-        <Route path="donation/failed" element={<DonationFailed />} />
+        <Route path="donation/failed" element={<DonationFailed />} /> */}
          
          
       </Route>
