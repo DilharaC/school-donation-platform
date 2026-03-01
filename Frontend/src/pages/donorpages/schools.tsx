@@ -1,4 +1,4 @@
-// DonorSchools.tsx (FULL UPDATED) — Premium drawer UI + Donate to School + Donate to Campaign (DonateModal) + ICONS
+// DonorSchools.tsx (FULL) — Premium drawer UI + Donate to School + Donate to Campaign (DonateModal) + ICONS
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import DonateModal from "../../components/DonateModal";
@@ -26,6 +26,7 @@ const API_BASE = `${API_ROOT}/api`;
 const SCHOOLS_LIST = `${API_BASE}/schools`;
 const SCHOOL_DETAIL = (id: number) => `${API_BASE}/schools/${id}`;
 const DONATE_TO_SCHOOL = (schoolId: number) => `${API_BASE}/donor/schools/${schoolId}/donate`;
+const VERIFY_DONATION = `${API_BASE}/donations/verify`;
 
 /** ---------------- UI Helpers ---------------- */
 const cx = (...s: Array<string | false | null | undefined>) => s.filter(Boolean).join(" ");
@@ -70,7 +71,12 @@ function Pill({
   icon?: React.ReactNode;
 }) {
   return (
-    <span className={cx("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold border", cls)}>
+    <span
+      className={cx(
+        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold border",
+        cls
+      )}
+    >
       {icon ? <span className="h-3.5 w-3.5">{icon}</span> : null}
       {children}
     </span>
@@ -111,8 +117,8 @@ type SchoolRow = {
   initials?: string;
   logo_url?: string | null;
 
-  fund_balance?: number; // ✅ add
-  total_received?: number; // optional
+  fund_balance?: number;
+  total_received?: number;
 };
 
 type SchoolDetailRes = {
@@ -132,6 +138,181 @@ type SchoolDetailRes = {
     last_donation_at?: string | null;
   };
 };
+
+/** ---------------- Donation Success Modal ---------------- */
+type StatusKey =
+  | "checking"
+  | "success"
+  | "already_paid"
+  | "pending"
+  | "no_session"
+  | "donation_not_found"
+  | "error";
+
+const statusUI: Record<
+  StatusKey,
+  { title: string; desc: string; tone: "ok" | "warn" | "bad" | "neutral" }
+> = {
+  checking: {
+    title: "Checking payment…",
+    desc: "Please wait a moment while we confirm your donation.",
+    tone: "neutral",
+  },
+  success: {
+    title: "Donation successful 🎉",
+    desc: "Thank you! Your donation has been confirmed.",
+    tone: "ok",
+  },
+  already_paid: {
+    title: "Already confirmed ✅",
+    desc: "This donation was already verified. (Refresh is safe.)",
+    tone: "ok",
+  },
+  pending: {
+    title: "Payment pending…",
+    desc: "Stripe is still processing. Try again in a few seconds.",
+    tone: "warn",
+  },
+  no_session: {
+    title: "Missing session ID",
+    desc: "We couldn’t find the Stripe session ID in the URL.",
+    tone: "bad",
+  },
+  donation_not_found: {
+    title: "Donation not found",
+    desc: "We couldn’t match this session to a donation record.",
+    tone: "bad",
+  },
+  error: {
+    title: "Something went wrong",
+    desc: "We couldn’t verify the donation. Please try again.",
+    tone: "bad",
+  },
+};
+
+function DonationSuccessModal({
+  open,
+  sessionId,
+  status,
+  details,
+  loading,
+  onRecheck,
+  onClose,
+}: {
+  open: boolean;
+  sessionId: string;
+  status: StatusKey;
+  details: string;
+  loading: boolean;
+  onRecheck: () => void;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+
+  const ui = statusUI[status] ?? statusUI.error;
+
+  const toneClasses =
+    ui.tone === "ok"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+      : ui.tone === "warn"
+      ? "border-amber-200 bg-amber-50 text-amber-900"
+      : ui.tone === "bad"
+      ? "border-rose-200 bg-rose-50 text-rose-900"
+      : "border-slate-200 bg-slate-50 text-slate-900";
+
+  return (
+    <div className="fixed inset-0 z-[120]">
+      <div
+        className="absolute inset-0 bg-black/25 backdrop-blur-[1px]"
+        onClick={onClose}
+      />
+      <div className="absolute inset-0 grid place-items-center p-4">
+        <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+          <div className="p-6 sm:p-7 border-b border-slate-100 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-slate-900 font-extrabold text-xl">Donation status</div>
+              <div className="text-slate-500 text-sm mt-1">Stripe checkout verification</div>
+            </div>
+            <button
+              onClick={onClose}
+              className="rounded-2xl px-3 py-2 text-sm font-extrabold border border-slate-200 hover:bg-slate-50 inline-flex items-center gap-2"
+            >
+              <XMarkIcon className="h-5 w-5" />
+              Close
+            </button>
+          </div>
+
+          <div className="p-6 sm:p-7">
+            <div className={cx("rounded-2xl border px-4 py-4", toneClasses)}>
+              <div className="flex items-start gap-3">
+                <div className="shrink-0 mt-0.5">
+                  <div
+                    className={cx(
+                      "h-10 w-10 rounded-2xl grid place-items-center font-black",
+                      ui.tone === "ok"
+                        ? "bg-emerald-600 text-white"
+                        : ui.tone === "warn"
+                        ? "bg-amber-600 text-white"
+                        : ui.tone === "bad"
+                        ? "bg-rose-600 text-white"
+                        : "bg-slate-700 text-white"
+                    )}
+                  >
+                    {ui.tone === "ok" ? "✓" : ui.tone === "warn" ? "!" : ui.tone === "bad" ? "×" : "…"}
+                  </div>
+                </div>
+
+                <div className="min-w-0">
+                  <div className="font-extrabold text-lg leading-tight">{ui.title}</div>
+                  <div className="text-sm opacity-80 mt-1">{ui.desc}</div>
+
+                  {details ? (
+                    <div className="mt-3 text-xs font-semibold opacity-70 break-words">
+                      Details: {details}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            {sessionId ? (
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div className="text-xs text-slate-500 font-bold">Session ID</div>
+                <div className="text-slate-900 font-extrabold text-sm break-words">{sessionId}</div>
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={onRecheck}
+                disabled={loading}
+                className={cx(
+                  "w-full sm:w-auto px-5 py-3 rounded-2xl font-extrabold text-white",
+                  loading ? "bg-slate-300 cursor-not-allowed" : "bg-slate-900 hover:bg-slate-800"
+                )}
+              >
+                {loading ? "Checking…" : "Re-check status"}
+              </button>
+
+              <button
+                onClick={onClose}
+                className="w-full sm:w-auto text-center px-5 py-3 rounded-2xl font-extrabold border border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
+              >
+                Continue
+              </button>
+            </div>
+
+            {status === "pending" ? (
+              <div className="mt-4 text-xs text-slate-500">
+                If it stays pending, wait a few seconds and click <b>Re-check status</b>.
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** ---------------- Component ---------------- */
 export default function DonorSchools() {
@@ -164,7 +345,7 @@ export default function DonorSchools() {
   const [selected, setSelected] = useState<SchoolRow | null>(null);
 
   /** --------- Donate to School state --------- */
-  const [donateAmount, setDonateAmount] = useState(""); // string input
+  const [donateAmount, setDonateAmount] = useState("");
   const [donateMessage, setDonateMessage] = useState("");
   const [donateAnonymous, setDonateAnonymous] = useState(false);
   const [donateLoading, setDonateLoading] = useState(false);
@@ -195,6 +376,15 @@ export default function DonorSchools() {
       return null;
     }
   }, []);
+
+  /** --------- Donation Success Modal state --------- */
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successSessionId, setSuccessSessionId] = useState("");
+  const [successStatus, setSuccessStatus] = useState<StatusKey>("checking");
+  const [successDetails, setSuccessDetails] = useState("");
+  const [successLoading, setSuccessLoading] = useState(false);
+
+  const verifyRan = useRef(false);
 
   /** --------- Derived --------- */
   const ran = useRef(false);
@@ -244,28 +434,31 @@ export default function DonorSchools() {
     }
   };
 
-  const openSchool = async (s: SchoolRow) => {
-    setSelected(s);
-    setDrawerOpen(true);
-
-    // reset drawer content
-    setDetail(null);
+  const fetchSelectedDetail = async (schoolId: number) => {
     setDetailLoading(true);
-
-    // reset donate-to-school box
-    setDonateAmount("");
-    setDonateMessage("");
-    setDonateAnonymous(false);
-    setDonateError(null);
-
     try {
-      const res = await axios.get<SchoolDetailRes>(SCHOOL_DETAIL(s.school_id), { withCredentials: true });
+      const res = await axios.get<SchoolDetailRes>(SCHOOL_DETAIL(schoolId), { withCredentials: true });
       setDetail(res.data);
     } catch {
       setDetail(null);
     } finally {
       setDetailLoading(false);
     }
+  };
+
+  const openSchool = async (s: SchoolRow) => {
+    setSelected(s);
+    setDrawerOpen(true);
+
+    setDetail(null);
+    setDetailLoading(true);
+
+    setDonateAmount("");
+    setDonateMessage("");
+    setDonateAnonymous(false);
+    setDonateError(null);
+
+    await fetchSelectedDetail(s.school_id);
   };
 
   const closeDrawer = () => setDrawerOpen(false);
@@ -317,6 +510,50 @@ export default function DonorSchools() {
     }
   };
 
+  const verifyDonation = async (sessionId: string) => {
+    if (!sessionId) {
+      setSuccessStatus("no_session");
+      setSuccessDetails("");
+      setSuccessLoading(false);
+      return;
+    }
+
+    setSuccessLoading(true);
+    setSuccessStatus("checking");
+    setSuccessDetails("");
+
+    try {
+      const res = await axios.get(VERIFY_DONATION, {
+        withCredentials: true,
+        params: { session_id: sessionId },
+      });
+
+      const s = (res.data?.status || "error") as StatusKey;
+      setSuccessStatus(s);
+      if (res.data?.message) setSuccessDetails(String(res.data.message));
+
+      // ✅ refresh UI after verification
+      await fetchSchools();
+      if (drawerOpen && selected?.school_id) {
+        await fetchSelectedDetail(selected.school_id);
+      }
+    } catch (err: any) {
+      const s = (err.response?.data?.status || "error") as StatusKey;
+      setSuccessStatus(s);
+      setSuccessDetails(err.response?.data?.message ? String(err.response.data.message) : "");
+    } finally {
+      setSuccessLoading(false);
+    }
+  };
+
+  const closeSuccessModal = () => {
+    setSuccessOpen(false);
+    setSuccessDetails("");
+
+    // ✅ clear query params after showing result
+    window.history.replaceState({}, "", window.location.pathname);
+  };
+
   /** --------- Effects --------- */
   useEffect(() => {
     if (ran.current) return;
@@ -335,28 +572,39 @@ export default function DonorSchools() {
     fetchSchools();
   };
 
-  // Optional verify-on-return
+  // ✅ Stripe return -> show modal + verify ONCE (StrictMode safe)
   useEffect(() => {
+    if (verifyRan.current) return;
+
     const qs = new URLSearchParams(window.location.search);
-    const sessionId = qs.get("session_id");
+    const sessionId = qs.get("session_id") || "";
     const success = qs.get("donation") === "success";
+
     if (!success || !sessionId) return;
 
-    axios
-      .get(`${API_BASE}/donations/verify`, {
-        withCredentials: true,
-        params: { session_id: sessionId },
-      })
-      .then(() => fetchSchools())
-      .finally(() => {
-        window.history.replaceState({}, "", window.location.pathname);
-      });
+    verifyRan.current = true;
+
+    setSuccessSessionId(sessionId);
+    setSuccessOpen(true);
+    verifyDonation(sessionId);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /** ---------------- Render ---------------- */
   return (
     <div className="w-full px-3 sm:px-0">
+      {/* Donation success modal */}
+      <DonationSuccessModal
+        open={successOpen}
+        sessionId={successSessionId}
+        status={successStatus}
+        details={successDetails}
+        loading={successLoading}
+        onRecheck={() => verifyDonation(successSessionId)}
+        onClose={closeSuccessModal}
+      />
+
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>

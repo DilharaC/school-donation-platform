@@ -27,6 +27,7 @@ import Schools from "../pages/adminpages/schools";
 import SchoolLayout from "../schooldashboardcomponents/SchoolLayout";
 import DonorOverview from "./DonorOverview";
 import DonorLayout from "../donorcomponents/donorLayout";
+
 import MyDonations from "../pages/donorpages/mydonations";
 import DonorSettings from "../pages/donorpages/settings";
 import DonorSchools from "../pages/donorpages/schools";
@@ -38,6 +39,10 @@ import MinistryCampaigns from "../pages/ministrypages/campaigns";
 import MinistryDonations from "../pages/ministrypages/donations";
 import MinistryAnalytics from "../pages/ministrypages/analytics";
 import MinistryReports from "../pages/ministrypages/reports";
+import AdminAuditTrail from "../pages/adminpages/audit";
+import Notifications from "../pages/adminpages/notifications";
+import DonorNotifications from "../pages/donorpages/donornotifications";
+import SchoolNotifications from "../pages/schoolpages/schoolnotifications";
 // import MinistryNotifications from "../pages/ministrypages/notifications";
 
 interface User {
@@ -88,6 +93,10 @@ const App: React.FC = () => {
           <Route path="analytics" element={<Analytics/>} />
           <Route path="Campaign" element={<Campaign />} />
           <Route path="Donors" element={<Donors />} />
+         
+          <Route path="notifications" element={<Notifications />} />
+          
+          <Route path="audit" element={<AdminAuditTrail />} />
 
 
          
@@ -104,7 +113,7 @@ const App: React.FC = () => {
     <Route path="myrequests" element={<MyRequests />} />
     <Route path="donations" element={<SchoolDonations />} />
     <Route path="documents" element={<SchoolDocuments />} />
-    {/* <Route path="notifications" element={<SchoolNotifications />} /> */}
+    <Route path="notifications" element={<SchoolNotifications />} />
     <Route path="settings" element={<SchoolSettings />} />
   </Route>
 
@@ -115,6 +124,7 @@ const App: React.FC = () => {
   <Route path="mydonations" element={<MyDonations />} />
   <Route path="schools" element={<DonorSchools/>} />
   <Route path="settings" element={<DonorSettings />} />
+  <Route path="donornotifications" element={<DonorNotifications />} />
 
   {/* other routes */}
 </Route>

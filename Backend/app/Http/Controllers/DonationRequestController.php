@@ -7,6 +7,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use App\Models\DonationRequestEvidence;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use App\Services\LedgerService;
+use App\Models\Donor;
+use App\Notifications\EvidenceUploadedNotification;
+
+use Illuminate\Support\Str;
 
 class DonationRequestController extends Controller
 {
@@ -181,6 +187,18 @@ public function show($id)
 
         $project->status = $request->status;
         $project->save();
+        app(\App\Services\LedgerService::class)->record(
+    'REQUEST_STATUS_UPDATED',
+    'donation_request',
+    (int)$project->request_id,
+    [
+        'request_id' => (int)$project->request_id,
+        'school_id' => (int)$project->school_id,
+        'from' => $old,
+        'to' => $project->status,
+        'at' => now()->toDateTimeString(),
+    ]
+);
 
         return response()->json([
             'message' => 'Status updated successfully',
@@ -192,57 +210,163 @@ public function show($id)
     }
 
     // Create project
-    public function create(Request $request)
-    {
-        $request->validate([
-            'school_id' => 'required|exists:schools,school_id',
-            'request_title' => 'required|string|max:255',
-            'category' => 'required|string|max:100',
-            'quantity' => 'required|integer|min:1',
-            'estimated_price' => 'required|numeric|min:0',
-            'description' => 'required|string',
-            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
-            'document_url' => 'nullable|string',
-        ]);
+  public function create(Request $request)
+{
+    $user = Auth::guard('school')->user();
+    $schoolId = $user?->school_id;
 
-        $imageUrl = null;
-
-        if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('donation_requests', 'public');
-            $imageUrl = '/storage/' . $path;
-        }
-
-        $donationRequest = DonationRequest::create([
-            'school_id' => $request->school_id,
-            'request_title' => $request->request_title,
-            'category' => $request->category,
-            'quantity' => $request->quantity,
-            'estimated_price' => $request->estimated_price,
-            'description' => $request->description,
-            'image_url' => $imageUrl,
-            'document_url' => $request->document_url ? trim($request->document_url) : null,
-            'status' => 'Pending'
-        ]);
-
-        return response()->json([
-            'message' => 'Donation request created',
-            'request' => $donationRequest
-        ]);
+    if (!$schoolId) {
+        return response()->json(['message' => 'School not authenticated'], 401);
     }
 
-    // Delete project
-    public function destroy($id)
-    {
-        $donationRequest = DonationRequest::find($id);
+    $request->validate([
+        'request_title' => 'required|string|max:255',
+        'category' => 'required|string|max:100',
+        'quantity' => 'required|integer|min:1',
+        'estimated_price' => 'required|numeric|min:0',
+        'description' => 'required|string',
+        'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
+        'document_url' => 'nullable|string',
+    ]);
+
+    $imageUrl = null;
+
+    if ($request->hasFile('image')) {
+        $path = $request->file('image')->store('donation_requests', 'public');
+        $imageUrl = '/storage/' . $path;
+    }
+
+    // ✅ Create donation request
+    $donationRequest = DonationRequest::create([
+        'school_id' => (int)$schoolId,
+        'request_title' => $request->request_title,
+        'category' => $request->category,
+        'quantity' => (int)$request->quantity,
+        'estimated_price' => (float)$request->estimated_price,
+        'amount_raised' => 0,
+        'description' => $request->description,
+        'image_url' => $imageUrl,
+        'document_url' => $request->document_url ? trim($request->document_url) : null,
+        'status' => 'Pending',
+    ]);
+
+    // ==============================
+    // ✅ LEDGER ENTRY
+    // ==============================
+    app(\App\Services\LedgerService::class)->record(
+        'REQUEST_CREATED',
+        'donation_request',
+        (int)$donationRequest->request_id,
+        [
+            'request_id' => (int)$donationRequest->request_id,
+            'school_id' => (int)$schoolId,
+            'request_title' => (string)$donationRequest->request_title,
+            'estimated_price' => (float)$donationRequest->estimated_price,
+            'status' => 'Pending',
+            'created_at' => now()->toDateTimeString(),
+        ]
+    );
+
+    // ==============================
+    // ✅ MANUAL ADMIN NOTIFICATION
+    // ==============================
+    DB::table('notifications')->insert([
+        'id' => \Illuminate\Support\Str::uuid()->toString(),
+        'type' => 'admin',
+        'notifiable_type' => 'admin',
+        'notifiable_id' => 1, // static admin
+        'data' => json_encode([
+            'title' => 'New Campaign Created',
+            'body' => 'A school created a new donation request. Review and approve.',
+            'request_id' => (int)$donationRequest->request_id,
+            'school_id' => (int)$schoolId,
+        ]),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    return response()->json([
+        'message' => 'Donation request created',
+        'request' => $donationRequest
+    ]);
+}
+
+   public function destroy($id)
+{
+    return DB::transaction(function () use ($id) {
+
+        $donationRequest = DonationRequest::where('request_id', (int)$id)->first();
 
         if (!$donationRequest) {
             return response()->json(['message' => 'Donation request not found'], 404);
         }
 
+        // ❌ Prevent delete if donations exist
+        $hasPaidDonations = DB::table('donations')
+            ->where('request_id', (int)$donationRequest->request_id)
+            ->whereRaw("LOWER(status)='paid'")
+            ->exists();
+
+        if ($hasPaidDonations) {
+            return response()->json([
+                'message' => 'Cannot delete. This request already has donations.'
+            ], 422);
+        }
+
+        // Save info for ledger before delete
+        $snapshot = [
+            'request_id' => (int)$donationRequest->request_id,
+            'school_id' => (int)$donationRequest->school_id,
+            'request_title' => $donationRequest->request_title,
+            'category' => $donationRequest->category,
+            'estimated_price' => (float)$donationRequest->estimated_price,
+            'amount_raised' => (float)$donationRequest->amount_raised,
+            'status' => $donationRequest->status,
+        ];
+
+        // Delete evidences first
+        DB::table('donation_request_evidences')
+            ->where('request_id', (int)$donationRequest->request_id)
+            ->delete();
+
+        // Delete request
         $donationRequest->delete();
 
-        return response()->json(['message' => 'Donation request deleted successfully']);
-    }
+        // ✅ Ledger entry
+        app(LedgerService::class)->record(
+            'DONATION_REQUEST_DELETED',
+            'donation_request',
+            (int)$snapshot['request_id'],
+            [
+                'deleted_request' => $snapshot,
+                'at' => now()->toDateTimeString(),
+            ]
+        );
+
+        // ✅ Notify admin
+        DB::table('notifications')->insert([
+            'id' => (string) Str::uuid(),
+            'type' => 'admin',
+            'notifiable_type' => 'admin',
+            'notifiable_id' => 1,
+            'data' => json_encode([
+                'title' => 'Campaign deleted',
+                'body' => 'A campaign was deleted by the school.',
+                'request_id' => (int)$snapshot['request_id'],
+                'school_id' => (int)$snapshot['school_id'],
+                'request_title' => $snapshot['request_title'],
+                'time' => now()->toDateTimeString(),
+            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'read_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Donation request deleted successfully'
+        ]);
+    });
+}
 
     public function update(Request $request, $id)
     {
@@ -282,6 +406,18 @@ public function show($id)
             $path = $request->file('image')->store('donation_requests', 'public');
             $imageUrl = '/storage/' . $path;
         }
+$before = [
+  'title' => $project->request_title,
+  'category' => $project->category,
+  'quantity' => (int)$project->quantity,
+  'estimated_price' => (float)$project->estimated_price,
+  'description' => $project->description,
+  'image_url' => $project->image_url,
+  'document_url' => $project->document_url,
+];
+
+
+
 
         $project->update([
             'request_title' => $request->request_title,
@@ -292,6 +428,26 @@ public function show($id)
             'image_url' => $imageUrl,
             'document_url' => $request->document_url ? trim($request->document_url) : null,
         ]);
+        app(\App\Services\LedgerService::class)->record(
+    'REQUEST_UPDATED',
+    'donation_request',
+    (int)$project->request_id,
+    [
+        'request_id' => (int)$project->request_id,
+        'school_id' => (int)$project->school_id,
+        'before' => $before,
+        'after' => [
+          'title' => $project->request_title,
+          'category' => $project->category,
+          'quantity' => (int)$project->quantity,
+          'estimated_price' => (float)$project->estimated_price,
+          'description' => $project->description,
+          'image_url' => $project->image_url,
+          'document_url' => $project->document_url,
+        ],
+        'at' => now()->toDateTimeString(),
+    ]
+);
 
         return response()->json([
             'message' => 'Donation request updated successfully',
@@ -311,41 +467,112 @@ public function show($id)
         ]);
     }
 
-    public function uploadEvidence(Request $request, $id)
-    {
-        $request->validate([
-            'files' => 'required',
-            'files.*' => 'file|mimes:jpg,jpeg,png,webp,pdf|max:8192',
-            'note' => 'nullable|string|max:255',
+ public function uploadEvidence(Request $request, $id)
+{
+    $request->validate([
+        'files' => 'required',
+        'files.*' => 'file|mimes:jpg,jpeg,png,webp,pdf|max:8192',
+        'note' => 'nullable|string|max:255',
+    ]);
+
+    // request_id based lookup
+    $dr = DonationRequest::where('request_id', (int)$id)->first();
+    if (!$dr) return response()->json(['message' => 'Request not found'], 404);
+
+    $saved = [];
+
+    foreach ($request->file('files') as $file) {
+        $path = $file->store('donation_evidences', 'public');
+        $url  = '/storage/' . $path;
+
+        $type = str_contains($file->getMimeType(), 'pdf') ? 'pdf' : 'image';
+
+        $ev = DonationRequestEvidence::create([
+            'request_id' => (int)$dr->request_id,
+            'file_url'   => $url,
+            'file_type'  => $type,
+            'note'       => $request->note,
         ]);
 
-        $dr = DonationRequest::find($id);
-        if (!$dr) return response()->json(['message' => 'Request not found'], 404);
+        // ✅ ledger per file
+        app(\App\Services\LedgerService::class)->record(
+            'REQUEST_EVIDENCE_UPLOADED',
+            'donation_request_evidence',
+            (int)$ev->id,
+            [
+                'evidence_id' => (int)$ev->id,
+                'request_id'  => (int)$ev->request_id,
+                'file_url'    => $ev->file_url,
+                'file_type'   => $ev->file_type,
+                'note'        => $ev->note,
+                'at'          => now()->toDateTimeString(),
+            ]
+        );
 
-        $saved = [];
-
-        foreach ($request->file('files') as $file) {
-            $path = $file->store('donation_evidences', 'public');
-            $url = '/storage/' . $path;
-
-            $type = str_contains($file->getMimeType(), 'pdf') ? 'pdf' : 'image';
-
-            $ev = DonationRequestEvidence::create([
-                'request_id' => $dr->request_id,
-                'file_url' => $url,
-                'file_type' => $type,
-                'note' => $request->note,
-            ]);
-
-            $saved[] = $ev;
-        }
-
-        return response()->json([
-            'message' => 'Evidence uploaded',
-            'evidences' => $saved
-        ]);
+        $saved[] = $ev;
     }
 
+    // ✅ Notify donors who donated to this request (paid only)
+    $donorIds = DB::table('donations')
+        ->where('request_id', (int)$dr->request_id)
+        ->whereRaw("LOWER(status)='paid'")
+        ->whereNotNull('donor_id')
+        ->distinct()
+        ->pluck('donor_id');
+
+    if ($donorIds->count() > 0) {
+        $title = 'New spending proof uploaded';
+        $body  = 'The school uploaded new invoice/receipt/proof for your supported request: '
+            . ($dr->request_title ?? ('Request #' . $dr->request_id));
+
+        $now = now();
+
+        $rows = [];
+        foreach ($donorIds as $donorId) {
+            $rows[] = [
+                'id' => (string) Str::uuid(),
+
+                // ✅ IMPORTANT: follow your existing pattern (from phpMyAdmin screenshot)
+                'type' => 'App\\Notifications\\EvidenceUploadedNotification',
+                'notifiable_type' => 'App\\Models\\Donor',
+                'notifiable_id' => (int) $donorId,
+
+                'data' => json_encode([
+                    'title' => $title,
+                    'body' => $body,
+                    'request_id' => (int)$dr->request_id,
+                    'school_id' => (int)$dr->school_id,
+                    'evidence_count' => count($saved),
+                    'time' => $now->toDateTimeString(),
+                ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+
+                'read_at' => null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        DB::table('notifications')->insert($rows);
+
+        // ✅ optional: ledger that donors were notified
+        app(\App\Services\LedgerService::class)->record(
+            'DONORS_NOTIFIED_EVIDENCE_UPLOADED',
+            'donation_request',
+            (int)$dr->request_id,
+            [
+                'request_id' => (int)$dr->request_id,
+                'donors_notified' => (int)$donorIds->count(),
+                'evidence_uploaded' => (int)count($saved),
+                'at' => $now->toDateTimeString(),
+            ]
+        );
+    }
+
+    return response()->json([
+        'message'   => 'Evidence uploaded',
+        'evidences' => $saved
+    ]);
+}
     public function listEvidences($id)
     {
         $dr = DonationRequest::find($id);
@@ -370,7 +597,19 @@ public function show($id)
             $path = str_replace('/storage/', '', $ev->file_url);
             Storage::disk('public')->delete($path);
         }
-
+app(\App\Services\LedgerService::class)->record(
+    'REQUEST_EVIDENCE_DELETED',
+    'donation_request_evidence',
+    (int)$ev->id,
+    [
+        'evidence_id' => (int)$ev->id,
+        'request_id' => (int)$ev->request_id,
+        'file_url' => $ev->file_url,
+        'file_type' => $ev->file_type,
+        'note' => $ev->note,
+        'at' => now()->toDateTimeString(),
+    ]
+);
         $ev->delete();
 
         return response()->json(['message' => 'Evidence deleted']);

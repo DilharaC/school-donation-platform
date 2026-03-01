@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import "../css/index.css";
 
+
 // =======================
 // SVG Icons (from your AdminDashboard)
 // =======================
@@ -74,6 +75,24 @@ const DollarSign = () => (
     <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
   </svg>
 );
+const AuditTrail = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M4 4h12a4 4 0 0 1 4 4v12" />
+    <path d="M4 4v16a2 2 0 0 0 2 2h14" />
+    <line x1="8" y1="9" x2="16" y2="9" />
+    <line x1="8" y1="13" x2="14" y2="13" />
+  </svg>
+);
 const School = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -107,6 +126,7 @@ const navItems: NavItem[] = [
   { icon: Heart, label: "Campaigns", to: "/Campaign" },
   { icon: TrendingUp, label: "Analytics", to: "/analytics" },
   { icon: FileText, label: "Reports", to: "/reports" },
+  { icon: AuditTrail, label: "Audit Trail", to: "/audit" },
   { icon: Bell, label: "Notifications", to: "/notifications" },
   { icon: Settings, label: "Settings", to: "/settings" },
 ];

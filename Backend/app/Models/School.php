@@ -5,9 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User as Authenticatable; // ✅ important
-
+use Illuminate\Notifications\Notifiable;
 class School extends Authenticatable
 {
+    use Notifiable;
+
+ 
     use HasFactory;
 
     protected $table = 'schools';
