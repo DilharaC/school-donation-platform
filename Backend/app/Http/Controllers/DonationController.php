@@ -113,23 +113,23 @@ public function verifySession(Request $request)
                 return response()->json(['status' => 'already_paid']);
             }
 
-            // ✅ mark paid
+          
             $donation->update([
                 'status'  => 'paid',
                 'paid_at' => now(),
             ]);
 
-            // ✅ ensure we have school_id
+           
             $schoolId = (int) ($donation->school_id ?? 0);
 
-            // If campaign donation but school_id was not saved (old rows), derive from request
+          
             if (!$schoolId && !empty($donation->request_id)) {
                 $schoolId = (int) DB::table('donation_requests')
                     ->where('request_id', (int) $donation->request_id)
                     ->value('school_id');
 
                 if ($schoolId) {
-                    $donation->update(['school_id' => $schoolId]); // optional backfill
+                    $donation->update(['school_id' => $schoolId]); 
                 }
             }
 
@@ -180,15 +180,15 @@ public function verifySession(Request $request)
     'amount'     => $donation->amount,
     'status'     => 'paid',
 
-    // optional custom donor text
+   
     'subject_donor' => 'Donation sent successfully 🎉',
     'title_donor'   => 'Thank you for your donation!',
     'message_donor' => 'Your donation was sent successfully.',
 
-    // optional custom school text
+   
     'subject_school' => 'New donation received 🎉',
     'title_school'   => 'You received a donation!',
-    // message_school can be omitted; it will auto-generate using donor name + request title
+    'message_school' => 'Your school received a new donation.',
 ]);
 
 

@@ -8,12 +8,7 @@ use Illuminate\Support\Facades\Auth;
 
 class NotificationController extends Controller
 {
-    /**
-     * Resolve current viewer for notifications
-     * admin: notifiable_type='admin', notifiable_id=1
-     * school: notifiable_type='App\Models\School', notifiable_id=school_id
-     * donor: notifiable_type='App\Models\Donor',  notifiable_id=donor_id
-     */
+  
     private function resolveNotifiable(Request $request): array
 {
     $role = strtolower((string) $request->query('role', 'admin'));
@@ -25,21 +20,17 @@ class NotificationController extends Controller
     if ($role === 'school') {
         $u = null;
 
-        // ✅ use school guard
         try { $u = Auth::guard('school')->user(); } catch (\Throwable $e) {}
 
-        // optional fallback if you really use default guard for school
         if (!$u) $u = $request->user();
 
         if (!$u) return ['ok' => false, 'message' => 'School not authenticated'];
 
-        // ✅ IMPORTANT: use model key (should be school_id)
-        $schoolId = (int) ($u->getKey()); // works if primaryKey is school_id
+        $schoolId = (int) ($u->getKey()); 
         if (!$schoolId) return ['ok' => false, 'message' => 'Invalid school session'];
 
         return ['ok' => true, 'type' => 'App\\Models\\School', 'id' => $schoolId];
     }
-
     if ($role === 'donor') {
         $u = $request->user();
         if (!$u) return ['ok' => false, 'message' => 'Donor not authenticated'];
@@ -52,7 +43,6 @@ class NotificationController extends Controller
 
     return ['ok' => true, 'type' => 'admin', 'id' => 1];
 }
-    // GET /api/notifications?role=admin|school|donor&page=1&limit=20&unread=1&search=
 public function index(Request $request)
 {
     $who = $this->resolveNotifiable($request);
@@ -61,7 +51,7 @@ public function index(Request $request)
     $role   = strtolower((string) $request->query('role', 'admin')); // admin|school|donor
     $page   = max(1, (int) $request->query('page', 1));
     $limit  = max(1, min(50, (int) $request->query('limit', 20)));
-    $unread = (int) $request->query('unread', 0); // 1=unread only
+    $unread = (int) $request->query('unread', 0); 
     $search = trim((string) $request->query('search', ''));
 
     $q = DB::table('notifications')
@@ -88,7 +78,7 @@ public function index(Request $request)
         ->take($limit)
         ->get(['id', 'type', 'data', 'read_at', 'created_at', 'updated_at']);
 
-    // ✅ decode json once
+    //  decode json once
     $rows->transform(function ($r) {
         $r->data_obj = null;
         if (!empty($r->data)) {
@@ -98,7 +88,7 @@ public function index(Request $request)
         return $r;
     });
 
-    // ✅ donor enrich: school_name + request_title
+    // donor enrich: school_name + request_title
     if ($role === 'donor') {
         $schoolIds  = [];
         $requestIds = [];
