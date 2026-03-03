@@ -24,9 +24,7 @@ use Illuminate\Support\Facades\Log;
 
 class SchoolController extends Controller
 {
-    /**
-     * ✅ Register School (with optional document upload)
-     */
+    
     public function register(Request $request)
 {
     $validated = $request->validate([
@@ -57,7 +55,7 @@ class SchoolController extends Controller
 
     return DB::transaction(function () use ($request, $validated) {
 
-        // ✅ store file into /public/uploads/docs
+       
         $docPath = null;
         if ($request->hasFile('document')) {
             $file = $request->file('document');
@@ -96,8 +94,7 @@ class SchoolController extends Controller
             'status'          => 'Inactive',
             'documents_url'   => $docPath,
         ]);
-
-        // ✅ Call Flask API to calculate need_score
+        //  Call Flask API to calculate need_score
         try {
             $response = Http::timeout(5)->withHeaders(['Content-Type' => 'application/json'])
                 ->post('http://127.0.0.1:5000/calculate_need', [
@@ -105,7 +102,7 @@ class SchoolController extends Controller
                     'facilities'     => (int) $school->facilities,
                     'area_type'      => (string) $school->area_type,
                     'performance'    => (int) $school->performance,
-                    'prev_donations' => (float) $school->prev_donations,
+            
                 ]);
 
             Log::info('Flask API raw response: ' . $response->body());
@@ -120,6 +117,8 @@ class SchoolController extends Controller
         } catch (\Throwable $e) {
             Log::error('Flask API call failed: ' . $e->getMessage());
         }
+
+
 
         // ✅ LEDGER: school registered (NOW it runs)
         app(LedgerService::class)->record(

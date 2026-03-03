@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Donor;
 use App\Models\School;
+use App\Models\Ministry;
 
 class AuthController extends Controller
 {
@@ -18,7 +19,7 @@ class AuthController extends Controller
         ]);
     }
 
-   public function login(Request $request)
+  public function login(Request $request)
 {
     $request->validate([
         'identifier' => 'required|string',
@@ -38,12 +39,26 @@ class AuthController extends Controller
         $type = "donor";
     }
 
-    // 2) School login ONLY by registration_no
+    // 2) Ministry login by email
+    if (!$user) {
+        $ministry = Ministry::where('email', $identifier)->first();
+        if ($ministry) {
+            if (isset($ministry->is_active) && (int)$ministry->is_active !== 1) {
+                return response()->json([
+                    "success" => false,
+                    "message" => "Ministry account is not active."
+                ], 403);
+            }
+
+            $user = $ministry;
+            $type = "ministry";
+        }
+    }
+
+    // 3) School login ONLY by registration_no
     if (!$user) {
         $school = School::where('registration_no', $identifier)->first();
-
         if ($school) {
-            // ✅ Allow ONLY active schools
             $isActive =
                 (isset($school->is_active) && (int)$school->is_active === 1) ||
                 (isset($school->status) && strtolower((string)$school->status) === 'active') ||
@@ -80,8 +95,10 @@ class AuthController extends Controller
     // login using correct guard
     if ($type === 'school') {
         Auth::guard('school')->login($user);
+    } elseif ($type === 'ministry') {
+        Auth::guard('ministry')->login($user);
     } else {
-        Auth::guard('web')->login($user);
+        Auth::guard('web')->login($user); // donor
     }
 
     return response()->json([
@@ -89,8 +106,8 @@ class AuthController extends Controller
         "user" => [
             "userType" => $type,
             "id"       => $user->id,
-            "name"     => $type === "donor" ? $user->full_name : $user->school_name,
-            "email"    => $type === "donor" ? $user->email : null,
+            "name"     => $type === "donor" ? $user->full_name : ($type === "school" ? $user->school_name : $user->name),
+            "email"    => in_array($type, ["donor","ministry"]) ? $user->email : null,
         ]
     ]);
 }

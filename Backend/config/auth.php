@@ -30,6 +30,12 @@ return [
             'driver' => 'session',
             'provider' => 'schools',
         ],
+          'ministry' => [
+        'driver' => 'session',
+        'provider' => 'ministries',
+    ],
+
+        
     ],
 
     /*
@@ -48,6 +54,10 @@ return [
             'driver' => 'eloquent',
             'model' => App\Models\School::class,
         ],
+          'ministries' => [
+        'driver' => 'eloquent',
+        'model' => App\Models\Ministry::class,
+          ],
 
         // If you ever create a User model, you can add it here
         // 'users' => [

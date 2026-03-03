@@ -4,7 +4,7 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-def calculate_need_score(students, facilities, area_type, performance, prev_donations):
+def calculate_need_score(students, facilities, area_type, performance):
     score = 0
 
     # Bigger weight for number of students
@@ -25,8 +25,8 @@ def calculate_need_score(students, facilities, area_type, performance, prev_dona
     else:
         score += 7  # default for suburban/other
 
-    # Donations reduce need
-    score += max(0, (10000 - prev_donations) / 500)  
+  
+   
 
     # Clamp score between 0 and 100
     score = min(max(score, 0), 100)
@@ -43,11 +43,11 @@ def calculate_need():
         facilities = int(data.get('facilities', 0))
         area_type = data.get('area_type', 'urban')
         performance = int(data.get('performance', 0))
-        prev_donations = float(data.get('prev_donations', 0))
+       
     except (ValueError, TypeError):
         return jsonify({"error": "Invalid data types"}), 400
 
-    need_score = calculate_need_score(students, facilities, area_type, performance, prev_donations)
+    need_score = calculate_need_score(students, facilities, area_type, performance)
     return jsonify({"need_score": need_score})
 
 @app.route('/', methods=['GET'])

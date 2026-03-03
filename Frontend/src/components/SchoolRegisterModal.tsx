@@ -871,18 +871,8 @@ export default function SchoolRegisterModal({
                             />
                           </InputShell>
 
-                          <div className="md:col-span-2">
-                            <InputShell label="Previous Donations" hint="If none, keep 0.">
-                              <input
-                                inputMode="numeric"
-                                className={inputBase}
-                                name="prev_donations"
-                                value={form.prev_donations}
-                                onChange={onChange}
-                                placeholder="0"
-                              />
-                            </InputShell>
-                          </div>
+                       
+                          
                         </div>
                       </div>
                     )}
