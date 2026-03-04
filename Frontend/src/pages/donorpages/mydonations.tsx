@@ -1,3 +1,9 @@
+// MyDonations.tsx (FULL UPDATED FILE)
+// ✅ Supports: campaign + direct school fund
+// ✅ Supports: allocation-based “Donated Requests” (recommended when donation can be split)
+// ✅ Adds: “View Allocation” modal per donation (shows fund_allocations split)
+// ✅ Fixes: request_id nullable (no crashes)
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import {
@@ -18,9 +24,18 @@ import {
 } from "@heroicons/react/24/solid";
 
 const API_BASE = "http://localhost:8000/api";
+
 const MY_DONATIONS = `${API_BASE}/donor/my-donations`;
+
+// ✅ RECOMMENDED: build “Donated Requests” from fund_allocations (correct if donation split)
+const MY_REQUEST_ALLOCATIONS = `${API_BASE}/donor/my-request-allocations`;
+
 const REQUEST_DETAIL = (id: number) => `${API_BASE}/donation_requests/${id}`;
 const RECEIPT_ENDPOINT = (id: number) => `${API_BASE}/donations/${id}/receipt`;
+
+// ✅ NEW: show allocations for a donation (you must implement this API on backend)
+const ALLOCATION_ENDPOINT = (donationId: number) =>
+  `${API_BASE}/donor/donations/${donationId}/allocations`;
 
 const cx = (...s: Array<string | false | null | undefined>) => s.filter(Boolean).join(" ");
 const formatLKR = (n: number) => `LKR ${Number.isFinite(n) ? n.toLocaleString() : "0"}`;
@@ -32,9 +47,11 @@ const toAbs = (u?: string | null) => {
   return `http://localhost:8000${u.startsWith("/") ? "" : "/"}${u}`;
 };
 
+// ✅ request_id is nullable now
 type DonationRow = {
   donation_id: number;
-  request_id: number;
+  request_id?: number | null;
+  donation_type?: "campaign" | "school_fund" | string;
   amount: number;
   status: "paid" | "pending" | string;
   created_at: string;
@@ -92,11 +109,45 @@ type DonatedRequestRow = {
   province?: string | null;
   district?: string | null;
 
-  total_donated: number;
+  total_donated: number; // used by UI
   donations_count: number;
   last_donated_at?: string | null;
 
   first_donation_id?: number | null;
+};
+
+// ✅ allocation based row (from backend)
+type RequestAllocationRow = {
+  request_id: number;
+  request_title: string;
+  school_name?: string | null;
+  province?: string | null;
+  district?: string | null;
+
+  total_allocated: number;
+  allocations_count: number;
+  last_allocated_at?: string | null;
+};
+
+// ✅ Donation allocations modal payload
+type AllocationRow = {
+  allocation_id: number;
+  allocation_type: "request" | "school_fund" | string;
+  request_id: number | null;
+  request_title?: string | null;
+  allocated_amount: number;
+  created_at?: string;
+};
+
+type DonationAllocationRes = {
+  donation: {
+    donation_id: number;
+    amount: number;
+    status: string;
+    created_at: string;
+  };
+  allocated_total: number;
+  allocations: AllocationRow[];
 };
 
 /** ---------------- Small UI helpers ---------------- */
@@ -366,7 +417,7 @@ function ReceiptModal({
 
               <div className="rounded-2xl border border-slate-200 p-4">
                 <div className="text-slate-500 text-xs font-black">Request</div>
-                <div className="font-black text-slate-900 mt-1">{receipt.request_title}</div>
+                <div className="font-black text-slate-900 mt-1">{receipt.request_title || "School Fund"}</div>
               </div>
 
               <div className="rounded-2xl border border-slate-200 p-4">
@@ -386,6 +437,84 @@ function ReceiptModal({
             <PrinterIcon className="h-5 w-5" />
             Print Receipt
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Allocation Modal */
+function AllocationModal({
+  open,
+  onClose,
+  data,
+  loading,
+}: {
+  open: boolean;
+  onClose: () => void;
+  data: DonationAllocationRes | null;
+  loading: boolean;
+}) {
+  return (
+    <div className={open ? "fixed inset-0 z-[115]" : "hidden"}>
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 relative border border-slate-200">
+          <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-slate-900">
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+
+          <div className="text-center">
+            <div className="mx-auto h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200 grid place-items-center text-slate-800">
+              <Squares2X2Icon className="h-6 w-6" />
+            </div>
+            <div className="text-xs text-slate-500 font-black mt-3">Donation Allocation</div>
+            <div className="text-xl font-black text-slate-900 mt-1">#{data?.donation?.donation_id || ""}</div>
+          </div>
+
+          {loading ? (
+            <div className="text-center py-10 text-slate-500">Loading allocation…</div>
+          ) : !data ? (
+            <div className="text-center py-10 text-rose-600 font-black">Could not load allocation.</div>
+          ) : (
+            <div className="mt-6 space-y-3 text-sm">
+              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 space-y-3">
+                <Row label="Donation Amount" value={<b className="text-slate-900">{formatLKR(Number(data.donation.amount) || 0)}</b>} />
+                <Row
+                  label="Allocated Total"
+                  value={<b className="text-slate-900">{formatLKR(Number(data.allocated_total) || 0)}</b>}
+                />
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 p-4">
+                <div className="text-slate-500 text-xs font-black mb-2">Breakdown</div>
+
+                {data.allocations?.length ? (
+                  <div className="space-y-2">
+                    {data.allocations.map((a) => (
+                      <div key={a.allocation_id} className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-black text-slate-900 truncate">
+                            {a.allocation_type === "request"
+                              ? a.request_title || (a.request_id ? `Request #${a.request_id}` : "Request")
+                              : "School Fund"}
+                          </div>
+                          <div className="text-[11px] text-slate-500 font-bold">
+                            {String(a.allocation_type || "").toUpperCase()}
+                          </div>
+                        </div>
+                        <div className="shrink-0 font-black text-slate-900">
+                          {formatLKR(Number(a.allocated_amount) || 0)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-slate-600 text-sm">No allocations found.</div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -416,7 +545,8 @@ function Avatar({
   getThumb: (requestId: number) => void;
 }) {
   useEffect(() => {
-    if (!requestImage && !schoolLogo) getThumb(requestId);
+    // ✅ only fetch thumb if we have a real request id
+    if (requestId > 0 && !requestImage && !schoolLogo) getThumb(requestId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestId]);
 
@@ -460,10 +590,19 @@ function useDebounced<T>(value: T, delay = 400) {
   return v;
 }
 
+/** small missing icon used in EmptyState above */
+function GiftIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor" aria-hidden="true">
+      <path d="M20 7h-1.4a3.5 3.5 0 0 0-6.6-1.3A3.5 3.5 0 0 0 5.4 7H4a2 2 0 0 0-2 2v2h10V7h2v4h10V9a2 2 0 0 0-2-2Zm-6.5-1.5A1.5 1.5 0 1 1 15 7h-2V5.5ZM9 7a1.5 1.5 0 1 1 1.5-1.5V7H9Zm3 6H2v7a2 2 0 0 0 2 2h8v-9Zm2 9h6a2 2 0 0 0 2-2v-7H14v9Z" />
+    </svg>
+  );
+}
+
 export default function MyDonations() {
   const [tab, setTab] = useState<"donations" | "requests">("requests");
 
-  // filters (draft + applied)
+  // filters
   const [draftSearch, setDraftSearch] = useState("");
   const debouncedSearch = useDebounced(draftSearch, 350);
 
@@ -497,6 +636,11 @@ export default function MyDonations() {
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [receipt, setReceipt] = useState<any>(null);
 
+  // allocation modal
+  const [allocationOpen, setAllocationOpen] = useState(false);
+  const [allocationLoading, setAllocationLoading] = useState(false);
+  const [allocationData, setAllocationData] = useState<DonationAllocationRes | null>(null);
+
   // thumbs cache
   const [thumbs, setThumbs] = useState<Record<number, { request_image?: string | null; school_logo?: string | null }>>(
     {}
@@ -508,7 +652,7 @@ export default function MyDonations() {
 
   /** Fetch & cache request image + school logo */
   const fetchThumbForRequest = async (requestId: number) => {
-    if (!requestId) return;
+    if (!requestId || requestId <= 0) return;
     if (thumbs[requestId]?.request_image || thumbs[requestId]?.school_logo) return;
     if (inflight.current.has(requestId)) return;
 
@@ -559,9 +703,43 @@ export default function MyDonations() {
     }
   };
 
+  // ✅ allocation-first, fallback grouping if endpoint not available
   const fetchDonatedRequests = async () => {
     setLoadingRequests(true);
     setErr(null);
+
+    // 1) Try allocations endpoint (correct if donation split)
+    try {
+      const res = await axios.get(MY_REQUEST_ALLOCATIONS, {
+        withCredentials: true,
+        params: { search, status, page: reqPage, limit: reqLimit },
+      });
+
+      const rows: RequestAllocationRow[] = res.data?.requests ?? [];
+      const total = Number(res.data?.total ?? rows.length);
+
+      setRequests(
+        rows.map((r) => ({
+          request_id: r.request_id,
+          request_title: r.request_title,
+          school_name: r.school_name,
+          province: r.province,
+          district: r.district,
+          total_donated: Number(r.total_allocated) || 0,
+          donations_count: Number(r.allocations_count) || 0,
+          last_donated_at: r.last_allocated_at ?? null,
+          first_donation_id: null,
+        }))
+      );
+      setReqTotal(total);
+
+      setLoadingRequests(false);
+      return;
+    } catch {
+      // fallback below
+    }
+
+    // 2) Fallback: group donations by request_id (not correct if split but works)
     try {
       const res = await axios.get(MY_DONATIONS, {
         withCredentials: true,
@@ -579,10 +757,10 @@ export default function MyDonations() {
       const map = new Map<number, DonatedRequestRow>();
 
       for (const d of rows) {
-        const id = Number(d.request_id);
+        const id = d.request_id ? Number(d.request_id) : 0;
 
-        // ✅ SKIP school fund donations (no request, no evidence)
-        if (!id || id <= 0) continue;
+        // ✅ skip school fund donations
+        if (!id) continue;
 
         const cur = map.get(id);
 
@@ -601,14 +779,13 @@ export default function MyDonations() {
         } else {
           cur.total_donated += Number(d.amount) || 0;
           cur.donations_count += 1;
-
           if (!cur.last_donated_at || new Date(d.created_at) > new Date(cur.last_donated_at)) {
             cur.last_donated_at = d.created_at;
             cur.first_donation_id = d.donation_id;
           }
         }
 
-        // cache thumbnails (only for real requests)
+        // thumbs cache
         if (d.request_image_url || d.school_logo_url) {
           setThumbs((prev) => ({
             ...prev,
@@ -677,6 +854,22 @@ export default function MyDonations() {
     }
   };
 
+  // ✅ NEW: open allocations modal
+  const openAllocation = async (donationId: number) => {
+    setAllocationOpen(true);
+    setAllocationLoading(true);
+    setAllocationData(null);
+
+    try {
+      const res = await axios.get<DonationAllocationRes>(ALLOCATION_ENDPOINT(donationId), { withCredentials: true });
+      setAllocationData(res.data ?? null);
+    } catch {
+      setAllocationData(null);
+    } finally {
+      setAllocationLoading(false);
+    }
+  };
+
   // Apply on tab/page/status/search changes
   useEffect(() => {
     if (tab === "donations") fetchDonations();
@@ -684,7 +877,7 @@ export default function MyDonations() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, donationsPage, reqPage, status, search]);
 
-  // Nice UX: auto-apply debounced typing (but only for text, not status)
+  // debounced search
   useEffect(() => {
     setSearch(debouncedSearch.trim());
     setDonationsPage(1);
@@ -726,9 +919,9 @@ export default function MyDonations() {
       {/* Summary row */}
       <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard
-          label={tab === "donations" ? "Total (this page list)" : "Total donated (requests page)"}
+          label={tab === "donations" ? "Total (this page list)" : "Total allocated (requests page)"}
           value={formatLKR(tab === "donations" ? stats.sum : stats.reqSum)}
-          hint={tab === "donations" ? "Based on currently loaded donations list" : "Based on grouped donated requests"}
+          hint={tab === "donations" ? "Based on currently loaded donations list" : "Based on request allocations"}
           icon={<ReceiptPercentIcon className="h-5 w-5" />}
         />
         <StatCard
@@ -772,8 +965,16 @@ export default function MyDonations() {
               />
 
               <div className="flex items-center gap-2">
-                {status === "paid" ? <Pill tone="emerald" icon={<CheckCircleIcon className="h-3.5 w-3.5" />}>PAID</Pill> : null}
-                {status === "pending" ? <Pill tone="amber" icon={<ClockIcon className="h-3.5 w-3.5" />}>PENDING</Pill> : null}
+                {status === "paid" ? (
+                  <Pill tone="emerald" icon={<CheckCircleIcon className="h-3.5 w-3.5" />}>
+                    PAID
+                  </Pill>
+                ) : null}
+                {status === "pending" ? (
+                  <Pill tone="amber" icon={<ClockIcon className="h-3.5 w-3.5" />}>
+                    PENDING
+                  </Pill>
+                ) : null}
                 {status === "all" ? <Pill tone="slate">ALL</Pill> : null}
               </div>
             </div>
@@ -862,15 +1063,15 @@ export default function MyDonations() {
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {donations.map((d) => {
-                  const reqId = Number(d.request_id) || 0;
-                  const isDirectFund = reqId <= 0;
+                  const reqId = d.request_id ? Number(d.request_id) : 0;
+                  const isDirectFund = !reqId;
 
                   const t = !isDirectFund ? thumbs[reqId] : undefined;
 
                   const requestImage = isDirectFund ? null : d.request_image_url ?? t?.request_image ?? null;
                   const schoolLogo = d.school_logo_url ?? (isDirectFund ? null : t?.school_logo ?? null);
 
-                  const title = isDirectFund ? "Direct School Fund" : d.request_title || `Request #${reqId}`;
+                  const title = isDirectFund ? "School Fund" : d.request_title || `Request #${reqId}`;
                   const schoolName = d.school_name?.trim() ? d.school_name : "School";
 
                   return (
@@ -914,7 +1115,7 @@ export default function MyDonations() {
                                   {String(d.status).toUpperCase()}
                                 </Pill>
                                 <Pill tone="indigo">#{d.donation_id}</Pill>
-                                {isDirectFund ? <Pill tone="slate">SCHOOL FUND</Pill> : null}
+                                {isDirectFund ? <Pill tone="slate">SCHOOL FUND</Pill> : <Pill tone="slate">CAMPAIGN</Pill>}
                               </div>
                             </div>
 
@@ -925,6 +1126,14 @@ export default function MyDonations() {
                           </div>
 
                           <div className="mt-4 flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => openAllocation(d.donation_id)}
+                              className="rounded-2xl px-3 py-2 text-xs font-black border border-slate-200 hover:bg-slate-50 flex items-center gap-2"
+                            >
+                              <Squares2X2Icon className="h-4 w-4 text-slate-700" />
+                              View Allocation
+                            </button>
+
                             <button
                               onClick={() => openReceipt(d.donation_id)}
                               className="rounded-2xl px-3 py-2 text-xs font-black border border-slate-200 hover:bg-slate-50 flex items-center gap-2"
@@ -1028,7 +1237,7 @@ export default function MyDonations() {
 
                               <div className="mt-3 flex items-center gap-2">
                                 <Pill tone="indigo">Request #{r.request_id}</Pill>
-                                <Pill tone="slate">{r.donations_count} donation{r.donations_count === 1 ? "" : "s"}</Pill>
+                                <Pill tone="slate">{r.donations_count} record{r.donations_count === 1 ? "" : "s"}</Pill>
                               </div>
                             </div>
 
@@ -1204,9 +1413,7 @@ export default function MyDonations() {
                     <PhotoIcon className="h-4 w-4 text-slate-400" />
                     Evidence uploaded
                   </div>
-                  <div className="text-sm text-slate-600 mt-1">
-                    {detail.evidences?.length ? `${detail.evidences.length} file(s)` : "No files yet"}
-                  </div>
+                  <div className="text-sm text-slate-600 mt-1">{detail.evidences?.length ? `${detail.evidences.length} file(s)` : "No files yet"}</div>
                 </div>
                 {detail.evidences?.length ? <Pill tone="slate">OPEN</Pill> : null}
               </div>
@@ -1224,13 +1431,7 @@ export default function MyDonations() {
 
                     if (isPdf) {
                       return (
-                        <a
-                          key={e.id}
-                          href={href}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-3xl border border-slate-200 p-4 hover:bg-slate-50 transition"
-                        >
+                        <a key={e.id} href={href} target="_blank" rel="noreferrer" className="rounded-3xl border border-slate-200 p-4 hover:bg-slate-50 transition">
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <div className="font-black text-slate-900 flex items-center gap-2">
@@ -1247,13 +1448,7 @@ export default function MyDonations() {
                     }
 
                     return (
-                      <a
-                        key={e.id}
-                        href={href}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-3xl border border-slate-200 overflow-hidden hover:bg-slate-50 transition"
-                      >
+                      <a key={e.id} href={href} target="_blank" rel="noreferrer" className="rounded-3xl border border-slate-200 overflow-hidden hover:bg-slate-50 transition">
                         <div className="aspect-[4/3] bg-slate-100">
                           <img src={href} alt="evidence" className="w-full h-full object-cover" />
                         </div>
@@ -1276,15 +1471,14 @@ export default function MyDonations() {
 
       {/* Receipt Modal */}
       <ReceiptModal open={receiptOpen} onClose={() => setReceiptOpen(false)} receipt={receipt} loading={receiptLoading} />
-    </div>
-  );
-}
 
-/** small missing icon used in EmptyState above */
-function GiftIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor" aria-hidden="true">
-      <path d="M20 7h-1.4a3.5 3.5 0 0 0-6.6-1.3A3.5 3.5 0 0 0 5.4 7H4a2 2 0 0 0-2 2v2h10V7h2v4h10V9a2 2 0 0 0-2-2Zm-6.5-1.5A1.5 1.5 0 1 1 15 7h-2V5.5ZM9 7a1.5 1.5 0 1 1 1.5-1.5V7H9Zm3 6H2v7a2 2 0 0 0 2 2h8v-9Zm2 9h6a2 2 0 0 0 2-2v-7H14v9Z" />
-    </svg>
+      {/* Allocation Modal */}
+      <AllocationModal
+        open={allocationOpen}
+        onClose={() => setAllocationOpen(false)}
+        data={allocationData}
+        loading={allocationLoading}
+      />
+    </div>
   );
 }
