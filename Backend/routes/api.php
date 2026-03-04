@@ -94,6 +94,10 @@ Route::get('/reports/trends', [DonationController::class, 'reportsTrends']);
 Route::get('/reports/top-provinces', [DonationController::class, 'reportsTopProvinces']);
 Route::get('/reports/top-campaigns', [DonationController::class, 'reportsTopCampaigns']);
 
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/donor/donations/{donationId}/allocations', [DonationController::class, 'donationAllocations']);
+});
+
 
 Route::post('/schools/register', [SchoolController::class, 'register']);
 Route::get('/schools', [SchoolController::class, 'listSchools']);

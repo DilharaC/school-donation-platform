@@ -1,4 +1,4 @@
-// DonorSchools.tsx (FULL) — Premium drawer UI + Donate to School + Donate to Campaign (DonateModal) + ICONS
+// DonorSchools.tsx (FULL) — UPDATED to use total_received everywhere (NO fund_balance in UI)
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import DonateModal from "../../components/DonateModal";
@@ -117,7 +117,7 @@ type SchoolRow = {
   initials?: string;
   logo_url?: string | null;
 
-  fund_balance?: number;
+  // ✅ Use this for "Received / Total received" everywhere
   total_received?: number;
 };
 
@@ -222,10 +222,7 @@ function DonationSuccessModal({
 
   return (
     <div className="fixed inset-0 z-[120]">
-      <div
-        className="absolute inset-0 bg-black/25 backdrop-blur-[1px]"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/25 backdrop-blur-[1px]" onClick={onClose} />
       <div className="absolute inset-0 grid place-items-center p-4">
         <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
           <div className="p-6 sm:p-7 border-b border-slate-100 flex items-start justify-between gap-3">
@@ -267,9 +264,7 @@ function DonationSuccessModal({
                   <div className="text-sm opacity-80 mt-1">{ui.desc}</div>
 
                   {details ? (
-                    <div className="mt-3 text-xs font-semibold opacity-70 break-words">
-                      Details: {details}
-                    </div>
+                    <div className="mt-3 text-xs font-semibold opacity-70 break-words">Details: {details}</div>
                   ) : null}
                 </div>
               </div>
@@ -549,8 +544,6 @@ export default function DonorSchools() {
   const closeSuccessModal = () => {
     setSuccessOpen(false);
     setSuccessDetails("");
-
-    // ✅ clear query params after showing result
     window.history.replaceState({}, "", window.location.pathname);
   };
 
@@ -572,7 +565,6 @@ export default function DonorSchools() {
     fetchSchools();
   };
 
-  // ✅ Stripe return -> show modal + verify ONCE (StrictMode safe)
   useEffect(() => {
     if (verifyRan.current) return;
 
@@ -856,7 +848,8 @@ export default function DonorSchools() {
                             Total received
                           </div>
                           <div className="text-sm font-extrabold text-[#0B1E3B]">
-                            {formatLKR(Number(s.fund_balance ?? s.total_received ?? 0))}
+                            {/* ✅ ONLY total_received */}
+                            {formatLKR(Number(s.total_received ?? 0))}
                           </div>
                         </div>
                       </div>
@@ -938,7 +931,9 @@ export default function DonorSchools() {
                     <BuildingOffice2Icon className="h-4 w-4 text-slate-400" />
                     School details
                   </div>
-                  <div className="text-lg font-extrabold text-slate-900 truncate">{selected?.school_name || "School"}</div>
+                  <div className="text-lg font-extrabold text-slate-900 truncate">
+                    {selected?.school_name || "School"}
+                  </div>
                 </div>
 
                 <button
@@ -962,7 +957,8 @@ export default function DonorSchools() {
                 <div className="rounded-3xl border border-slate-200 p-5 text-slate-700">
                   Could not load details.
                   <div className="text-xs text-slate-500 mt-2">
-                    This UI calls: <span className="font-mono">{selected ? SCHOOL_DETAIL(selected.school_id) : "-"}</span>
+                    This UI calls:{" "}
+                    <span className="font-mono">{selected ? SCHOOL_DETAIL(selected.school_id) : "-"}</span>
                   </div>
                 </div>
               ) : (
@@ -972,7 +968,11 @@ export default function DonorSchools() {
                     <div className="flex items-start gap-4">
                       <div className="h-14 w-14 rounded-2xl overflow-hidden bg-slate-900 shrink-0">
                         {toAbs(detail.school.logo_url) ? (
-                          <img src={toAbs(detail.school.logo_url)!} alt="logo" className="w-full h-full object-cover" />
+                          <img
+                            src={toAbs(detail.school.logo_url)!}
+                            alt="logo"
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
                           <div className="w-full h-full grid place-items-center text-white font-extrabold">
                             {(detail.school.initials || initials(detail.school.school_name)).slice(0, 2)}
@@ -985,18 +985,27 @@ export default function DonorSchools() {
                         <div className="text-sm text-slate-600 flex items-center gap-2 mt-1">
                           <MapPinIcon className="h-4 w-4 text-slate-400" />
                           <span>
-                            {detail.school.province || "—"} {detail.school.district ? `• ${detail.school.district}` : ""}
+                            {detail.school.province || "—"}{" "}
+                            {detail.school.district ? `• ${detail.school.district}` : ""}
                           </span>
                         </div>
-                        {detail.school.address ? <div className="text-sm text-slate-600 mt-1">{detail.school.address}</div> : null}
+                        {detail.school.address ? (
+                          <div className="text-sm text-slate-600 mt-1">{detail.school.address}</div>
+                        ) : null}
 
                         <div className="mt-3 flex flex-wrap gap-2">
                           {Number(detail.school.verified || 0) === 1 ? (
-                            <Pill cls="bg-emerald-50 text-emerald-700 border-emerald-200" icon={<CheckBadgeIcon className="h-3.5 w-3.5" />}>
+                            <Pill
+                              cls="bg-emerald-50 text-emerald-700 border-emerald-200"
+                              icon={<CheckBadgeIcon className="h-3.5 w-3.5" />}
+                            >
                               VERIFIED
                             </Pill>
                           ) : null}
-                          <Pill cls={needTone(needLevel(detail.school.need_score))} icon={<FunnelIcon className="h-3.5 w-3.5" />}>
+                          <Pill
+                            cls={needTone(needLevel(detail.school.need_score))}
+                            icon={<FunnelIcon className="h-3.5 w-3.5" />}
+                          >
                             {needLevel(detail.school.need_score).toUpperCase()} NEED
                           </Pill>
                         </div>
@@ -1007,16 +1016,21 @@ export default function DonorSchools() {
                       <div className="rounded-2xl bg-slate-50 p-3">
                         <div className="text-xs text-slate-500 font-bold">Received</div>
                         <div className="font-extrabold text-slate-900">
-                          {formatLKR(Number(detail.school.fund_balance ?? detail.donation_summary?.total_received ?? 0))}
+                          {/* ✅ ONLY total_received (fallback to donation_summary for safety) */}
+                          {formatLKR(Number(detail.school.total_received ?? detail.donation_summary?.total_received ?? 0))}
                         </div>
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-3">
                         <div className="text-xs text-slate-500 font-bold">Donations</div>
-                        <div className="font-extrabold text-slate-900">{Number(detail.donation_summary?.donations_count || 0)}</div>
+                        <div className="font-extrabold text-slate-900">
+                          {Number(detail.donation_summary?.donations_count || 0)}
+                        </div>
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-3">
                         <div className="text-xs text-slate-500 font-bold">Need score</div>
-                        <div className="font-extrabold text-slate-900">{Number(detail.school.need_score || 0).toFixed(1)}</div>
+                        <div className="font-extrabold text-slate-900">
+                          {Number(detail.school.need_score || 0).toFixed(1)}
+                        </div>
                       </div>
                     </div>
 
@@ -1077,7 +1091,9 @@ export default function DonorSchools() {
                         />
                         <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
                           <span>Minimum LKR {MIN_LKR}</span>
-                          <span className="font-extrabold text-slate-700">You will donate: {formatLKR(donateAmountNum || 0)}</span>
+                          <span className="font-extrabold text-slate-700">
+                            You will donate: {formatLKR(donateAmountNum || 0)}
+                          </span>
                         </div>
                       </div>
 
@@ -1106,7 +1122,12 @@ export default function DonorSchools() {
                           )}
                           aria-pressed={donateAnonymous}
                         >
-                          <span className={cx("inline-block h-6 w-6 rounded-full bg-white transition translate-x-1", donateAnonymous && "translate-x-7")} />
+                          <span
+                            className={cx(
+                              "inline-block h-6 w-6 rounded-full bg-white transition translate-x-1",
+                              donateAnonymous && "translate-x-7"
+                            )}
+                          />
                         </button>
                       </div>
 
@@ -1121,7 +1142,11 @@ export default function DonorSchools() {
                         )}
                       >
                         <CurrencyDollarIcon className="h-5 w-5" />
-                        {donateLoading ? "Redirecting…" : donateAmountNum < MIN_LKR ? `Enter at least LKR ${MIN_LKR}` : "Continue to payment"}
+                        {donateLoading
+                          ? "Redirecting…"
+                          : donateAmountNum < MIN_LKR
+                          ? `Enter at least LKR ${MIN_LKR}`
+                          : "Continue to payment"}
                         <ChevronRightIcon className="h-5 w-5" />
                       </button>
                     </div>
@@ -1159,9 +1184,9 @@ export default function DonorSchools() {
 
                                 <button
                                   onClick={(e) => {
-                                    e.stopPropagation();
-                                    openDonateForRequest(c.request_id);
-                                  }}
+                                  e.stopPropagation();
+                                  openDonateForRequest(c.request_id);
+                                }}
                                   className="shrink-0 rounded-2xl px-4 py-2 text-xs font-extrabold bg-slate-900 text-white hover:opacity-95 inline-flex items-center gap-2"
                                 >
                                   <HeartIcon className="h-4 w-4" />
