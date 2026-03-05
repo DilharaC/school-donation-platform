@@ -16,16 +16,13 @@ jobs:
         env:
           MYSQL_DATABASE: edufund_test
           MYSQL_ROOT_PASSWORD: password
-        ports:
-          - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -ppassword"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -ppassword --silent"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
 
     steps:
-      # 1. Checkout code
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -42,49 +39,51 @@ jobs:
         working-directory: ./Backend
         run: composer install --no-progress --prefer-dist --no-interaction
 
-      # Ensure Laravel uses testing env for tests
+      # Install mysql client on runner so we can wait/import
+      - name: Install MySQL client
+        run: sudo apt-get update && sudo apt-get install -y mysql-client
+
+      # Create .env.testing used by php artisan test --env=testing
       - name: Create .env.testing for CI
         working-directory: ./Backend
         run: |
-          if [ -f .env.testing ]; then
-            echo ".env.testing already exists"
-          else
-            cp .env.example .env.testing
-          fi
+          cp .env.example .env.testing
 
-          # Force CI testing config
-          sed -i 's/^APP_ENV=.*/APP_ENV=testing/' .env.testing || true
           echo "APP_ENV=testing" >> .env.testing
+          echo "APP_KEY=${{ secrets.APP_KEY }}" >> .env.testing
 
-          # DB settings for CI mysql service
           echo "DB_CONNECTION=mysql" >> .env.testing
-          echo "DB_HOST=127.0.0.1" >> .env.testing
+          echo "DB_HOST=mysql" >> .env.testing
           echo "DB_PORT=3306" >> .env.testing
           echo "DB_DATABASE=edufund_test" >> .env.testing
           echo "DB_USERNAME=root" >> .env.testing
           echo "DB_PASSWORD=password" >> .env.testing
 
-          # Your existing values (optional; only needed if tests require them)
-          echo "APP_KEY=${{ secrets.APP_KEY }}" >> .env.testing
+          # optional if tests require it
           echo "STRIPE_SECRET=${{ secrets.STRIPE_SECRET }}" >> .env.testing
+
+      - name: Clear config cache
+        working-directory: ./Backend
+        run: |
+          php artisan config:clear
+          php artisan cache:clear
 
       - name: Generate Laravel app key (testing)
         working-directory: ./Backend
         run: php artisan key:generate --env=testing
 
-      - name: Wait for MySQL
+      - name: Wait for MySQL to be ready
         run: |
-          for i in {1..30}; do
-            mysqladmin ping -h 127.0.0.1 -ppassword --silent && exit 0
+          for i in {1..60}; do
+            mysqladmin ping -h mysql -uroot -ppassword --silent && exit 0
             sleep 2
           done
           echo "MySQL did not become ready in time" >&2
           exit 1
 
-      # IMPORT DATASET (because you said you imported dataset / no migrations)
       - name: Import test database dump
         run: |
-          mysql -h 127.0.0.1 -uroot -ppassword edufund_test < Backend/database/edufund_test.sql
+          mysql -h mysql -uroot -ppassword edufund_test < Backend/database/edufund_test.sql
 
       - name: Run Laravel tests
         working-directory: ./Backend
