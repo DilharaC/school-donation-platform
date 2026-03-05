@@ -5,6 +5,7 @@ use Tests\TestCase;
 
 class DonationApiTest extends TestCase
 {
+    use DatabaseTransactions;
     /** @test */
     public function donation_allocations_requires_authentication(): void
     {

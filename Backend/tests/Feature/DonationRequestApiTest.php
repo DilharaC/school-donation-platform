@@ -3,7 +3,7 @@ namespace Tests\Feature;
 use Tests\TestCase;
 class DonationRequestApiTest extends TestCase
 {
-   
+   use DatabaseTransactions;
    /** @test */
     public function show_campaign_invalid_id_returns_404(): void
     {

@@ -6,6 +6,7 @@ use Illuminate\Support\Str;
 
 class AuthApiTest extends TestCase
 {
+    use DatabaseTransactions;
 /** @test */
 public function ministry_login_with_inactive_account_returns_403(): void
 {
