@@ -9,10 +9,6 @@ use Carbon\Carbon;
 
 class MinistryController extends Controller
 {
-    /**
-     * GET /api/ministry/overview
-     * Ministry dashboard summary (read-only monitoring).
-     */
     public function overview(Request $request)
     {
         $days = (int) $request->query('days', 30);
@@ -22,9 +18,7 @@ class MinistryController extends Controller
         $from = Carbon::now()->subDays($days - 1)->startOfDay();
         $to   = Carbon::now()->endOfDay();
 
-        // -------------------------
-        // KPIs (system-wide)
-        // -------------------------
+     
         $totalSchools = (int) DB::table('schools')->count();
 
         $schoolsByStatus = DB::table('schools')
@@ -34,23 +28,14 @@ class MinistryController extends Controller
             ->get();
 
         $totalDonors = (int) DB::table('donors')->count();
-
         $donationsKpiBase = DB::table('donations');
-
         $totalDonations = (int) (clone $donationsKpiBase)->count();
         $paidCount = (int) (clone $donationsKpiBase)->whereRaw("LOWER(status)='paid'")->count();
         $pendingCount = (int) (clone $donationsKpiBase)->whereRaw("LOWER(status)='pending'")->count();
-
         $paidAmountTotal = (float) (clone $donationsKpiBase)->whereRaw("LOWER(status)='paid'")->sum('amount');
-
-        // campaigns stats
         $totalCampaigns = (int) DB::table('donation_requests')->count();
         $approvedCampaigns = (int) DB::table('donation_requests')->where('status', 'Approved')->count();
         $pendingCampaigns  = (int) DB::table('donation_requests')->where('status', 'Pending')->count();
-
-        // -------------------------
-        // Trends (paid donations) by day for last N days
-        // -------------------------
         $trendRows = DB::table('donations')
             ->whereBetween('created_at', [$from, $to])
             ->whereRaw("LOWER(status)='paid'")
@@ -73,11 +58,6 @@ class MinistryController extends Controller
             ];
             $cursor->addDay();
         }
-
-        // -------------------------
-        // Recent donations (paid)
-        // includes school + request if available (campaign OR direct fund)
-        // -------------------------
         $recentDonations = DB::table('donations')
             ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
             ->leftJoin('schools', function ($join) {
@@ -107,9 +87,6 @@ class MinistryController extends Controller
             return $d;
         });
 
-        // -------------------------
-        // Top provinces (paid donations in last N days)
-        // -------------------------
         $topProvinces = DB::table('donations')
             ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
             ->leftJoin('schools', function ($join) {
@@ -124,9 +101,6 @@ class MinistryController extends Controller
             ->limit(8)
             ->get();
 
-        // -------------------------
-        // Top campaigns (paid donations in last N days)
-        // -------------------------
         $topCampaigns = DB::table('donations')
             ->join('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
             ->whereBetween('donations.created_at', [$from, $to])
@@ -137,10 +111,6 @@ class MinistryController extends Controller
             ->limit(8)
             ->get();
 
-        // -------------------------
-        // Schools map / table (read-only)
-        // Uses schools.fund_balance as total_received (your system)
-        // -------------------------
         $schoolsMap = DB::table('schools')
             ->select(
                 'school_id',

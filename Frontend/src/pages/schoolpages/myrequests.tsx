@@ -1184,7 +1184,7 @@ const openView = async (id: number) => {
 
               {/* ✅ Evidence Upload + List (FIXED + SCROLL + RESET INPUT) */}
               <Card className="p-6">
-                <div className="text-sm font-extrabold text-slate-900">Upload Evidence</div>
+                <div className="text-sm font-extrabold text-slate-900">upload expenditures</div>
 
                 <div className="mt-3 space-y-3">
                   <input

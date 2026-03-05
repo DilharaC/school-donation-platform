@@ -24,12 +24,6 @@ const cx = (...s: Array<string | false | null | undefined>) => s.filter(Boolean)
 const formatLKR = (n: number) => `LKR ${Math.round(Number(n || 0)).toLocaleString()}`;
 const fmtDate = (iso?: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
 
-// const toAbs = (u?: string | null) => {
-//   if (!u) return null;
-//   if (u.startsWith("http://") || u.startsWith("https://")) return u;
-//   return `${API_ROOT}${u.startsWith("/") ? "" : "/"}${u}`;
-// };
-
 type TrendPoint = { day: string; total: number };
 
 type RecentDonation = {
@@ -67,9 +61,6 @@ type OverviewRes = {
   top_schools: TopSchool[];
 };
 
-
-
- 
 function initials(name?: string | null) {
   const s = (name || "").trim();
   if (!s) return "D";
@@ -111,15 +102,17 @@ function LineChart({
 
   return (
     <div className="w-full">
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-[90px] text-slate-900">
-        <line x1="0" y1={h - pad} x2={w} y2={h - pad} stroke="currentColor" strokeOpacity="0.08" />
-        <path d={d} fill="none" stroke="currentColor" strokeOpacity="0.9" strokeWidth="2" />
+      {/* ✅ AdminDashboard palette (blue) */}
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-[90px] text-blue-700">
+        <line x1="0" y1={h - pad} x2={w} y2={h - pad} stroke="currentColor" strokeOpacity="0.12" />
+        <path d={d} fill="none" stroke="currentColor" strokeOpacity="0.95" strokeWidth="2" />
         {points.length > 0 && (
           <circle cx={points[points.length - 1].x} cy={points[points.length - 1].y} r="3.5" fill="currentColor" />
         )}
       </svg>
+
       <div className="mt-1 text-xs text-slate-500">
-        Last 30 days total: <span className="font-semibold text-slate-700">{formatLKR(last)}</span>
+        Last 30 days total: <span className="font-semibold text-slate-800">{formatLKR(last)}</span>
       </div>
     </div>
   );
@@ -145,10 +138,13 @@ function KpiCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs text-slate-500 font-bold">{label}</div>
+          {/* keep KPI number strong like admin */}
           <div className="mt-2 text-2xl font-extrabold text-slate-900">{value}</div>
           {hint ? <div className="mt-1 text-xs text-slate-500">{hint}</div> : null}
         </div>
-        <div className="h-10 w-10 rounded-2xl bg-slate-50 border border-slate-200 grid place-items-center text-slate-900">
+
+        {/* ✅ blue badge like AdminDashboard */}
+        <div className="h-10 w-10 rounded-2xl bg-blue-50 border border-blue-200 grid place-items-center text-blue-700">
           <div className="h-5 w-5">{icon}</div>
         </div>
       </div>
@@ -169,7 +165,7 @@ function EmptyBlock({
 }) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center">
-      <div className="mx-auto h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200 grid place-items-center text-slate-700">
+      <div className="mx-auto h-12 w-12 rounded-2xl bg-blue-50 border border-blue-200 grid place-items-center text-blue-700">
         <div className="h-6 w-6">{icon}</div>
       </div>
       <div className="mt-4 text-slate-900 font-extrabold text-lg">{title}</div>
@@ -184,8 +180,6 @@ const DonorOverview: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [ov, setOv] = useState<OverviewRes | null>(null);
-
- 
 
   const chartData = useMemo(() => {
     const t = ov?.trend_30d || [];
@@ -209,7 +203,7 @@ const DonorOverview: React.FC = () => {
       }
     };
 
-      load();
+    load();
 
     return () => {
       alive = false;
@@ -248,16 +242,19 @@ const DonorOverview: React.FC = () => {
       <Card className="p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-extrabold">
+            {/* ✅ blue like AdminDashboard */}
+            <div className="w-12 h-12 rounded-2xl bg-blue-700 text-white flex items-center justify-center font-extrabold">
               {initials(donor?.name)}
             </div>
+
             <div>
               <div className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
                 Welcome back{donor?.name ? `, ${donor.name}` : ""}
-                <span className="inline-flex items-center justify-center h-6 w-6 rounded-xl bg-slate-50 border border-slate-200 text-slate-700">
+                <span className="inline-flex items-center justify-center h-6 w-6 rounded-xl bg-blue-50 border border-blue-200 text-blue-700">
                   <HeartIcon className="h-4 w-4" />
                 </span>
               </div>
+
               <div className="text-sm text-slate-500">
                 Track your impact and find high-need campaigns to support.
               </div>
@@ -267,16 +264,19 @@ const DonorOverview: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => nav("/projects")}
-              className="px-4 py-2 rounded-2xl bg-slate-900 text-white text-sm font-extrabold hover:opacity-95 inline-flex items-center gap-2"
+              className="px-4 py-2 rounded-2xl bg-blue-700 text-white text-sm font-extrabold hover:bg-blue-800 inline-flex items-center gap-2
+                         focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
             >
               <MagnifyingGlassIcon className="h-5 w-5" />
               Browse Needs
             </button>
+
             <button
               onClick={() => nav("/donor/mydonations")}
-              className="px-4 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-extrabold text-slate-800 hover:bg-slate-50 inline-flex items-center gap-2"
+              className="px-4 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-extrabold text-slate-700 hover:bg-slate-50 inline-flex items-center gap-2
+                         focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2"
             >
-              <ClipboardDocumentListIcon className="h-5 w-5 text-slate-700" />
+              <ClipboardDocumentListIcon className="h-5 w-5 text-slate-500" />
               My Donations
             </button>
           </div>
@@ -317,11 +317,13 @@ const DonorOverview: React.FC = () => {
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="font-extrabold text-slate-900 flex items-center gap-2">
-                <ChartBarIcon className="h-5 w-5 text-slate-900" />
+                {/* ✅ blue icon like admin */}
+                <ChartBarIcon className="h-5 w-5 text-blue-700" />
                 Donation trend
               </div>
               <div className="text-sm text-slate-500">Paid donations (last 30 days)</div>
             </div>
+
             <button
               onClick={() => nav("/donor/mydonations")}
               className="text-sm font-extrabold text-slate-700 hover:text-slate-900 inline-flex items-center gap-1"
@@ -346,9 +348,10 @@ const DonorOverview: React.FC = () => {
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div className="font-extrabold text-slate-900 flex items-center gap-2">
-              <UsersIcon className="h-5 w-5 text-slate-900" />
+              <UsersIcon className="h-5 w-5 text-blue-700" />
               Top schools
             </div>
+
             <button
               onClick={() => nav("/donor/schools")}
               className="text-sm font-extrabold text-slate-700 hover:text-slate-900 inline-flex items-center gap-1"
@@ -383,11 +386,12 @@ const DonorOverview: React.FC = () => {
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="font-extrabold text-slate-900 flex items-center gap-2">
-              <ClipboardDocumentListIcon className="h-5 w-5 text-slate-900" />
+              <ClipboardDocumentListIcon className="h-5 w-5 text-blue-700" />
               Recent donations
             </div>
             <div className="text-sm text-slate-500">Your latest paid contributions</div>
           </div>
+
           <button
             onClick={() => nav("/donor/mydonations")}
             className="text-sm font-extrabold text-slate-700 hover:text-slate-900 inline-flex items-center gap-1"
@@ -405,8 +409,9 @@ const DonorOverview: React.FC = () => {
                 desc="Start by browsing high-need campaigns."
                 action={
                   <button
-                    onClick={() => nav("/donor/projects")}
-                    className="px-4 py-2 rounded-2xl bg-slate-900 text-white text-sm font-extrabold hover:opacity-95 inline-flex items-center gap-2"
+                    onClick={() => nav("/projects")}
+                    className="px-4 py-2 rounded-2xl bg-blue-700 text-white text-sm font-extrabold hover:bg-blue-800 inline-flex items-center gap-2
+                               focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
                   >
                     <MagnifyingGlassIcon className="h-5 w-5" />
                     Browse needs
@@ -424,21 +429,35 @@ const DonorOverview: React.FC = () => {
                   <div key={d.donation_id} className="p-4 flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="font-extrabold text-slate-900 truncate flex items-center gap-2">
-                        <span className={cx("h-8 w-8 rounded-2xl border grid place-items-center", isFund ? "bg-slate-50 border-slate-200" : "bg-slate-900 border-slate-900 text-white")}>
-                          {isFund ? <BuildingOffice2Icon className="h-4 w-4 text-slate-700" /> : <HeartIcon className="h-4 w-4" />}
+                        <span
+                          className={cx(
+                            "h-8 w-8 rounded-2xl border grid place-items-center",
+                            isFund
+                              ? "bg-slate-50 border-slate-200 text-slate-700"
+                              : "bg-blue-700 border-blue-700 text-white"
+                          )}
+                        >
+                          {isFund ? (
+                            <BuildingOffice2Icon className="h-4 w-4" />
+                          ) : (
+                            <HeartIcon className="h-4 w-4" />
+                          )}
                         </span>
+
                         {isFund ? "Direct School Fund" : d.request_title || `Request #${reqId}`}
                       </div>
+
                       <div className="text-xs text-slate-500 truncate flex items-center gap-1.5 mt-1">
                         <MapPinIcon className="h-4 w-4 text-slate-400" />
                         {d.school_name || "School"} • {d.district || "—"} • {d.province || "—"}
                       </div>
+
                       <div className="mt-1 text-xs text-slate-400">{d.time || fmtDate(d.created_at)}</div>
                     </div>
 
                     <div className="text-right">
                       <div className="font-extrabold text-slate-900">{formatLKR(d.amount)}</div>
-                      <div className="text-[11px] text-emerald-700 font-extrabold">PAID</div>
+                      <div className="text-[11px] text-green-700 font-extrabold">PAID</div>
                     </div>
                   </div>
                 );
@@ -447,8 +466,6 @@ const DonorOverview: React.FC = () => {
           )}
         </div>
       </Card>
-
-    
     </div>
   );
 };

@@ -23,14 +23,10 @@ public function index(Request $request)
     $page     = max(1, (int) $request->query('page', 1));
     $limit    = max(1, min(50, (int) $request->query('limit', 6)));
 
-    $needBand = $request->query('needBand', 'all'); // all|high|medium|low
-    $sortBy   = $request->query('sortBy', 'latest'); // latest|need_high|need_low
-
+    $needBand = $request->query('needBand', 'all'); 
+    $sortBy   = $request->query('sortBy', 'latest');
     $query = DonationRequest::with('school');
-
-    // ✅ PUBLIC ONLY
     $query->where('status', 'Approved');
-
     if ($search !== '') {
         $query->where(function ($q) use ($search) {
             $q->where('request_title', 'like', "%{$search}%")
@@ -40,11 +36,9 @@ public function index(Request $request)
               });
         });
     }
-
     if ($category && $category !== 'All') {
         $query->where('category', $category);
     }
-
     if ($needBand === 'high') {
         $query->whereHas('school', fn ($q) => $q->where('need_score', '>=', 70));
     } elseif ($needBand === 'medium') {
@@ -52,7 +46,6 @@ public function index(Request $request)
     } elseif ($needBand === 'low') {
         $query->whereHas('school', fn ($q) => $q->where('need_score', '<', 40));
     }
-
     $summary = (clone $query)->reorder()->selectRaw('
         COUNT(*) as total_requests,
         SUM(CASE WHEN status = "Approved" THEN 1 ELSE 0 END) as approved_count,
@@ -70,11 +63,8 @@ public function index(Request $request)
     } else {
         $query->orderBy('donation_requests.created_at', 'desc');
     }
-
-    // ✅ avoid duplicates when join exists
     $total = (clone $query)->distinct('donation_requests.request_id')->count('donation_requests.request_id');
-
-    $projects = (clone $query)
+  $projects = (clone $query)
         ->skip(($page - 1) * $limit)
         ->take($limit)
         ->get()
@@ -271,10 +261,10 @@ public function show($id)
         return response()->json(['message' => 'Donation request not found'], 404);
     }
 
-    // ✅ define old status FIRST
+   
     $old = $project->status;
 
-    // ✅ if same status, no need update
+
     if ($old === $request->status) {
         return response()->json([
             'message' => 'Status already set',
@@ -518,9 +508,6 @@ $before = [
   'document_url' => $project->document_url,
 ];
 
-
-
-
         $project->update([
             'request_title' => $request->request_title,
             'category' => $request->category,
@@ -577,7 +564,6 @@ $before = [
         'note' => 'nullable|string|max:255',
     ]);
 
-    // request_id based lookup
     $dr = DonationRequest::where('request_id', (int)$id)->first();
     if (!$dr) return response()->json(['message' => 'Request not found'], 404);
 
@@ -596,7 +582,7 @@ $before = [
             'note'       => $request->note,
         ]);
 
-        // ✅ ledger per file
+      
         app(\App\Services\LedgerService::class)->record(
             'REQUEST_EVIDENCE_UPLOADED',
             'donation_request_evidence',
@@ -614,7 +600,6 @@ $before = [
         $saved[] = $ev;
     }
 
-    // ✅ Notify donors who donated to this request (paid only)
     $donorIds = DB::table('donations')
         ->where('request_id', (int)$dr->request_id)
         ->whereRaw("LOWER(status)='paid'")
@@ -628,13 +613,11 @@ $before = [
             . ($dr->request_title ?? ('Request #' . $dr->request_id));
 
         $now = now();
-
         $rows = [];
         foreach ($donorIds as $donorId) {
             $rows[] = [
                 'id' => (string) Str::uuid(),
 
-                // ✅ IMPORTANT: follow your existing pattern (from phpMyAdmin screenshot)
                 'type' => 'App\\Notifications\\EvidenceUploadedNotification',
                 'notifiable_type' => 'App\\Models\\Donor',
                 'notifiable_id' => (int) $donorId,
