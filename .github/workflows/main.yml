@@ -10,19 +10,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_DATABASE: edufund_test
-          MYSQL_ROOT_PASSWORD: password
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -ppassword --silent"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-
     steps:
+      # 1. Checkout code
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -33,61 +22,29 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
-          extensions: mbstring, bcmath, ctype, fileinfo, json, tokenizer, pdo_mysql
+          extensions: mbstring, bcmath, ctype, fileinfo, json, tokenizer
 
       - name: Install Laravel dependencies
         working-directory: ./Backend
         run: composer install --no-progress --prefer-dist --no-interaction
 
-      # Install mysql client on runner so we can wait/import
-      - name: Install MySQL client
-        run: sudo apt-get update && sudo apt-get install -y mysql-client
+      - name: Set up .env file
+        working-directory: ./Backend
+        run: cp .env.example .env
 
-      # Create .env.testing used by php artisan test --env=testing
-      - name: Create .env.testing for CI
+      - name: Inject secrets into .env
         working-directory: ./Backend
         run: |
-          cp .env.example .env.testing
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          echo "APP_KEY=${{ secrets.APP_KEY }}" >> .env
 
-          echo "APP_ENV=testing" >> .env.testing
-          echo "APP_KEY=${{ secrets.APP_KEY }}" >> .env.testing
-
-          echo "DB_CONNECTION=mysql" >> .env.testing
-          echo "DB_HOST=mysql" >> .env.testing
-          echo "DB_PORT=3306" >> .env.testing
-          echo "DB_DATABASE=edufund_test" >> .env.testing
-          echo "DB_USERNAME=root" >> .env.testing
-          echo "DB_PASSWORD=password" >> .env.testing
-
-          # optional if tests require it
-          echo "STRIPE_SECRET=${{ secrets.STRIPE_SECRET }}" >> .env.testing
-
-      - name: Clear config cache
+      - name: Generate Laravel app key
         working-directory: ./Backend
-        run: |
-          php artisan config:clear
-          php artisan cache:clear
-
-      - name: Generate Laravel app key (testing)
-        working-directory: ./Backend
-        run: php artisan key:generate --env=testing
-
-      - name: Wait for MySQL to be ready
-        run: |
-          for i in {1..60}; do
-            mysqladmin ping -h mysql -uroot -ppassword --silent && exit 0
-            sleep 2
-          done
-          echo "MySQL did not become ready in time" >&2
-          exit 1
-
-      - name: Import test database dump
-        run: |
-          mysql -h mysql -uroot -ppassword edufund_test < Backend/database/edufund_test.sql
+        run: php artisan key:generate
 
       - name: Run Laravel tests
         working-directory: ./Backend
-        run: php artisan test --env=testing
+        run: php artisan test
 
       # -------------------------
       # Frontend
@@ -99,7 +56,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: ./Frontend
-        run: npm ci
+        run: npm install
 
       - name: Build frontend
         working-directory: ./Frontend
