@@ -2,6 +2,7 @@
 namespace Tests\Feature;
 use Tests\TestCase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
 
 class AuthApiTest extends TestCase
