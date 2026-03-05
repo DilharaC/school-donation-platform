@@ -607,7 +607,7 @@ function EvidenceCard({ e }: { e: Evidence }) {
   const href = toAbs(raw);
   const type = String(e?.file_type || "").toLowerCase();
   const isPdf = type === "pdf" || raw.toLowerCase().endsWith(".pdf");
-  const isImg = !isPdf;
+  
 
   if (!href) return null;
 
