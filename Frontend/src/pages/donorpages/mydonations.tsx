@@ -3,6 +3,7 @@
 // ✅ Supports: allocation-based “Donated Requests” (recommended when donation can be split)
 // ✅ Adds: “View Allocation” modal per donation (shows fund_allocations split)
 // ✅ Fixes: request_id nullable (no crashes)
+// ✅ UPDATED: Evidence section UI (modern cards + PDF preview + image gallery style)
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
@@ -596,6 +597,222 @@ function GiftIcon() {
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor" aria-hidden="true">
       <path d="M20 7h-1.4a3.5 3.5 0 0 0-6.6-1.3A3.5 3.5 0 0 0 5.4 7H4a2 2 0 0 0-2 2v2h10V7h2v4h10V9a2 2 0 0 0-2-2Zm-6.5-1.5A1.5 1.5 0 1 1 15 7h-2V5.5ZM9 7a1.5 1.5 0 1 1 1.5-1.5V7H9Zm3 6H2v7a2 2 0 0 0 2 2h8v-9Zm2 9h6a2 2 0 0 0 2-2v-7H14v9Z" />
     </svg>
+  );
+}
+
+/** ---------------- Modern Evidence UI ---------------- */
+
+function EvidenceCard({ e }: { e: Evidence }) {
+  const raw = e?.file_url || "";
+  const href = toAbs(raw);
+  const type = String(e?.file_type || "").toLowerCase();
+  const isPdf = type === "pdf" || raw.toLowerCase().endsWith(".pdf");
+  const isImg = !isPdf;
+
+  if (!href) return null;
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className={cx(
+        "group block rounded-3xl border border-slate-200 bg-white overflow-hidden",
+        "shadow-sm hover:shadow-md hover:border-slate-300 transition"
+      )}
+      title="Open in new tab"
+    >
+      {/* Preview */}
+      <div className="relative aspect-[4/3] bg-slate-50">
+        {isPdf ? (
+          <>
+            {/* lightweight-ish preview; if browser blocks, the overlay still looks good */}
+            <iframe
+              src={`${href}#page=1&view=FitH`}
+              className="absolute inset-0 w-full h-full pointer-events-none opacity-90"
+              title={`pdf-${e.id}`}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/5 to-transparent" />
+            <div className="absolute left-3 top-3">
+              <Pill tone="slate" icon={<DocumentTextIcon className="h-3.5 w-3.5" />}>
+                PDF
+              </Pill>
+            </div>
+            <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition">
+              <span className="inline-flex items-center gap-2 rounded-2xl bg-white/95 backdrop-blur px-3 py-2 text-xs font-black text-slate-900 border border-slate-200 shadow-sm">
+                Open <span aria-hidden>↗</span>
+              </span>
+            </div>
+            <div className="absolute left-3 bottom-3 flex items-center gap-2">
+              <div className="h-10 w-10 rounded-2xl bg-white/95 border border-slate-200 grid place-items-center text-slate-800 shadow-sm">
+                <DocumentTextIcon className="h-5 w-5" />
+              </div>
+              <div className="text-white drop-shadow">
+                <div className="text-sm font-black leading-tight">PDF Evidence</div>
+                <div className="text-[11px] opacity-90 font-bold">Tap to view</div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <img
+              src={href}
+              alt="evidence"
+              loading="lazy"
+              className="absolute inset-0 w-full h-full object-cover"
+              onError={(ev) => {
+                (ev.currentTarget as HTMLImageElement).style.display = "none";
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/5 to-transparent" />
+            <div className="absolute left-3 top-3">
+              <Pill tone="slate" icon={<PhotoIcon className="h-3.5 w-3.5" />}>
+                IMAGE
+              </Pill>
+            </div>
+            <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition">
+              <span className="inline-flex items-center gap-2 rounded-2xl bg-white/95 backdrop-blur px-3 py-2 text-xs font-black text-slate-900 border border-slate-200 shadow-sm">
+                View <span aria-hidden>↗</span>
+              </span>
+            </div>
+            <div className="absolute left-3 bottom-3 flex items-center gap-2">
+              <div className="h-10 w-10 rounded-2xl bg-white/95 border border-slate-200 grid place-items-center text-slate-800 shadow-sm">
+                <PhotoIcon className="h-5 w-5" />
+              </div>
+              <div className="text-white drop-shadow">
+                <div className="text-sm font-black leading-tight">Image Evidence</div>
+                <div className="text-[11px] opacity-90 font-bold">Tap to zoom</div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Meta */}
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="font-black text-slate-900 truncate">{isPdf ? "PDF Evidence" : "Image Evidence"}</div>
+            {e.note ? <div className="text-xs text-slate-600 mt-1 line-clamp-2">{e.note}</div> : null}
+          </div>
+          <div className="shrink-0">
+            <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-black border border-slate-200 bg-slate-50 text-slate-700">
+              OPEN
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <div className="text-[11px] text-slate-500 font-bold truncate">
+            {e.created_at ? new Date(e.created_at).toLocaleString() : "—"}
+          </div>
+          <div className="text-[11px] text-slate-500 font-bold truncate max-w-[55%]">{raw}</div>
+        </div>
+      </div>
+    </a>
+  );
+}
+
+function EvidenceSection({ evidences }: { evidences: Evidence[] }) {
+  const [filter, setFilter] = useState<"all" | "pdf" | "image">("all");
+
+  const counts = useMemo(() => {
+    const pdf = evidences.filter((e) => {
+      const t = String(e.file_type || "").toLowerCase();
+      return t === "pdf" || String(e.file_url || "").toLowerCase().endsWith(".pdf");
+    }).length;
+    const img = evidences.length - pdf;
+    return { pdf, img, all: evidences.length };
+  }, [evidences]);
+
+  const filtered = useMemo(() => {
+    if (filter === "all") return evidences;
+    if (filter === "pdf") {
+      return evidences.filter((e) => {
+        const t = String(e.file_type || "").toLowerCase();
+        return t === "pdf" || String(e.file_url || "").toLowerCase().endsWith(".pdf");
+      });
+    }
+    return evidences.filter((e) => {
+      const t = String(e.file_type || "").toLowerCase();
+      const isPdf = t === "pdf" || String(e.file_url || "").toLowerCase().endsWith(".pdf");
+      return !isPdf;
+    });
+  }, [evidences, filter]);
+
+  return (
+    <div className="rounded-3xl border border-slate-200 p-5 bg-white">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-xs text-slate-500 font-black flex items-center gap-2">
+            <PhotoIcon className="h-4 w-4 text-slate-400" />
+            Evidence uploaded
+          </div>
+          <div className="text-sm text-slate-600 mt-1">
+            {counts.all ? (
+              <>
+                <span className="font-black text-slate-900">{counts.all}</span> file(s) •{" "}
+                <span className="font-black text-slate-900">{counts.pdf}</span> PDF •{" "}
+                <span className="font-black text-slate-900">{counts.img}</span> image
+              </>
+            ) : (
+              "No files yet"
+            )}
+          </div>
+        </div>
+
+        {counts.all ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setFilter("all")}
+              className={cx(
+                "rounded-2xl px-3 py-2 text-xs font-black border transition",
+                filter === "all" ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 hover:bg-slate-50"
+              )}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setFilter("pdf")}
+              className={cx(
+                "rounded-2xl px-3 py-2 text-xs font-black border transition flex items-center gap-2",
+                filter === "pdf" ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 hover:bg-slate-50"
+              )}
+            >
+              <DocumentTextIcon className="h-4 w-4" />
+              PDF
+            </button>
+            <button
+              onClick={() => setFilter("image")}
+              className={cx(
+                "rounded-2xl px-3 py-2 text-xs font-black border transition flex items-center gap-2",
+                filter === "image" ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 hover:bg-slate-50"
+              )}
+            >
+              <PhotoIcon className="h-4 w-4" />
+              Images
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      {!counts.all ? (
+        <div className="mt-4 text-sm text-slate-600">
+          No evidence uploaded yet.
+          <div className="text-xs text-slate-500 mt-1">Once the school uploads proof, it will appear here.</div>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-5 text-slate-700">
+          No files match this filter.
+        </div>
+      ) : (
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {filtered.map((e) => (
+            <EvidenceCard key={e.id} e={e} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1405,66 +1622,8 @@ export default function MyDonations() {
               )}
             </div>
 
-            {/* Evidence */}
-            <div className="rounded-3xl border border-slate-200 p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-slate-500 font-black flex items-center gap-2">
-                    <PhotoIcon className="h-4 w-4 text-slate-400" />
-                    Evidence uploaded
-                  </div>
-                  <div className="text-sm text-slate-600 mt-1">{detail.evidences?.length ? `${detail.evidences.length} file(s)` : "No files yet"}</div>
-                </div>
-                {detail.evidences?.length ? <Pill tone="slate">OPEN</Pill> : null}
-              </div>
-
-              {!detail.evidences || detail.evidences.length === 0 ? (
-                <div className="mt-4 text-sm text-slate-600">
-                  No evidence uploaded yet.
-                  <div className="text-xs text-slate-500 mt-1">Once the school uploads proof, it will appear here.</div>
-                </div>
-              ) : (
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {detail.evidences.map((e) => {
-                    const isPdf = String(e.file_type).toLowerCase() === "pdf" || e.file_url.toLowerCase().endsWith(".pdf");
-                    const href = `http://localhost:8000${e.file_url}`;
-
-                    if (isPdf) {
-                      return (
-                        <a key={e.id} href={href} target="_blank" rel="noreferrer" className="rounded-3xl border border-slate-200 p-4 hover:bg-slate-50 transition">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <div className="font-black text-slate-900 flex items-center gap-2">
-                                <DocumentTextIcon className="h-5 w-5 text-slate-700" />
-                                PDF Evidence
-                              </div>
-                              {e.note ? <div className="text-xs text-slate-600 mt-2">{e.note}</div> : null}
-                              <div className="text-[11px] text-slate-500 mt-2 break-all">{e.file_url}</div>
-                            </div>
-                            <div className="text-xs font-black text-slate-700">Open →</div>
-                          </div>
-                        </a>
-                      );
-                    }
-
-                    return (
-                      <a key={e.id} href={href} target="_blank" rel="noreferrer" className="rounded-3xl border border-slate-200 overflow-hidden hover:bg-slate-50 transition">
-                        <div className="aspect-[4/3] bg-slate-100">
-                          <img src={href} alt="evidence" className="w-full h-full object-cover" />
-                        </div>
-                        <div className="p-4">
-                          <div className="font-black text-slate-900 flex items-center gap-2">
-                            <PhotoIcon className="h-5 w-5 text-slate-700" />
-                            Image Evidence
-                          </div>
-                          {e.note ? <div className="text-xs text-slate-600 mt-1">{e.note}</div> : null}
-                        </div>
-                      </a>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            {/* Evidence (UPDATED) */}
+            <EvidenceSection evidences={detail.evidences || []} />
           </div>
         )}
       </Drawer>
@@ -1473,12 +1632,7 @@ export default function MyDonations() {
       <ReceiptModal open={receiptOpen} onClose={() => setReceiptOpen(false)} receipt={receipt} loading={receiptLoading} />
 
       {/* Allocation Modal */}
-      <AllocationModal
-        open={allocationOpen}
-        onClose={() => setAllocationOpen(false)}
-        data={allocationData}
-        loading={allocationLoading}
-      />
+      <AllocationModal open={allocationOpen} onClose={() => setAllocationOpen(false)} data={allocationData} loading={allocationLoading} />
     </div>
   );
 }

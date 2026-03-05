@@ -89,6 +89,7 @@ class DonationController extends Controller
 
         return response()->json(['checkout_url' => $session->url]);
     }
+
 public function donationAllocations($donationId)
 {
     $user = Auth::user();
@@ -97,7 +98,6 @@ public function donationAllocations($donationId)
     $donorId = $user->donor_id ?? $user->id ?? null;
     if (!$donorId) return response()->json(['message' => 'Donor not found'], 404);
 
-    // ✅ Only allow donor to view THEIR donation
     $donation = DB::table('donations')
         ->where('donation_id', (int)$donationId)
         ->where('donor_id', (int)$donorId)
@@ -106,8 +106,6 @@ public function donationAllocations($donationId)
     if (!$donation) {
         return response()->json(['message' => 'Donation not found'], 404);
     }
-
-    // ✅ allocations (request + school_fund)
     $allocs = DB::table('fund_allocations as fa')
         ->leftJoin('donation_requests as dr', 'fa.request_id', '=', 'dr.request_id')
         ->where('fa.donation_id', (int)$donationId)
@@ -136,6 +134,7 @@ public function donationAllocations($donationId)
         'allocations' => $allocs,
     ]);
 }
+
     /**
      * Verify Stripe session and update donation & allocations
      */
@@ -541,14 +540,13 @@ public function listDonations(Request $request)
     $allowedSort = ['created_at', 'amount', 'status'];
     if (!in_array($sortBy, $allowedSort)) $sortBy = 'created_at';
 
-    // ✅ Base query now uses fund_allocations (real money received per school/request)
+   
     $q = DB::table('fund_allocations as fa')
         ->join('donations as d', 'fa.donation_id', '=', 'd.donation_id')
         ->join('schools as s', 'fa.school_id', '=', 's.school_id')
         ->leftJoin('donation_requests as dr', 'fa.request_id', '=', 'dr.request_id')
         ->where('fa.status', 'active')
         ->select(
-            // donation info
             'd.donation_id',
             DB::raw('fa.request_id as request_id'),
             DB::raw('fa.school_id as school_id'),
@@ -556,36 +554,26 @@ public function listDonations(Request $request)
             'd.donor_name',
             'd.donor_email',
 
-            // ✅ amount = allocated_amount (important!)
             DB::raw('fa.allocated_amount as amount'),
-
             'd.status',
             DB::raw("COALESCE(d.paid_at, d.created_at) as created_at"),
-
-            // ✅ request title fallback for school fund
             DB::raw("COALESCE(dr.request_title, 'School Fund') as request_title"),
-
-            // school info
             's.school_name',
             's.district',
             's.province',
-
-            // ✅ helpful label for frontend
             DB::raw("CASE 
                 WHEN fa.allocation_type='request' THEN 'campaign'
                 ELSE 'school_fund'
             END as donation_type"),
 
-            // optional: allocation_type if you want it
             DB::raw("fa.allocation_type as allocation_type")
         );
 
-    // status filter (case-insensitive, based on donation status)
     if ($status !== 'all') {
         $q->whereRaw('LOWER(d.status) = ?', [$status]);
     }
 
-    // date filters (based on paid_at if available; else created_at)
+   
     if ($dateFrom) {
         $q->where(DB::raw("COALESCE(d.paid_at, d.created_at)"), '>=', Carbon::parse($dateFrom)->startOfDay());
     }
@@ -593,7 +581,7 @@ public function listDonations(Request $request)
         $q->where(DB::raw("COALESCE(d.paid_at, d.created_at)"), '<=', Carbon::parse($dateTo)->endOfDay());
     }
 
-    // search
+   
     if ($search !== '') {
         $q->where(function ($qq) use ($search) {
             $qq->where('d.donor_name', 'like', "%{$search}%")
@@ -607,7 +595,7 @@ public function listDonations(Request $request)
 
     $total = (clone $q)->count();
 
-    // sorting
+  
     if ($sortBy === 'amount') {
         $q->orderBy(DB::raw('fa.allocated_amount'), $sortDir);
     } elseif ($sortBy === 'status') {
