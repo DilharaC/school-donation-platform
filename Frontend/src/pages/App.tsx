@@ -44,6 +44,8 @@ import Notifications from "../pages/adminpages/notifications";
 import DonorNotifications from "../pages/donorpages/donornotifications";
 import SchoolNotifications from "../pages/schoolpages/schoolnotifications";
 import SchoolRegister from "./SchoolRegister";
+import MinistryAccounts from "../pages/adminpages/MinistryAccounts";
+import Messages from "../pages/adminpages/messages";
 
 // import MinistryNotifications from "../pages/ministrypages/notifications";
 
@@ -94,8 +96,9 @@ const App: React.FC = () => {
             <Route path="schools" element={<Schools/>} />
           <Route path="analytics" element={<Analytics/>} />
           <Route path="Campaign" element={<Campaign />} />
+          <Route path="messages" element={<Messages />} />
           <Route path="Donors" element={<Donors />} />
-         
+          <Route path="ministry-accounts" element={<MinistryAccounts />} />
           <Route path="notifications" element={<Notifications />} />
           
           <Route path="audit" element={<AdminAuditTrail />} />

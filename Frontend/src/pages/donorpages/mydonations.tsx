@@ -1,9 +1,12 @@
 // MyDonations.tsx (FULL UPDATED FILE)
+// ✅ Softer text colors
+// ✅ Better button colors (blue primary, clean secondary)
+// ✅ Reduced overly dark text
 // ✅ Supports: campaign + direct school fund
-// ✅ Supports: allocation-based “Donated Requests” (recommended when donation can be split)
-// ✅ Adds: “View Allocation” modal per donation (shows fund_allocations split)
-// ✅ Fixes: request_id nullable (no crashes)
-// ✅ UPDATED: Evidence section UI (modern cards + PDF preview + image gallery style)
+// ✅ Supports: allocation-based “Donated Requests”
+// ✅ Adds: “View Allocation” modal per donation
+// ✅ Fixes: request_id nullable
+// ✅ Evidence section UI kept modern
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
@@ -27,14 +30,9 @@ import {
 const API_BASE = "http://localhost:8000/api";
 
 const MY_DONATIONS = `${API_BASE}/donor/my-donations`;
-
-// ✅ RECOMMENDED: build “Donated Requests” from fund_allocations (correct if donation split)
 const MY_REQUEST_ALLOCATIONS = `${API_BASE}/donor/my-request-allocations`;
-
 const REQUEST_DETAIL = (id: number) => `${API_BASE}/donation_requests/${id}`;
 const RECEIPT_ENDPOINT = (id: number) => `${API_BASE}/donations/${id}/receipt`;
-
-// ✅ NEW: show allocations for a donation (you must implement this API on backend)
 const ALLOCATION_ENDPOINT = (donationId: number) =>
   `${API_BASE}/donor/donations/${donationId}/allocations`;
 
@@ -48,7 +46,6 @@ const toAbs = (u?: string | null) => {
   return `http://localhost:8000${u.startsWith("/") ? "" : "/"}${u}`;
 };
 
-// ✅ request_id is nullable now
 type DonationRow = {
   donation_id: number;
   request_id?: number | null;
@@ -110,14 +107,13 @@ type DonatedRequestRow = {
   province?: string | null;
   district?: string | null;
 
-  total_donated: number; // used by UI
+  total_donated: number;
   donations_count: number;
   last_donated_at?: string | null;
 
   first_donation_id?: number | null;
 };
 
-// ✅ allocation based row (from backend)
 type RequestAllocationRow = {
   request_id: number;
   request_title: string;
@@ -130,7 +126,6 @@ type RequestAllocationRow = {
   last_allocated_at?: string | null;
 };
 
-// ✅ Donation allocations modal payload
 type AllocationRow = {
   allocation_id: number;
   allocation_type: "request" | "school_fund" | string;
@@ -165,12 +160,12 @@ function SectionTitle({
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <div className="text-xs font-black text-slate-500 flex items-center gap-2">
-          <Squares2X2Icon className="h-4 w-4 text-slate-400" />
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+          <Squares2X2Icon className="h-4 w-4 text-blue-500" />
           Donor dashboard
         </div>
-        <div className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">{title}</div>
-        {subtitle ? <div className="text-sm text-slate-600 mt-1">{subtitle}</div> : null}
+        <div className="text-2xl font-semibold tracking-tight text-slate-800 sm:text-3xl">{title}</div>
+        {subtitle ? <div className="mt-1 text-sm text-slate-500">{subtitle}</div> : null}
       </div>
       {right}
     </div>
@@ -192,11 +187,11 @@ function StatCard({
     <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs font-black text-slate-500">{label}</div>
-          <div className="mt-1 text-xl font-black text-slate-900">{value}</div>
+          <div className="text-xs font-semibold text-slate-500">{label}</div>
+          <div className="mt-1 text-xl font-semibold text-slate-800">{value}</div>
         </div>
         {icon ? (
-          <div className="h-10 w-10 rounded-2xl bg-slate-50 border border-slate-200 grid place-items-center text-slate-700">
+          <div className="grid h-10 w-10 place-items-center rounded-2xl border border-blue-200 bg-blue-50 text-blue-700">
             {icon}
           </div>
         ) : null}
@@ -212,7 +207,7 @@ function Pill({
   icon,
 }: {
   children: React.ReactNode;
-  tone?: "slate" | "emerald" | "amber" | "rose" | "indigo";
+  tone?: "slate" | "emerald" | "amber" | "rose" | "indigo" | "blue";
   icon?: React.ReactNode;
 }) {
   const map: Record<string, string> = {
@@ -221,11 +216,12 @@ function Pill({
     amber: "bg-amber-50 text-amber-700 border-amber-200",
     rose: "bg-rose-50 text-rose-700 border-rose-200",
     indigo: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    blue: "bg-blue-50 text-blue-700 border-blue-200",
   };
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold border",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
         map[tone]
       )}
     >
@@ -273,8 +269,8 @@ function Segmented({
           key={it.key}
           onClick={() => onChange(it.key)}
           className={cx(
-            "px-4 py-2 rounded-xl text-sm font-extrabold transition flex items-center gap-2",
-            value === it.key ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-50"
+            "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition",
+            value === it.key ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"
           )}
         >
           {it.icon ? <span className="h-4 w-4">{it.icon}</span> : null}
@@ -289,15 +285,15 @@ function SkeletonCard() {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex gap-4">
-        <div className="h-12 w-12 rounded-2xl bg-slate-100 animate-pulse" />
+        <div className="h-12 w-12 animate-pulse rounded-2xl bg-slate-100" />
         <div className="flex-1">
-          <div className="h-4 w-2/3 bg-slate-100 rounded animate-pulse" />
-          <div className="mt-2 h-3 w-1/2 bg-slate-100 rounded animate-pulse" />
-          <div className="mt-4 h-3 w-1/3 bg-slate-100 rounded animate-pulse" />
+          <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
+          <div className="mt-2 h-3 w-1/2 animate-pulse rounded bg-slate-100" />
+          <div className="mt-4 h-3 w-1/3 animate-pulse rounded bg-slate-100" />
         </div>
         <div className="w-24">
-          <div className="h-4 w-full bg-slate-100 rounded animate-pulse" />
-          <div className="mt-3 h-6 w-16 bg-slate-100 rounded-full animate-pulse" />
+          <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
+          <div className="mt-3 h-6 w-16 animate-pulse rounded-full bg-slate-100" />
         </div>
       </div>
     </div>
@@ -307,11 +303,11 @@ function SkeletonCard() {
 function EmptyState({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-      <div className="mx-auto h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200 grid place-items-center text-slate-700">
+      <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-blue-200 bg-blue-50 text-blue-700">
         {icon}
       </div>
-      <div className="text-slate-900 font-black text-xl mt-4">{title}</div>
-      <div className="text-slate-500 text-sm mt-1">{desc}</div>
+      <div className="mt-4 text-xl font-semibold text-slate-800">{title}</div>
+      <div className="mt-1 text-sm text-slate-500">{desc}</div>
     </div>
   );
 }
@@ -339,28 +335,28 @@ function Drawer({
       />
       <div
         className={cx(
-          "absolute right-0 top-0 h-full w-full sm:w-[640px] bg-white shadow-2xl transition-transform duration-200",
+          "absolute right-0 top-0 h-full w-full bg-white shadow-2xl transition-transform duration-200 sm:w-[640px]",
           open ? "translate-x-0" : "translate-x-full"
         )}
       >
-        <div className="h-full flex flex-col">
-          <div className="p-5 border-b flex items-start justify-between gap-3">
+        <div className="flex h-full flex-col">
+          <div className="flex items-start justify-between gap-3 border-b p-5">
             <div className="min-w-0">
-              <div className="text-xs text-slate-500 font-black flex items-center gap-2">
-                <EyeIcon className="h-4 w-4 text-slate-400" />
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                <EyeIcon className="h-4 w-4 text-blue-500" />
                 Evidence & details
               </div>
-              <div className="text-lg font-black text-slate-900 truncate">{title}</div>
+              <div className="truncate text-lg font-semibold text-slate-800">{title}</div>
             </div>
             <button
               onClick={onClose}
-              className="shrink-0 rounded-2xl px-3 py-2 text-sm font-extrabold border border-slate-200 hover:bg-slate-50 flex items-center gap-2"
+              className="flex shrink-0 items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
             >
               <XMarkIcon className="h-4 w-4" />
               Close
             </button>
           </div>
-          <div className="p-5 overflow-auto">{children}</div>
+          <div className="overflow-auto p-5">{children}</div>
         </div>
       </div>
     </div>
@@ -383,48 +379,51 @@ function ReceiptModal({
     <div className={open ? "fixed inset-0 z-[110]" : "hidden"}>
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 relative border border-slate-200">
-          <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-slate-900">
+        <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+          <button onClick={onClose} className="absolute right-4 top-4 text-slate-400 hover:text-slate-700">
             <XMarkIcon className="h-5 w-5" />
           </button>
 
           <div className="text-center">
-            <div className="mx-auto h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200 grid place-items-center text-slate-800">
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-blue-200 bg-blue-50 text-blue-700">
               <ReceiptPercentIcon className="h-6 w-6" />
             </div>
-            <div className="text-xs text-slate-500 font-black mt-3">Donation Receipt</div>
-            <div className="text-xl font-black text-slate-900 mt-1">#{receipt?.donation_id || ""}</div>
+            <div className="mt-3 text-xs font-semibold text-slate-500">Donation Receipt</div>
+            <div className="mt-1 text-xl font-semibold text-slate-800">#{receipt?.donation_id || ""}</div>
           </div>
 
           {loading ? (
-            <div className="text-center py-10 text-slate-500">Loading receipt…</div>
+            <div className="py-10 text-center text-slate-500">Loading receipt…</div>
           ) : !receipt ? (
-            <div className="text-center py-10 text-rose-600 font-black">Could not load receipt.</div>
+            <div className="py-10 text-center font-semibold text-rose-600">Could not load receipt.</div>
           ) : (
             <div className="mt-6 space-y-3 text-sm">
-              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 space-y-3">
-                <Row label="Amount" value={<b className="text-slate-900">{formatLKR(Number(receipt.amount) || 0)}</b>} />
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <Row label="Amount" value={<b className="text-slate-800">{formatLKR(Number(receipt.amount) || 0)}</b>} />
                 <Row
                   label="Status"
                   value={
-                    <span className="font-black uppercase text-emerald-700 flex items-center gap-2 justify-end">
+                    <span className="flex items-center justify-end gap-2 font-semibold uppercase text-emerald-700">
                       <CheckCircleIcon className="h-4 w-4" />
                       {String(receipt.status || "").toUpperCase()}
                     </span>
                   }
                 />
-                <Row label="Date" value={<span className="font-semibold">{new Date(receipt.created_at).toLocaleString()}</span>} />
+                <Row
+                  label="Date"
+                  value={<span className="font-medium text-slate-700">{new Date(receipt.created_at).toLocaleString()}</span>}
+                />
               </div>
 
               <div className="rounded-2xl border border-slate-200 p-4">
-                <div className="text-slate-500 text-xs font-black">Request</div>
-                <div className="font-black text-slate-900 mt-1">{receipt.request_title || "School Fund"}</div>
+                <div className="text-xs font-semibold text-slate-500">Request</div>
+                <div className="mt-1 font-semibold text-slate-800">{receipt.request_title || "School Fund"}</div>
               </div>
 
               <div className="rounded-2xl border border-slate-200 p-4">
-                <div className="text-slate-500 text-xs font-black">School</div>
-                <div className="font-black text-slate-900 mt-1">{receipt.school_name}</div>
-                <div className="text-xs text-slate-500 mt-1">
+                <div className="text-xs font-semibold text-slate-500">School</div>
+                <div className="mt-1 font-semibold text-slate-800">{receipt.school_name}</div>
+                <div className="mt-1 text-xs text-slate-500">
                   {receipt.province} • {receipt.district}
                 </div>
               </div>
@@ -433,7 +432,7 @@ function ReceiptModal({
 
           <button
             onClick={() => window.print()}
-            className="mt-6 w-full bg-slate-900 text-white rounded-2xl py-3 font-black hover:opacity-95 flex items-center justify-center gap-2"
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3 font-semibold text-white hover:bg-blue-700"
           >
             <PrinterIcon className="h-5 w-5" />
             Print Receipt
@@ -460,58 +459,61 @@ function AllocationModal({
     <div className={open ? "fixed inset-0 z-[115]" : "hidden"}>
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 relative border border-slate-200">
-          <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-slate-900">
+        <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+          <button onClick={onClose} className="absolute right-4 top-4 text-slate-400 hover:text-slate-700">
             <XMarkIcon className="h-5 w-5" />
           </button>
 
           <div className="text-center">
-            <div className="mx-auto h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200 grid place-items-center text-slate-800">
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-blue-200 bg-blue-50 text-blue-700">
               <Squares2X2Icon className="h-6 w-6" />
             </div>
-            <div className="text-xs text-slate-500 font-black mt-3">Donation Allocation</div>
-            <div className="text-xl font-black text-slate-900 mt-1">#{data?.donation?.donation_id || ""}</div>
+            <div className="mt-3 text-xs font-semibold text-slate-500">Donation Allocation</div>
+            <div className="mt-1 text-xl font-semibold text-slate-800">#{data?.donation?.donation_id || ""}</div>
           </div>
 
           {loading ? (
-            <div className="text-center py-10 text-slate-500">Loading allocation…</div>
+            <div className="py-10 text-center text-slate-500">Loading allocation…</div>
           ) : !data ? (
-            <div className="text-center py-10 text-rose-600 font-black">Could not load allocation.</div>
+            <div className="py-10 text-center font-semibold text-rose-600">Could not load allocation.</div>
           ) : (
             <div className="mt-6 space-y-3 text-sm">
-              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 space-y-3">
-                <Row label="Donation Amount" value={<b className="text-slate-900">{formatLKR(Number(data.donation.amount) || 0)}</b>} />
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <Row
+                  label="Donation Amount"
+                  value={<b className="text-slate-800">{formatLKR(Number(data.donation.amount) || 0)}</b>}
+                />
                 <Row
                   label="Allocated Total"
-                  value={<b className="text-slate-900">{formatLKR(Number(data.allocated_total) || 0)}</b>}
+                  value={<b className="text-slate-800">{formatLKR(Number(data.allocated_total) || 0)}</b>}
                 />
               </div>
 
               <div className="rounded-2xl border border-slate-200 p-4">
-                <div className="text-slate-500 text-xs font-black mb-2">Breakdown</div>
+                <div className="mb-2 text-xs font-semibold text-slate-500">Breakdown</div>
 
                 {data.allocations?.length ? (
                   <div className="space-y-2">
                     {data.allocations.map((a) => (
                       <div key={a.allocation_id} className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="font-black text-slate-900 truncate">
+                          <div className="truncate font-semibold text-slate-800">
                             {a.allocation_type === "request"
                               ? a.request_title || (a.request_id ? `Request #${a.request_id}` : "Request")
                               : "School Fund"}
                           </div>
-                          <div className="text-[11px] text-slate-500 font-bold">
+                          <div className="text-[11px] font-medium text-slate-500">
                             {String(a.allocation_type || "").toUpperCase()}
                           </div>
                         </div>
-                        <div className="shrink-0 font-black text-slate-900">
+                        <div className="shrink-0 font-semibold text-slate-700">
                           {formatLKR(Number(a.allocated_amount) || 0)}
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-slate-600 text-sm">No allocations found.</div>
+                  <div className="text-sm text-slate-600">No allocations found.</div>
                 )}
               </div>
             </div>
@@ -525,7 +527,7 @@ function AllocationModal({
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className="text-slate-500 font-bold">{label}</span>
+      <span className="font-medium text-slate-500">{label}</span>
       <span className="text-right">{value}</span>
     </div>
   );
@@ -546,7 +548,6 @@ function Avatar({
   getThumb: (requestId: number) => void;
 }) {
   useEffect(() => {
-    // ✅ only fetch thumb if we have a real request id
     if (requestId > 0 && !requestImage && !schoolLogo) getThumb(requestId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestId]);
@@ -554,18 +555,18 @@ function Avatar({
   const src = toAbs(requestImage) || toAbs(schoolLogo);
 
   return (
-    <div className="shrink-0 h-12 w-12 rounded-2xl overflow-hidden bg-slate-900 ring-1 ring-black/5">
+    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-blue-600 ring-1 ring-black/5">
       {src ? (
         <img
           src={src}
           alt="thumb"
-          className="w-full h-full object-cover"
+          className="h-full w-full object-cover"
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }}
         />
       ) : (
-        <div className="w-full h-full text-white grid place-items-center font-black text-sm">{initials(label)}</div>
+        <div className="grid h-full w-full place-items-center text-sm font-semibold text-white">{initials(label)}</div>
       )}
     </div>
   );
@@ -575,8 +576,8 @@ function Avatar({
 function ProgressBar({ value }: { value: number }) {
   const v = Math.max(0, Math.min(100, value));
   return (
-    <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-      <div className="h-full bg-slate-900 rounded-full" style={{ width: `${v}%` }} />
+    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+      <div className="h-full rounded-full bg-blue-600" style={{ width: `${v}%` }} />
     </div>
   );
 }
@@ -607,7 +608,6 @@ function EvidenceCard({ e }: { e: Evidence }) {
   const href = toAbs(raw);
   const type = String(e?.file_type || "").toLowerCase();
   const isPdf = type === "pdf" || raw.toLowerCase().endsWith(".pdf");
-  
 
   if (!href) return null;
 
@@ -617,39 +617,37 @@ function EvidenceCard({ e }: { e: Evidence }) {
       target="_blank"
       rel="noreferrer"
       className={cx(
-        "group block rounded-3xl border border-slate-200 bg-white overflow-hidden",
-        "shadow-sm hover:shadow-md hover:border-slate-300 transition"
+        "group block overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition",
+        "hover:border-slate-300 hover:shadow-md"
       )}
       title="Open in new tab"
     >
-      {/* Preview */}
       <div className="relative aspect-[4/3] bg-slate-50">
         {isPdf ? (
           <>
-            {/* lightweight-ish preview; if browser blocks, the overlay still looks good */}
             <iframe
               src={`${href}#page=1&view=FitH`}
-              className="absolute inset-0 w-full h-full pointer-events-none opacity-90"
+              className="pointer-events-none absolute inset-0 h-full w-full opacity-90"
               title={`pdf-${e.id}`}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/5 to-transparent" />
             <div className="absolute left-3 top-3">
-              <Pill tone="slate" icon={<DocumentTextIcon className="h-3.5 w-3.5" />}>
+              <Pill tone="blue" icon={<DocumentTextIcon className="h-3.5 w-3.5" />}>
                 PDF
               </Pill>
             </div>
-            <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition">
-              <span className="inline-flex items-center gap-2 rounded-2xl bg-white/95 backdrop-blur px-3 py-2 text-xs font-black text-slate-900 border border-slate-200 shadow-sm">
+            <div className="absolute right-3 top-3 opacity-0 transition group-hover:opacity-100">
+              <span className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm backdrop-blur">
                 Open <span aria-hidden>↗</span>
               </span>
             </div>
-            <div className="absolute left-3 bottom-3 flex items-center gap-2">
-              <div className="h-10 w-10 rounded-2xl bg-white/95 border border-slate-200 grid place-items-center text-slate-800 shadow-sm">
+            <div className="absolute bottom-3 left-3 flex items-center gap-2">
+              <div className="grid h-10 w-10 place-items-center rounded-2xl border border-blue-200 bg-white/95 text-blue-700 shadow-sm">
                 <DocumentTextIcon className="h-5 w-5" />
               </div>
               <div className="text-white drop-shadow">
-                <div className="text-sm font-black leading-tight">PDF Evidence</div>
-                <div className="text-[11px] opacity-90 font-bold">Tap to view</div>
+                <div className="text-sm font-semibold leading-tight">PDF Evidence</div>
+                <div className="text-[11px] font-medium opacity-90">Tap to view</div>
               </div>
             </div>
           </>
@@ -659,54 +657,53 @@ function EvidenceCard({ e }: { e: Evidence }) {
               src={href}
               alt="evidence"
               loading="lazy"
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 h-full w-full object-cover"
               onError={(ev) => {
                 (ev.currentTarget as HTMLImageElement).style.display = "none";
               }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/5 to-transparent" />
             <div className="absolute left-3 top-3">
-              <Pill tone="slate" icon={<PhotoIcon className="h-3.5 w-3.5" />}>
+              <Pill tone="blue" icon={<PhotoIcon className="h-3.5 w-3.5" />}>
                 IMAGE
               </Pill>
             </div>
-            <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition">
-              <span className="inline-flex items-center gap-2 rounded-2xl bg-white/95 backdrop-blur px-3 py-2 text-xs font-black text-slate-900 border border-slate-200 shadow-sm">
+            <div className="absolute right-3 top-3 opacity-0 transition group-hover:opacity-100">
+              <span className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm backdrop-blur">
                 View <span aria-hidden>↗</span>
               </span>
             </div>
-            <div className="absolute left-3 bottom-3 flex items-center gap-2">
-              <div className="h-10 w-10 rounded-2xl bg-white/95 border border-slate-200 grid place-items-center text-slate-800 shadow-sm">
+            <div className="absolute bottom-3 left-3 flex items-center gap-2">
+              <div className="grid h-10 w-10 place-items-center rounded-2xl border border-blue-200 bg-white/95 text-blue-700 shadow-sm">
                 <PhotoIcon className="h-5 w-5" />
               </div>
               <div className="text-white drop-shadow">
-                <div className="text-sm font-black leading-tight">Image Evidence</div>
-                <div className="text-[11px] opacity-90 font-bold">Tap to zoom</div>
+                <div className="text-sm font-semibold leading-tight">Image Evidence</div>
+                <div className="text-[11px] font-medium opacity-90">Tap to zoom</div>
               </div>
             </div>
           </>
         )}
       </div>
 
-      {/* Meta */}
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="font-black text-slate-900 truncate">{isPdf ? "PDF Evidence" : "Image Evidence"}</div>
-            {e.note ? <div className="text-xs text-slate-600 mt-1 line-clamp-2">{e.note}</div> : null}
+            <div className="truncate font-semibold text-slate-800">{isPdf ? "PDF Evidence" : "Image Evidence"}</div>
+            {e.note ? <div className="mt-1 line-clamp-2 text-xs text-slate-600">{e.note}</div> : null}
           </div>
           <div className="shrink-0">
-            <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-black border border-slate-200 bg-slate-50 text-slate-700">
+            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
               OPEN
             </span>
           </div>
         </div>
 
         <div className="mt-3 flex items-center justify-between gap-3">
-          <div className="text-[11px] text-slate-500 font-bold truncate">
+          <div className="truncate text-[11px] font-medium text-slate-500">
             {e.created_at ? new Date(e.created_at).toLocaleString() : "—"}
           </div>
-          <div className="text-[11px] text-slate-500 font-bold truncate max-w-[55%]">{raw}</div>
+          <div className="max-w-[55%] truncate text-[11px] font-medium text-slate-500">{raw}</div>
         </div>
       </div>
     </a>
@@ -741,19 +738,19 @@ function EvidenceSection({ evidences }: { evidences: Evidence[] }) {
   }, [evidences, filter]);
 
   return (
-    <div className="rounded-3xl border border-slate-200 p-5 bg-white">
+    <div className="rounded-3xl border border-slate-200 bg-white p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-xs text-slate-500 font-black flex items-center gap-2">
-            <PhotoIcon className="h-4 w-4 text-slate-400" />
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <PhotoIcon className="h-4 w-4 text-blue-500" />
             Evidence uploaded
           </div>
-          <div className="text-sm text-slate-600 mt-1">
+          <div className="mt-1 text-sm text-slate-500">
             {counts.all ? (
               <>
-                <span className="font-black text-slate-900">{counts.all}</span> file(s) •{" "}
-                <span className="font-black text-slate-900">{counts.pdf}</span> PDF •{" "}
-                <span className="font-black text-slate-900">{counts.img}</span> image
+                <span className="font-semibold text-slate-800">{counts.all}</span> file(s) •{" "}
+                <span className="font-semibold text-slate-800">{counts.pdf}</span> PDF •{" "}
+                <span className="font-semibold text-slate-800">{counts.img}</span> image
               </>
             ) : (
               "No files yet"
@@ -766,8 +763,8 @@ function EvidenceSection({ evidences }: { evidences: Evidence[] }) {
             <button
               onClick={() => setFilter("all")}
               className={cx(
-                "rounded-2xl px-3 py-2 text-xs font-black border transition",
-                filter === "all" ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 hover:bg-slate-50"
+                "rounded-2xl border px-3 py-2 text-xs font-semibold transition",
+                filter === "all" ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 hover:bg-slate-50"
               )}
             >
               All
@@ -775,8 +772,8 @@ function EvidenceSection({ evidences }: { evidences: Evidence[] }) {
             <button
               onClick={() => setFilter("pdf")}
               className={cx(
-                "rounded-2xl px-3 py-2 text-xs font-black border transition flex items-center gap-2",
-                filter === "pdf" ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 hover:bg-slate-50"
+                "flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold transition",
+                filter === "pdf" ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 hover:bg-slate-50"
               )}
             >
               <DocumentTextIcon className="h-4 w-4" />
@@ -785,8 +782,8 @@ function EvidenceSection({ evidences }: { evidences: Evidence[] }) {
             <button
               onClick={() => setFilter("image")}
               className={cx(
-                "rounded-2xl px-3 py-2 text-xs font-black border transition flex items-center gap-2",
-                filter === "image" ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 hover:bg-slate-50"
+                "flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold transition",
+                filter === "image" ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 hover:bg-slate-50"
               )}
             >
               <PhotoIcon className="h-4 w-4" />
@@ -799,14 +796,14 @@ function EvidenceSection({ evidences }: { evidences: Evidence[] }) {
       {!counts.all ? (
         <div className="mt-4 text-sm text-slate-600">
           No evidence uploaded yet.
-          <div className="text-xs text-slate-500 mt-1">Once the school uploads proof, it will appear here.</div>
+          <div className="mt-1 text-xs text-slate-500">Once the school uploads proof, it will appear here.</div>
         </div>
       ) : filtered.length === 0 ? (
         <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-5 text-slate-700">
           No files match this filter.
         </div>
       ) : (
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           {filtered.map((e) => (
             <EvidenceCard key={e.id} e={e} />
           ))}
@@ -819,21 +816,18 @@ function EvidenceSection({ evidences }: { evidences: Evidence[] }) {
 export default function MyDonations() {
   const [tab, setTab] = useState<"donations" | "requests">("requests");
 
-  // filters
   const [draftSearch, setDraftSearch] = useState("");
   const debouncedSearch = useDebounced(draftSearch, 350);
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"paid" | "pending" | "all">("paid");
 
-  // donations list
   const [loadingDonations, setLoadingDonations] = useState(true);
   const [donations, setDonations] = useState<DonationRow[]>([]);
   const [donationsTotal, setDonationsTotal] = useState(0);
   const [donationsPage, setDonationsPage] = useState(1);
   const donationsLimit = 10;
 
-  // requests grouped
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [requests, setRequests] = useState<DonatedRequestRow[]>([]);
   const [reqTotal, setReqTotal] = useState(0);
@@ -842,23 +836,19 @@ export default function MyDonations() {
 
   const [err, setErr] = useState<string | null>(null);
 
-  // drawer
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detail, setDetail] = useState<RequestDetailRes["project"] | null>(null);
   const [selectedReq, setSelectedReq] = useState<DonatedRequestRow | null>(null);
 
-  // receipt modal
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [receipt, setReceipt] = useState<any>(null);
 
-  // allocation modal
   const [allocationOpen, setAllocationOpen] = useState(false);
   const [allocationLoading, setAllocationLoading] = useState(false);
   const [allocationData, setAllocationData] = useState<DonationAllocationRes | null>(null);
 
-  // thumbs cache
   const [thumbs, setThumbs] = useState<Record<number, { request_image?: string | null; school_logo?: string | null }>>(
     {}
   );
@@ -867,7 +857,6 @@ export default function MyDonations() {
   const donationsPages = useMemo(() => Math.max(1, Math.ceil(donationsTotal / donationsLimit)), [donationsTotal]);
   const reqPages = useMemo(() => Math.max(1, Math.ceil(reqTotal / reqLimit)), [reqTotal]);
 
-  /** Fetch & cache request image + school logo */
   const fetchThumbForRequest = async (requestId: number) => {
     if (!requestId || requestId <= 0) return;
     if (thumbs[requestId]?.request_image || thumbs[requestId]?.school_logo) return;
@@ -920,12 +909,10 @@ export default function MyDonations() {
     }
   };
 
-  // ✅ allocation-first, fallback grouping if endpoint not available
   const fetchDonatedRequests = async () => {
     setLoadingRequests(true);
     setErr(null);
 
-    // 1) Try allocations endpoint (correct if donation split)
     try {
       const res = await axios.get(MY_REQUEST_ALLOCATIONS, {
         withCredentials: true,
@@ -956,7 +943,6 @@ export default function MyDonations() {
       // fallback below
     }
 
-    // 2) Fallback: group donations by request_id (not correct if split but works)
     try {
       const res = await axios.get(MY_DONATIONS, {
         withCredentials: true,
@@ -975,8 +961,6 @@ export default function MyDonations() {
 
       for (const d of rows) {
         const id = d.request_id ? Number(d.request_id) : 0;
-
-        // ✅ skip school fund donations
         if (!id) continue;
 
         const cur = map.get(id);
@@ -1002,7 +986,6 @@ export default function MyDonations() {
           }
         }
 
-        // thumbs cache
         if (d.request_image_url || d.school_logo_url) {
           setThumbs((prev) => ({
             ...prev,
@@ -1071,7 +1054,6 @@ export default function MyDonations() {
     }
   };
 
-  // ✅ NEW: open allocations modal
   const openAllocation = async (donationId: number) => {
     setAllocationOpen(true);
     setAllocationLoading(true);
@@ -1087,14 +1069,12 @@ export default function MyDonations() {
     }
   };
 
-  // Apply on tab/page/status/search changes
   useEffect(() => {
     if (tab === "donations") fetchDonations();
     if (tab === "requests") fetchDonatedRequests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, donationsPage, reqPage, status, search]);
 
-  // debounced search
   useEffect(() => {
     setSearch(debouncedSearch.trim());
     setDonationsPage(1);
@@ -1104,7 +1084,6 @@ export default function MyDonations() {
 
   const refresh = () => (tab === "donations" ? fetchDonations() : fetchDonatedRequests());
 
-  /** ---------------- Stats ---------------- */
   const stats = useMemo(() => {
     const list = tab === "donations" ? donations : [];
     const paidCount = list.filter((d) => String(d.status).toLowerCase() === "paid").length;
@@ -1118,14 +1097,14 @@ export default function MyDonations() {
   }, [donations, requests, reqTotal, tab]);
 
   return (
-    <div className="w-full px-3 sm:px-0 pb-10">
+    <div className="w-full px-3 pb-10 text-slate-700 sm:px-0">
       <SectionTitle
         title="My Donations"
         subtitle="Track your donations and open evidence for donated requests."
         right={
           <button
             onClick={refresh}
-            className="rounded-2xl px-4 py-2.5 font-black bg-slate-900 text-white hover:opacity-95 flex items-center gap-2"
+            className="flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 font-semibold text-white hover:bg-blue-700"
           >
             <ArrowPathIcon className="h-5 w-5" />
             Refresh
@@ -1134,7 +1113,7 @@ export default function MyDonations() {
       />
 
       {/* Summary row */}
-      <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard
           label={tab === "donations" ? "Total (this page list)" : "Total allocated (requests page)"}
           value={formatLKR(tab === "donations" ? stats.sum : stats.reqSum)}
@@ -1164,9 +1143,9 @@ export default function MyDonations() {
       </div>
 
       {/* Tabs + Filters */}
-      <div className="mt-5 sticky top-[10px] z-[5]">
+      <div className="sticky top-[10px] z-[5] mt-5">
         <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="p-3 sm:p-4 flex flex-col gap-3">
+          <div className="flex flex-col gap-3 p-3 sm:p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <Segmented
                 value={tab}
@@ -1196,16 +1175,16 @@ export default function MyDonations() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
               <div className="lg:col-span-7">
-                <label className="text-xs font-black text-slate-600">Search</label>
-                <div className="mt-1 relative">
-                  <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <label className="text-xs font-semibold text-slate-600">Search</label>
+                <div className="relative mt-1">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                   <input
                     value={draftSearch}
                     onChange={(e) => setDraftSearch(e.target.value)}
                     placeholder="Search by request title / school / district / province..."
-                    className="w-full rounded-2xl border border-slate-200 pl-10 pr-10 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+                    className="w-full rounded-2xl border border-slate-200 py-3 pl-10 pr-10 text-sm outline-none focus:ring-2 focus:ring-blue-100"
                   />
                   {draftSearch ? (
                     <button
@@ -1223,7 +1202,7 @@ export default function MyDonations() {
               </div>
 
               <div className="lg:col-span-3">
-                <label className="text-xs font-black text-slate-600">Status</label>
+                <label className="text-xs font-semibold text-slate-600">Status</label>
                 <select
                   value={status}
                   onChange={(e) => {
@@ -1231,7 +1210,7 @@ export default function MyDonations() {
                     setDonationsPage(1);
                     setReqPage(1);
                   }}
-                  className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-100"
                 >
                   <option value="paid">Paid</option>
                   <option value="pending">Pending</option>
@@ -1239,12 +1218,12 @@ export default function MyDonations() {
                 </select>
               </div>
 
-              <div className="lg:col-span-2 flex items-end">
+              <div className="flex items-end lg:col-span-2">
                 <button
                   onClick={() => refresh()}
-                  className="w-full rounded-2xl px-3 py-3 text-sm font-black border border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-2"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 px-3 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
                 >
-                  <ArrowPathIcon className="h-5 w-5 text-slate-700" />
+                  <ArrowPathIcon className="h-5 w-5 text-slate-500" />
                   Apply
                 </button>
               </div>
@@ -1255,18 +1234,17 @@ export default function MyDonations() {
 
       {err ? (
         <div className="mt-4 rounded-3xl border border-rose-200 bg-rose-50 p-5 text-rose-800">
-          <div className="font-black">Something went wrong</div>
-          <div className="text-sm mt-1">{err}</div>
+          <div className="font-semibold">Something went wrong</div>
+          <div className="mt-1 text-sm">{err}</div>
         </div>
       ) : null}
 
       {/* Content */}
       <div className="mt-6">
-        {/* Donations List */}
         {tab === "donations" && (
           <>
             {loadingDonations ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <SkeletonCard key={i} />
                 ))}
@@ -1278,7 +1256,7 @@ export default function MyDonations() {
                 desc="Try changing filters or clearing search."
               />
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {donations.map((d) => {
                   const reqId = d.request_id ? Number(d.request_id) : 0;
                   const isDirectFund = !reqId;
@@ -1295,8 +1273,8 @@ export default function MyDonations() {
                     <div
                       key={d.donation_id}
                       className={cx(
-                        "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm",
-                        "transition hover:shadow-md hover:border-slate-300"
+                        "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition",
+                        "hover:border-slate-300 hover:shadow-md"
                       )}
                     >
                       <div className="flex items-start gap-4">
@@ -1313,11 +1291,11 @@ export default function MyDonations() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <div className="text-base font-black text-slate-900 truncate">{title}</div>
+                              <div className="truncate text-base font-semibold text-slate-800">{title}</div>
 
-                              <div className="mt-1 text-xs text-slate-500 truncate flex items-center gap-2">
+                              <div className="mt-1 flex items-center gap-2 truncate text-xs text-slate-500">
                                 <BuildingOffice2Icon className="h-4 w-4 text-slate-400" />
-                                <span className="font-bold text-slate-700">{schoolName}</span>
+                                <span className="font-medium text-slate-600">{schoolName}</span>
                                 {(d.province || d.district) && (
                                   <span className="inline-flex items-center gap-1">
                                     <MapPinIcon className="h-4 w-4 text-slate-400" />
@@ -1337,7 +1315,7 @@ export default function MyDonations() {
                             </div>
 
                             <div className="shrink-0 text-right">
-                              <div className="text-slate-900 font-black">{formatLKR(Number(d.amount) || 0)}</div>
+                              <div className="font-semibold text-slate-700">{formatLKR(Number(d.amount) || 0)}</div>
                               <div className="mt-1 text-xs text-slate-500">{d.time || new Date(d.created_at).toLocaleString()}</div>
                             </div>
                           </div>
@@ -1345,17 +1323,17 @@ export default function MyDonations() {
                           <div className="mt-4 flex items-center justify-end gap-2">
                             <button
                               onClick={() => openAllocation(d.donation_id)}
-                              className="rounded-2xl px-3 py-2 text-xs font-black border border-slate-200 hover:bg-slate-50 flex items-center gap-2"
+                              className="flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                             >
-                              <Squares2X2Icon className="h-4 w-4 text-slate-700" />
+                              <Squares2X2Icon className="h-4 w-4 text-slate-500" />
                               View Allocation
                             </button>
 
                             <button
                               onClick={() => openReceipt(d.donation_id)}
-                              className="rounded-2xl px-3 py-2 text-xs font-black border border-slate-200 hover:bg-slate-50 flex items-center gap-2"
+                              className="flex items-center gap-2 rounded-2xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
                             >
-                              <ReceiptPercentIcon className="h-4 w-4 text-slate-700" />
+                              <ReceiptPercentIcon className="h-4 w-4" />
                               View Receipt
                             </button>
                           </div>
@@ -1367,19 +1345,18 @@ export default function MyDonations() {
               </div>
             )}
 
-            {/* Pagination */}
-            <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm text-slate-600">
-                Page <span className="font-black text-slate-900">{donationsPage}</span> / {donationsPages} • Total{" "}
-                <span className="font-black text-slate-900">{donationsTotal}</span>
+                Page <span className="font-semibold text-slate-800">{donationsPage}</span> / {donationsPages} • Total{" "}
+                <span className="font-semibold text-slate-800">{donationsTotal}</span>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   disabled={donationsPage <= 1}
                   onClick={() => setDonationsPage((p) => Math.max(1, p - 1))}
                   className={cx(
-                    "rounded-2xl px-4 py-2 text-sm font-black border",
-                    donationsPage <= 1 ? "border-slate-200 text-slate-400" : "border-slate-200 hover:bg-slate-50"
+                    "rounded-2xl border px-4 py-2 text-sm font-semibold",
+                    donationsPage <= 1 ? "border-slate-200 text-slate-400" : "border-slate-200 text-slate-600 hover:bg-slate-50"
                   )}
                 >
                   Prev
@@ -1388,8 +1365,8 @@ export default function MyDonations() {
                   disabled={donationsPage >= donationsPages}
                   onClick={() => setDonationsPage((p) => Math.min(donationsPages, p + 1))}
                   className={cx(
-                    "rounded-2xl px-4 py-2 text-sm font-black border",
-                    donationsPage >= donationsPages ? "border-slate-200 text-slate-400" : "border-slate-200 hover:bg-slate-50"
+                    "rounded-2xl border px-4 py-2 text-sm font-semibold",
+                    donationsPage >= donationsPages ? "border-slate-200 text-slate-400" : "border-slate-200 text-slate-600 hover:bg-slate-50"
                   )}
                 >
                   Next
@@ -1399,11 +1376,10 @@ export default function MyDonations() {
           </>
         )}
 
-        {/* Donated Requests */}
         {tab === "requests" && (
           <>
             {loadingRequests ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <SkeletonCard key={i} />
                 ))}
@@ -1411,7 +1387,7 @@ export default function MyDonations() {
             ) : requests.length === 0 ? (
               <EmptyState icon={<GiftIcon />} title="No donated requests" desc="Donate to a request and it will appear here." />
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {requests.map((r) => {
                   const t = thumbs[r.request_id];
                   const requestImage = t?.request_image ?? null;
@@ -1422,8 +1398,8 @@ export default function MyDonations() {
                       key={r.request_id}
                       onClick={() => openEvidenceDrawer(r)}
                       className={cx(
-                        "group w-full text-left rounded-3xl border border-slate-200 bg-white p-5 shadow-sm",
-                        "transition hover:-translate-y-[2px] hover:shadow-md hover:border-slate-300"
+                        "group w-full rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition",
+                        "hover:-translate-y-[2px] hover:border-slate-300 hover:shadow-md"
                       )}
                     >
                       <div className="flex items-start gap-4">
@@ -1438,11 +1414,11 @@ export default function MyDonations() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <div className="text-base font-black text-slate-900 truncate">{r.request_title}</div>
+                              <div className="truncate text-base font-semibold text-slate-800">{r.request_title}</div>
 
-                              <div className="mt-1 text-xs text-slate-500 truncate flex items-center gap-2">
+                              <div className="mt-1 flex items-center gap-2 truncate text-xs text-slate-500">
                                 <BuildingOffice2Icon className="h-4 w-4 text-slate-400" />
-                                <span className="font-bold text-slate-700">{r.school_name || "School"}</span>
+                                <span className="font-medium text-slate-600">{r.school_name || "School"}</span>
                                 {(r.province || r.district) && (
                                   <span className="inline-flex items-center gap-1">
                                     <MapPinIcon className="h-4 w-4 text-slate-400" />
@@ -1454,14 +1430,16 @@ export default function MyDonations() {
 
                               <div className="mt-3 flex items-center gap-2">
                                 <Pill tone="indigo">Request #{r.request_id}</Pill>
-                                <Pill tone="slate">{r.donations_count} record{r.donations_count === 1 ? "" : "s"}</Pill>
+                                <Pill tone="slate">
+                                  {r.donations_count} record{r.donations_count === 1 ? "" : "s"}
+                                </Pill>
                               </div>
                             </div>
 
                             <div className="shrink-0 text-right">
-                              <div className="text-slate-900 font-black">{formatLKR(Number(r.total_donated) || 0)}</div>
+                              <div className="font-semibold text-slate-700">{formatLKR(Number(r.total_donated) || 0)}</div>
                               {r.last_donated_at ? (
-                                <div className="mt-1 text-xs text-slate-500 flex items-center gap-1 justify-end">
+                                <div className="mt-1 flex items-center justify-end gap-1 text-xs text-slate-500">
                                   <ClockIcon className="h-4 w-4 text-slate-400" />
                                   {new Date(r.last_donated_at).toLocaleString()}
                                 </div>
@@ -1472,7 +1450,7 @@ export default function MyDonations() {
                           </div>
 
                           <div className="mt-4 flex items-center justify-end">
-                            <div className="text-xs font-black text-slate-700 group-hover:text-slate-900 flex items-center gap-2">
+                            <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 group-hover:text-blue-700">
                               <EyeIcon className="h-4 w-4" />
                               View evidence
                             </div>
@@ -1485,19 +1463,18 @@ export default function MyDonations() {
               </div>
             )}
 
-            {/* Pagination */}
-            <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm text-slate-600">
-                Page <span className="font-black text-slate-900">{reqPage}</span> / {reqPages} • Total{" "}
-                <span className="font-black text-slate-900">{reqTotal}</span>
+                Page <span className="font-semibold text-slate-800">{reqPage}</span> / {reqPages} • Total{" "}
+                <span className="font-semibold text-slate-800">{reqTotal}</span>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   disabled={reqPage <= 1}
                   onClick={() => setReqPage((p) => Math.max(1, p - 1))}
                   className={cx(
-                    "rounded-2xl px-4 py-2 text-sm font-black border",
-                    reqPage <= 1 ? "border-slate-200 text-slate-400" : "border-slate-200 hover:bg-slate-50"
+                    "rounded-2xl border px-4 py-2 text-sm font-semibold",
+                    reqPage <= 1 ? "border-slate-200 text-slate-400" : "border-slate-200 text-slate-600 hover:bg-slate-50"
                   )}
                 >
                   Prev
@@ -1506,8 +1483,8 @@ export default function MyDonations() {
                   disabled={reqPage >= reqPages}
                   onClick={() => setReqPage((p) => Math.min(reqPages, p + 1))}
                   className={cx(
-                    "rounded-2xl px-4 py-2 text-sm font-black border",
-                    reqPage >= reqPages ? "border-slate-200 text-slate-400" : "border-slate-200 hover:bg-slate-50"
+                    "rounded-2xl border px-4 py-2 text-sm font-semibold",
+                    reqPage >= reqPages ? "border-slate-200 text-slate-400" : "border-slate-200 text-slate-600 hover:bg-slate-50"
                   )}
                 >
                   Next
@@ -1532,11 +1509,11 @@ export default function MyDonations() {
             <div className="rounded-3xl border border-slate-200 p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-xs text-slate-500 font-black flex items-center gap-2">
-                    <DocumentTextIcon className="h-4 w-4 text-slate-400" />
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                    <DocumentTextIcon className="h-4 w-4 text-blue-500" />
                     Request
                   </div>
-                  <div className="mt-1 text-lg font-black text-slate-900">{detail.request_title}</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-800">{detail.request_title}</div>
                   {detail.category ? (
                     <div className="mt-2">
                       <Pill tone="indigo">{String(detail.category).toUpperCase()}</Pill>
@@ -1553,13 +1530,13 @@ export default function MyDonations() {
               {detail.description ? <div className="mt-3 text-sm text-slate-600">{detail.description}</div> : null}
 
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-2xl bg-slate-50 p-3 border border-slate-200">
-                  <div className="text-xs text-slate-500 font-black">Goal</div>
-                  <div className="font-black text-slate-900">{formatLKR(Number(detail.estimated_price) || 0)}</div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="text-xs font-semibold text-slate-500">Goal</div>
+                  <div className="font-semibold text-slate-800">{formatLKR(Number(detail.estimated_price) || 0)}</div>
                 </div>
-                <div className="rounded-2xl bg-slate-50 p-3 border border-slate-200">
-                  <div className="text-xs text-slate-500 font-black">Raised</div>
-                  <div className="font-black text-slate-900">{formatLKR(Number(detail.amount_raised) || 0)}</div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="text-xs font-semibold text-slate-500">Raised</div>
+                  <div className="font-semibold text-slate-800">{formatLKR(Number(detail.amount_raised) || 0)}</div>
                 </div>
               </div>
 
@@ -1570,9 +1547,9 @@ export default function MyDonations() {
                   const pct = goal > 0 ? (raised / goal) * 100 : 0;
                   return (
                     <>
-                      <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
-                        <span className="font-bold">Progress</span>
-                        <span className="font-bold">{Math.round(Math.max(0, Math.min(100, pct)))}%</span>
+                      <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
+                        <span className="font-medium">Progress</span>
+                        <span className="font-medium">{Math.round(Math.max(0, Math.min(100, pct)))}%</span>
                       </div>
                       <ProgressBar value={pct} />
                     </>
@@ -1583,13 +1560,13 @@ export default function MyDonations() {
 
             {/* School info */}
             <div className="rounded-3xl border border-slate-200 p-5">
-              <div className="text-xs text-slate-500 font-black flex items-center gap-2">
-                <BuildingOffice2Icon className="h-4 w-4 text-slate-400" />
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                <BuildingOffice2Icon className="h-4 w-4 text-blue-500" />
                 School
               </div>
-              <div className="mt-1 font-black text-slate-900">{detail.school?.school_name || "School"}</div>
+              <div className="mt-1 font-semibold text-slate-800">{detail.school?.school_name || "School"}</div>
 
-              <div className="mt-2 text-sm text-slate-600 flex items-center gap-2">
+              <div className="mt-2 flex items-center gap-2 text-sm text-slate-600">
                 <MapPinIcon className="h-4 w-4 text-slate-400" />
                 <span>
                   {detail.school?.province ? `${detail.school.province}` : ""}
@@ -1598,31 +1575,31 @@ export default function MyDonations() {
               </div>
 
               {detail.school?.address ? (
-                <div className="mt-2 text-sm text-slate-600 flex items-start gap-2">
-                  <MapPinIcon className="h-4 w-4 text-slate-400 mt-0.5" />
+                <div className="mt-2 flex items-start gap-2 text-sm text-slate-600">
+                  <MapPinIcon className="mt-0.5 h-4 w-4 text-slate-400" />
                   <span>{detail.school.address}</span>
                 </div>
               ) : null}
 
               {(detail.school?.contact_email || detail.school?.contact_phone) && (
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                   {detail.school?.contact_email ? (
-                    <div className="rounded-2xl bg-slate-50 p-3 border border-slate-200">
-                      <div className="text-xs text-slate-500 font-black">Email</div>
-                      <div className="font-semibold text-slate-900 break-all">{detail.school.contact_email}</div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="text-xs font-semibold text-slate-500">Email</div>
+                      <div className="break-all font-medium text-slate-700">{detail.school.contact_email}</div>
                     </div>
                   ) : null}
                   {detail.school?.contact_phone ? (
-                    <div className="rounded-2xl bg-slate-50 p-3 border border-slate-200">
-                      <div className="text-xs text-slate-500 font-black">Phone</div>
-                      <div className="font-semibold text-slate-900 break-all">{detail.school.contact_phone}</div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="text-xs font-semibold text-slate-500">Phone</div>
+                      <div className="break-all font-medium text-slate-700">{detail.school.contact_phone}</div>
                     </div>
                   ) : null}
                 </div>
               )}
             </div>
 
-            {/* Evidence (UPDATED) */}
+            {/* Evidence */}
             <EvidenceSection evidences={detail.evidences || []} />
           </div>
         )}

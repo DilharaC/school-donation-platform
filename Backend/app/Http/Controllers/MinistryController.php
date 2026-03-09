@@ -5,155 +5,187 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use App\Models\Ministry;
+
+
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
+
 
 
 class MinistryController extends Controller
 {
-    public function overview(Request $request)
-    {
-        $days = (int) $request->query('days', 30);
-        if ($days < 7) $days = 7;
-        if ($days > 365) $days = 365;
+   public function overview(Request $request)
+{
+    $ministry = auth()->guard('ministry')->user();
 
-        $from = Carbon::now()->subDays($days - 1)->startOfDay();
-        $to   = Carbon::now()->endOfDay();
-
-     
-        $totalSchools = (int) DB::table('schools')->count();
-
-        $schoolsByStatus = DB::table('schools')
-            ->selectRaw("LOWER(COALESCE(status,'inactive')) as status, COUNT(*) as count")
-            ->groupBy('status')
-            ->orderByDesc('count')
-            ->get();
-
-        $totalDonors = (int) DB::table('donors')->count();
-        $donationsKpiBase = DB::table('donations');
-        $totalDonations = (int) (clone $donationsKpiBase)->count();
-        $paidCount = (int) (clone $donationsKpiBase)->whereRaw("LOWER(status)='paid'")->count();
-        $pendingCount = (int) (clone $donationsKpiBase)->whereRaw("LOWER(status)='pending'")->count();
-        $paidAmountTotal = (float) (clone $donationsKpiBase)->whereRaw("LOWER(status)='paid'")->sum('amount');
-        $totalCampaigns = (int) DB::table('donation_requests')->count();
-        $approvedCampaigns = (int) DB::table('donation_requests')->where('status', 'Approved')->count();
-        $pendingCampaigns  = (int) DB::table('donation_requests')->where('status', 'Pending')->count();
-        $trendRows = DB::table('donations')
-            ->whereBetween('created_at', [$from, $to])
-            ->whereRaw("LOWER(status)='paid'")
-            ->selectRaw("DATE(created_at) as day, SUM(amount) as amount, COUNT(*) as count")
-            ->groupBy('day')
-            ->orderBy('day')
-            ->get();
-
-        $trendAmountMap = $trendRows->pluck('amount', 'day');
-        $trendCountMap  = $trendRows->pluck('count', 'day');
-
-        $trend = [];
-        $cursor = $from->copy();
-        while ($cursor <= $to) {
-            $d = $cursor->toDateString();
-            $trend[] = [
-                'day' => $d,
-                'amount' => (float) ($trendAmountMap[$d] ?? 0),
-                'count' => (int) ($trendCountMap[$d] ?? 0),
-            ];
-            $cursor->addDay();
-        }
-        $recentDonations = DB::table('donations')
-            ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
-            ->leftJoin('schools', function ($join) {
-                $join->on('schools.school_id', '=', 'donation_requests.school_id')
-                     ->orOn('schools.school_id', '=', 'donations.school_id');
-            })
-            ->whereRaw("LOWER(donations.status)='paid'")
-            ->orderByDesc('donations.created_at')
-            ->limit(10)
-            ->get([
-                'donations.donation_id',
-                'donations.amount',
-                'donations.created_at',
-                'donations.donor_name',
-                'donations.donor_email',
-                'donations.request_id',
-                'donation_requests.request_title',
-                'schools.school_id',
-                'schools.school_name',
-                'schools.province',
-                'schools.district',
-            ]);
-
-        $recentDonations->transform(function ($d) {
-            $d->time = $d->created_at ? Carbon::parse($d->created_at)->diffForHumans() : null;
-            $d->amount = (float) ($d->amount ?? 0);
-            return $d;
-        });
-
-        $topProvinces = DB::table('donations')
-            ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
-            ->leftJoin('schools', function ($join) {
-                $join->on('schools.school_id', '=', 'donation_requests.school_id')
-                     ->orOn('schools.school_id', '=', 'donations.school_id');
-            })
-            ->whereBetween('donations.created_at', [$from, $to])
-            ->whereRaw("LOWER(donations.status)='paid'")
-            ->selectRaw("COALESCE(schools.province,'Unknown') as province, SUM(donations.amount) as total")
-            ->groupBy('province')
-            ->orderByDesc('total')
-            ->limit(8)
-            ->get();
-
-        $topCampaigns = DB::table('donations')
-            ->join('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
-            ->whereBetween('donations.created_at', [$from, $to])
-            ->whereRaw("LOWER(donations.status)='paid'")
-            ->selectRaw("donation_requests.request_id, donation_requests.request_title, SUM(donations.amount) as total, COUNT(*) as count")
-            ->groupBy('donation_requests.request_id', 'donation_requests.request_title')
-            ->orderByDesc('total')
-            ->limit(8)
-            ->get();
-
-        $schoolsMap = DB::table('schools')
-            ->select(
-                'school_id',
-                'school_name',
-                'district',
-                'province',
-                'latitude',
-                'longitude',
-                DB::raw('COALESCE(fund_balance, 0) as total_received'),
-                'need_score'
-            )
-            ->orderByDesc(DB::raw('COALESCE(fund_balance,0)'))
-            ->limit(500) // keep response light
-            ->get();
-
+    if (!$ministry) {
         return response()->json([
-            'range' => [
-                'days' => $days,
-                'from' => $from->toDateString(),
-                'to' => $to->toDateString(),
-            ],
-            'kpis' => [
-                'total_schools' => $totalSchools,
-                'schools_by_status' => $schoolsByStatus,
-                'total_donors' => $totalDonors,
-
-                'total_campaigns' => $totalCampaigns,
-                'approved_campaigns' => $approvedCampaigns,
-                'pending_campaigns' => $pendingCampaigns,
-
-                'total_donations' => $totalDonations,
-                'paid_count' => $paidCount,
-                'pending_count' => $pendingCount,
-                'paid_amount_total' => $paidAmountTotal,
-            ],
-            'trend' => $trend,
-            'recent_donations' => $recentDonations,
-            'top_provinces' => $topProvinces,
-            'top_campaigns' => $topCampaigns,
-            'schools_map' => $schoolsMap,
-        ]);
+            'message' => 'Ministry not authenticated'
+        ], 401);
     }
 
+    $days = (int) $request->query('days', 30);
+    if ($days < 7) $days = 7;
+    if ($days > 365) $days = 365;
+
+    $from = Carbon::now()->subDays($days - 1)->startOfDay();
+    $to   = Carbon::now()->endOfDay();
+
+    $totalSchools = (int) DB::table('schools')->count();
+
+    $schoolsByStatus = DB::table('schools')
+        ->selectRaw("LOWER(COALESCE(status,'inactive')) as status, COUNT(*) as count")
+        ->groupBy('status')
+        ->orderByDesc('count')
+        ->get();
+
+    $totalDonors = (int) DB::table('donors')->count();
+
+    $donationsKpiBase = DB::table('donations');
+    $totalDonations = (int) (clone $donationsKpiBase)->count();
+    $paidCount = (int) (clone $donationsKpiBase)->whereRaw("LOWER(status)='paid'")->count();
+    $pendingCount = (int) (clone $donationsKpiBase)->whereRaw("LOWER(status)='pending'")->count();
+    $paidAmountTotal = (float) (clone $donationsKpiBase)->whereRaw("LOWER(status)='paid'")->sum('amount');
+
+    $totalCampaigns = (int) DB::table('donation_requests')->count();
+    $approvedCampaigns = (int) DB::table('donation_requests')->where('status', 'Approved')->count();
+    $pendingCampaigns  = (int) DB::table('donation_requests')->where('status', 'Pending')->count();
+
+    $trendRows = DB::table('donations')
+        ->whereBetween('created_at', [$from, $to])
+        ->whereRaw("LOWER(status)='paid'")
+        ->selectRaw("DATE(created_at) as day, SUM(amount) as amount, COUNT(*) as count")
+        ->groupBy('day')
+        ->orderBy('day')
+        ->get();
+
+    $trendAmountMap = $trendRows->pluck('amount', 'day');
+    $trendCountMap  = $trendRows->pluck('count', 'day');
+
+    $trend = [];
+    $cursor = $from->copy();
+    while ($cursor <= $to) {
+        $d = $cursor->toDateString();
+        $trend[] = [
+            'day' => $d,
+            'amount' => (float) ($trendAmountMap[$d] ?? 0),
+            'count' => (int) ($trendCountMap[$d] ?? 0),
+        ];
+        $cursor->addDay();
+    }
+
+    $recentDonations = DB::table('donations')
+        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->leftJoin('schools', function ($join) {
+            $join->on('schools.school_id', '=', 'donation_requests.school_id')
+                 ->orOn('schools.school_id', '=', 'donations.school_id');
+        })
+        ->whereRaw("LOWER(donations.status)='paid'")
+        ->orderByDesc('donations.created_at')
+        ->limit(10)
+        ->get([
+            'donations.donation_id',
+            'donations.amount',
+            'donations.created_at',
+            'donations.donor_name',
+            'donations.donor_email',
+            'donations.request_id',
+            'donation_requests.request_title',
+            'schools.school_id',
+            'schools.school_name',
+            'schools.province',
+            'schools.district',
+        ]);
+
+    $recentDonations->transform(function ($d) {
+        $d->time = $d->created_at ? Carbon::parse($d->created_at)->diffForHumans() : null;
+        $d->amount = (float) ($d->amount ?? 0);
+        return $d;
+    });
+
+    $topProvinces = DB::table('donations')
+        ->leftJoin('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->leftJoin('schools', function ($join) {
+            $join->on('schools.school_id', '=', 'donation_requests.school_id')
+                 ->orOn('schools.school_id', '=', 'donations.school_id');
+        })
+        ->whereBetween('donations.created_at', [$from, $to])
+        ->whereRaw("LOWER(donations.status)='paid'")
+        ->selectRaw("COALESCE(schools.province,'Unknown') as province, SUM(donations.amount) as total")
+        ->groupBy('province')
+        ->orderByDesc('total')
+        ->limit(8)
+        ->get();
+
+    $topCampaigns = DB::table('donations')
+        ->join('donation_requests', 'donations.request_id', '=', 'donation_requests.request_id')
+        ->whereBetween('donations.created_at', [$from, $to])
+        ->whereRaw("LOWER(donations.status)='paid'")
+        ->selectRaw("donation_requests.request_id, donation_requests.request_title, SUM(donations.amount) as total, COUNT(*) as count")
+        ->groupBy('donation_requests.request_id', 'donation_requests.request_title')
+        ->orderByDesc('total')
+        ->limit(8)
+        ->get();
+
+    $schoolsMap = DB::table('schools as s')
+        ->leftJoin('fund_allocations as fa', function ($join) {
+            $join->on('s.school_id', '=', 'fa.school_id')
+                 ->where('fa.status', '=', 'active');
+        })
+        ->selectRaw("
+            s.school_id,
+            s.school_name,
+            s.district,
+            s.province,
+            s.latitude,
+            s.longitude,
+            COALESCE(SUM(fa.allocated_amount), 0) as total_received,
+            COALESCE(s.need_score, 0) as need_score
+        ")
+        ->groupBy(
+            's.school_id',
+            's.school_name',
+            's.district',
+            's.province',
+            's.latitude',
+            's.longitude',
+            's.need_score'
+        )
+        ->orderByDesc('total_received')
+        ->limit(500)
+        ->get();
+
+    return response()->json([
+        'ministry' => [
+            'ministry_id' => $ministry->ministry_id,
+            'name' => $ministry->name,
+            'email' => $ministry->email,
+        ],
+        'range' => [
+            'days' => $days,
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+        ],
+        'kpis' => [
+            'total_schools' => $totalSchools,
+            'schools_by_status' => $schoolsByStatus,
+            'total_donors' => $totalDonors,
+            'total_campaigns' => $totalCampaigns,
+            'approved_campaigns' => $approvedCampaigns,
+            'pending_campaigns' => $pendingCampaigns,
+            'total_donations' => $totalDonations,
+            'paid_count' => $paidCount,
+            'pending_count' => $pendingCount,
+            'paid_amount_total' => $paidAmountTotal,
+        ],
+        'trend' => $trend,
+        'recent_donations' => $recentDonations,
+        'top_provinces' => $topProvinces,
+        'top_campaigns' => $topCampaigns,
+        'schools_map' => $schoolsMap,
+    ]);
+}
 
     // GET /api/ministry/donors?search=&sortBy=created_at|total_donated|donations_count&sortDir=asc|desc
     public function index(Request $request)
@@ -465,4 +497,141 @@ class MinistryController extends Controller
         return response()->json(['donations' => $rows]);
     }
 
+// GET /api/ministry/accounts
+public function accounts(Request $request)
+{
+    $search = trim($request->query('search', ''));
+
+    $q = Ministry::select(
+        'id',
+        'name',
+        'email',
+        'is_active',
+        'created_at',
+        'updated_at'
+    );
+
+    if ($search !== '') {
+        $q->where(function ($qq) use ($search) {
+            $qq->where('name', 'like', "%{$search}%")
+               ->orWhere('email', 'like', "%{$search}%");
+        });
+    }
+
+    $rows = $q->orderByDesc('id')->get();
+
+    $rows->transform(function ($r) {
+        $r->is_active = (int) ($r->is_active ?? 0);
+        $r->time = $r->created_at ? Carbon::parse($r->created_at)->diffForHumans() : null;
+        return $r;
+    });
+
+    return response()->json([
+        'accounts' => $rows
+    ]);
+}
+
+// POST /api/ministry/accounts
+public function storeAccount(Request $request)
+{
+    $validated = $request->validate([
+        'name' => ['required', 'string', 'max:255'],
+        'email' => ['required', 'email', 'max:255', 'unique:ministries,email'],
+        'password' => ['required', 'string', 'min:6'],
+        'is_active' => ['nullable', 'boolean'],
+    ]);
+
+    $account = Ministry::create([
+        'name' => $validated['name'],
+        'email' => $validated['email'],
+        'password' => Hash::make($validated['password']),
+        'is_active' => $validated['is_active'] ?? 1,
+    ]);
+
+    return response()->json([
+        'message' => 'Ministry account created successfully',
+        'account' => [
+            'id' => $account->id,
+            'name' => $account->name,
+            'email' => $account->email,
+            'is_active' => (int) $account->is_active,
+            'created_at' => $account->created_at,
+        ]
+    ], 201);
+}
+
+// PUT /api/ministry/accounts/{id}
+public function updateAccount(Request $request, $id)
+{
+    $account = Ministry::find($id);
+
+    if (!$account) {
+        return response()->json([
+            'message' => 'Ministry account not found'
+        ], 404);
+    }
+
+    $validated = $request->validate([
+        'name' => ['required', 'string', 'max:255'],
+        'email' => [
+            'required',
+            'email',
+            'max:255',
+            Rule::unique('ministries', 'email')->ignore($account->id),
+        ],
+        'password' => ['nullable', 'string', 'min:6'],
+        'is_active' => ['nullable', 'boolean'],
+    ]);
+
+    $account->name = $validated['name'];
+    $account->email = $validated['email'];
+
+    if ($request->filled('password')) {
+        $account->password = Hash::make($validated['password']);
+    }
+
+    if ($request->has('is_active')) {
+        $account->is_active = $validated['is_active'];
+    }
+
+    $account->save();
+
+    return response()->json([
+        'message' => 'Ministry account updated successfully',
+        'account' => [
+            'id' => $account->id,
+            'name' => $account->name,
+            'email' => $account->email,
+            'is_active' => (int) $account->is_active,
+            'updated_at' => $account->updated_at,
+        ]
+    ]);
+}
+
+// PATCH /api/ministry/accounts/{id}/toggle
+public function toggleAccount($id)
+{
+    $account = Ministry::find($id);
+
+    if (!$account) {
+        return response()->json([
+            'message' => 'Ministry account not found'
+        ], 404);
+    }
+
+    $account->is_active = !$account->is_active;
+    $account->save();
+
+    return response()->json([
+        'message' => 'Account status updated successfully',
+        'account' => [
+            'id' => $account->id,
+            'name' => $account->name,
+            'email' => $account->email,
+            'is_active' => (int) $account->is_active,
+        ]
+    ]);
+}
+
+    
 }

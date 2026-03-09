@@ -2,6 +2,9 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import heroImage from "../uploads/images/school-children-dressed-uniform-have-fun-play-schoolyard.jpg";
+import axios from "axios";
+
+
 
 const Home: React.FC = () => {
 const howItWorks = [
@@ -24,7 +27,54 @@ const howItWorks = [
     img: "/images/how/impact.jpg",
   },
 ];
+const API_BASE = "http://localhost:8000/api";
 
+const [form, setForm] = React.useState({
+  name: "",
+  email: "",
+  message: "",
+});
+
+const [sending, setSending] = React.useState(false);
+const [successMsg, setSuccessMsg] = React.useState("");
+const [errorMsg, setErrorMsg] = React.useState("");
+React.useEffect(() => {
+  if (!successMsg) return;
+
+  const timer = setTimeout(() => {
+    setSuccessMsg("");
+  }, 3000);
+
+  return () => clearTimeout(timer);
+}, [successMsg]);
+
+const handleContactSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setSending(true);
+  setSuccessMsg("");
+  setErrorMsg("");
+  
+
+  try {
+    const res = await axios.post(`${API_BASE}/contact-messages`, form);
+
+    if (res.data?.success) {
+      setSuccessMsg("Your message has been sent successfully.");
+      setForm({ name: "", email: "", message: "" });
+    }
+  } catch (error: any) {
+    if (error.response?.data?.message) {
+      setErrorMsg(error.response.data.message);
+    } else if (error.response?.data?.errors) {
+      const firstError = Object.values(error.response.data.errors)[0];
+      setErrorMsg(Array.isArray(firstError) ? firstError[0] : "Validation error.");
+    } else {
+      setErrorMsg("Failed to send message. Please try again.");
+    }
+  } finally {
+    setSending(false);
+  }
+};
 const impact = [
   {
     icon: "bx bx-award",
@@ -375,7 +425,10 @@ const impact = [
 
       {/* RIGHT: Form (unchanged) */}
       <div className="lg:col-span-7">
-        <form className="rounded-3xl border border-slate-200 bg-white p-7 sm:p-8 shadow-sm">
+     <form
+  onSubmit={handleContactSubmit}
+  className="rounded-3xl border border-slate-200 bg-white p-7 sm:p-8 shadow-sm"
+>
 
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -397,48 +450,66 @@ const impact = [
             <div>
               <label className="text-xs font-extrabold text-slate-700">Name</label>
               <input
-                type="text"
-                required
-                placeholder="Your Name"
-                className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none
-                           focus:ring-2 focus:ring-slate-300 focus:border-slate-400 transition"
-              />
+  type="text"
+  required
+  placeholder="Your Name"
+  value={form.name}
+  onChange={(e) => setForm({ ...form, name: e.target.value })}
+  className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none
+             focus:ring-2 focus:ring-slate-300 focus:border-slate-400 transition"
+/>
             </div>
 
             <div>
               <label className="text-xs font-extrabold text-slate-700">Email</label>
-              <input
-                type="email"
-                required
-                placeholder="Your Email"
-                className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none
-                           focus:ring-2 focus:ring-slate-300 focus:border-slate-400 transition"
-              />
+            <input
+  type="email"
+  required
+  placeholder="Your Email"
+  value={form.email}
+  onChange={(e) => setForm({ ...form, email: e.target.value })}
+  className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none
+             focus:ring-2 focus:ring-slate-300 focus:border-slate-400 transition"
+/>
             </div>
           </div>
 
           <div className="mt-4">
             <label className="text-xs font-extrabold text-slate-700">Message</label>
-            <textarea
-              rows={6}
-              required
-              placeholder="Your Message"
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none
-                         focus:ring-2 focus:ring-slate-300 focus:border-slate-400 transition"
-            />
+            {successMsg && (
+  <div className="mt-4 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">
+    {successMsg}
+  </div>
+)}
+
+{errorMsg && (
+  <div className="mt-4 rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-700">
+    {errorMsg}
+  </div>
+)}
+           <textarea
+  rows={6}
+  required
+  placeholder="Your Message"
+  value={form.message}
+  onChange={(e) => setForm({ ...form, message: e.target.value })}
+  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none
+             focus:ring-2 focus:ring-slate-300 focus:border-slate-400 transition"
+/>
             <div className="mt-2 text-xs text-slate-500">
               Don’t include passwords or sensitive info.
             </div>
           </div>
 
           <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center h-11 px-6 rounded-xl font-extrabold text-sm text-white
-                         bg-rose-500 hover:bg-rose-600 transition shadow-sm"
-            >
-              Send Message
-            </button>
+           <button
+  type="submit"
+  disabled={sending}
+  className="inline-flex items-center justify-center h-11 px-6 rounded-xl font-extrabold text-sm text-white
+             bg-rose-500 hover:bg-rose-600 transition shadow-sm disabled:opacity-60"
+>
+  {sending ? "Sending..." : "Send Message"}
+</button>
 
             <div className="text-xs text-slate-500">
               By sending, you agree to be contacted back.

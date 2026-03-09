@@ -194,10 +194,7 @@ public function donationAllocations($donationId)
                     ], 500);
                 }
 
-                // ✅ ALWAYS credit school fund_balance (campaign + school_fund)
-                DB::table('schools')
-                    ->where('school_id', $schoolId)
-                    ->increment('fund_balance', (float) $donation->amount);
+             
 
                 // ======================================================
                 // ✅ FUND ALLOCATION MODULE (Donation → Request / School Fund)
@@ -800,7 +797,6 @@ public function schoolDonations(Request $request)
     $from = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : null;
     $to   = $dateTo   ? Carbon::parse($dateTo)->endOfDay()     : null;
 
-    // sorting (based on donation created_at or allocation amount/status)
     $sortBy  = $request->query('sortBy', 'created_at'); // created_at | amount | status
     $sortDir = strtolower($request->query('sortDir', 'desc')) === 'asc' ? 'asc' : 'desc';
     $allowedSort = ['created_at', 'amount', 'status'];
@@ -813,48 +809,55 @@ public function schoolDonations(Request $request)
         ->where('fa.status', 'active')
         ->where('fa.school_id', (int)$schoolId)
         ->select(
-            // donation info
             'd.donation_id',
             DB::raw('fa.request_id as request_id'),
             DB::raw('fa.school_id as school_id'),
             'd.donor_id',
-            'd.donor_name',
-            'd.donor_email',
-            DB::raw('fa.allocated_amount as amount'),   // ✅ KEY: allocation amount as amount
+
+            DB::raw("CASE
+                WHEN COALESCE(d.anonymous, 0) = 1 THEN 'Anonymous'
+                ELSE COALESCE(NULLIF(TRIM(d.donor_name), ''), 'Anonymous')
+            END as donor_name"),
+
+            DB::raw("CASE
+                WHEN COALESCE(d.anonymous, 0) = 1 THEN NULL
+                ELSE d.donor_email
+            END as donor_email"),
+
+            DB::raw('fa.allocated_amount as amount'),
             'd.status',
-            'd.created_at',
-
-            // request title (fallback for school fund)
+            DB::raw("COALESCE(d.paid_at, d.created_at) as created_at"),
             DB::raw("COALESCE(dr.request_title, 'School Fund') as request_title"),
-
-            // school info
             's.school_name',
             's.district',
             's.province',
-
-            // optional (if you ever want to show it)
             DB::raw("fa.allocation_type as allocation_type")
         );
 
-    // status filter (donation status)
     if ($status !== 'all') {
         $q->whereRaw('LOWER(d.status) = ?', [$status]);
     }
 
-    // date filter (donation created_at)
     if ($from && $to) {
-        $q->whereBetween('d.created_at', [$from, $to]);
+        $q->whereBetween(DB::raw("COALESCE(d.paid_at, d.created_at)"), [$from, $to]);
     } elseif ($from) {
-        $q->where('d.created_at', '>=', $from);
+        $q->where(DB::raw("COALESCE(d.paid_at, d.created_at)"), '>=', $from);
     } elseif ($to) {
-        $q->where('d.created_at', '<=', $to);
+        $q->where(DB::raw("COALESCE(d.paid_at, d.created_at)"), '<=', $to);
     }
 
-    // search
     if ($search !== '') {
         $q->where(function ($qq) use ($search) {
-            $qq->where('d.donor_name', 'like', "%{$search}%")
-               ->orWhere('d.donor_email', 'like', "%{$search}%")
+            $qq->whereRaw("
+                    CASE
+                        WHEN COALESCE(d.anonymous, 0) = 1 THEN 'Anonymous'
+                        ELSE COALESCE(NULLIF(TRIM(d.donor_name), ''), 'Anonymous')
+                    END like ?
+                ", ["%{$search}%"])
+               ->orWhere(function ($q2) use ($search) {
+                    $q2->whereRaw("COALESCE(d.anonymous, 0) = 0")
+                       ->where('d.donor_email', 'like', "%{$search}%");
+               })
                ->orWhere('dr.request_title', 'like', "%{$search}%")
                ->orWhere('s.school_name', 'like', "%{$search}%");
         });
@@ -862,27 +865,25 @@ public function schoolDonations(Request $request)
 
     $total = (clone $q)->count();
 
-    // sorting
     if ($sortBy === 'amount') {
         $q->orderBy(DB::raw('fa.allocated_amount'), $sortDir);
     } elseif ($sortBy === 'status') {
         $q->orderBy(DB::raw('LOWER(d.status)'), $sortDir);
     } else {
-        $q->orderBy('d.created_at', $sortDir);
+        $q->orderBy(DB::raw("COALESCE(d.paid_at, d.created_at)"), $sortDir);
     }
 
     $rows = $q->skip(($page - 1) * $limit)->take($limit)->get();
 
     $rows->transform(function ($r) {
-        $name = $r->donor_name ?: 'Anonymous';
-        $parts = preg_split('/\s+/', trim($name));
+        $name = trim((string) ($r->donor_name ?? '')) ?: 'Anonymous';
+        $parts = preg_split('/\s+/', $name);
 
         $r->initials = strtoupper(substr($parts[0] ?? 'A', 0, 1) . substr($parts[1] ?? '', 0, 1));
         $r->time = $r->created_at ? Carbon::parse($r->created_at)->diffForHumans() : null;
         $r->status = strtolower($r->status ?? 'pending');
         $r->amount = (float) ($r->amount ?? 0);
-
-        // optional label
+        $r->request_id = $r->request_id ? (int) $r->request_id : null;
         $r->donation_type = !empty($r->request_id) ? 'campaign' : 'school_fund';
 
         return $r;
@@ -896,7 +897,6 @@ public function schoolDonations(Request $request)
     ]);
 }
 
-
 // ✅ Top Donors (ALL donations of that school - NOT paginated)
 // ✅ Top Donors (PAID ONLY) - NOW uses fund_allocations
 public function schoolTopDonors(Request $request)
@@ -908,53 +908,56 @@ public function schoolTopDonors(Request $request)
         return response()->json(['message' => 'School not authenticated'], 401);
     }
 
-    $limit = max(1, min(20, (int) $request->query('limit', 8)));
+    $limit = max(1, min(20, (int)$request->query('limit', 8)));
 
-    $dateFrom = $request->query('dateFrom');
-    $dateTo   = $request->query('dateTo');
-
-    $from = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : null;
-    $to   = $dateTo   ? Carbon::parse($dateTo)->endOfDay()     : null;
-
-    $q = DB::table('fund_allocations as fa')
+    $rows = DB::table('fund_allocations as fa')
         ->join('donations as d', 'fa.donation_id', '=', 'd.donation_id')
+        ->where('fa.school_id', $schoolId)
         ->where('fa.status', 'active')
-        ->where('fa.school_id', (int)$schoolId)
-        ->whereRaw("LOWER(d.status)='paid'");
-
-    if ($from && $to) {
-        $q->whereBetween('d.created_at', [$from, $to]);
-    } elseif ($from) {
-        $q->where('d.created_at', '>=', $from);
-    } elseif ($to) {
-        $q->where('d.created_at', '<=', $to);
-    }
-
-    $rows = $q->selectRaw("
-            COALESCE(NULLIF(TRIM(d.donor_name),''), 'Anonymous') as donor_name,
-            d.donor_email as donor_email,
-            COUNT(DISTINCT d.donation_id) as donations_count,
-            COALESCE(SUM(fa.allocated_amount), 0) as total_donated,
-            MAX(d.created_at) as last_donated_at
-        ")
-        ->groupBy('donor_email', 'donor_name')
+        ->whereRaw("LOWER(d.status)='paid'")
+        ->select(
+            'd.donor_name',
+            'd.donor_email',
+            'd.anonymous',
+            DB::raw('COUNT(DISTINCT d.donation_id) as donations_count'),
+            DB::raw('SUM(fa.allocated_amount) as total_donated'),
+            DB::raw('MAX(COALESCE(d.paid_at,d.created_at)) as last_donated_at')
+        )
+        ->groupBy('d.donor_name','d.donor_email','d.anonymous')
         ->orderByDesc('total_donated')
         ->limit($limit)
         ->get();
 
     $rows->transform(function ($r) {
-        $name = $r->donor_name ?: 'Anonymous';
-        $parts = preg_split('/\s+/', trim($name));
-        $r->initials = strtoupper(substr($parts[0] ?? 'A', 0, 1) . substr($parts[1] ?? '', 0, 1));
-        $r->last_time = $r->last_donated_at ? Carbon::parse($r->last_donated_at)->diffForHumans() : null;
-        $r->total_donated = (float) $r->total_donated;
-        $r->donations_count = (int) $r->donations_count;
+
+        if ($r->anonymous) {
+            $r->donor_name = 'Anonymous';
+            $r->donor_email = null;
+            $r->initials = 'AN';
+        } else {
+            $name = trim($r->donor_name ?: 'Anonymous');
+            $parts = preg_split('/\s+/', $name);
+
+            $r->initials = strtoupper(
+                substr($parts[0] ?? 'A',0,1) .
+                substr($parts[1] ?? '',0,1)
+            );
+        }
+
+        $r->last_time = $r->last_donated_at
+            ? Carbon::parse($r->last_donated_at)->diffForHumans()
+            : null;
+
+        $r->total_donated = (float)$r->total_donated;
+        $r->donations_count = (int)$r->donations_count;
+
         return $r;
     });
 
-    return response()->json(['top_donors' => $rows]);
+    return response()->json([
+        'top_donors' => $rows
+    ]);
 }
-
 
 public function donorOverview(Request $request)
 {
@@ -1197,8 +1200,7 @@ public function receipt($id)
 }
 
 
-
-   public function createSchoolDonation(Request $request, $schoolId)
+public function createSchoolDonation(Request $request, $schoolId)
 {
     $request->validate([
         'amount' => 'required|numeric|min:1',
@@ -1213,37 +1215,24 @@ public function receipt($id)
     $school = DB::table('schools')->where('school_id', (int)$schoolId)->first();
     if (!$school) return response()->json(['message' => 'School not found'], 404);
 
-    // ✅ pick best existing request ONLY (do not create)
-    $best = DB::table('donation_requests')
-        ->where('school_id', (int)$schoolId)
-        ->where('status', 'Approved')
-        ->whereColumn('amount_raised', '<', 'estimated_price')
-        ->orderByRaw('(estimated_price - amount_raised) DESC')
-        ->orderByDesc('created_at')
-        ->first();
-
     $donorId = $user->donor_id ?? $user->id ?? null;
     $donorName = $user->full_name ?? $user->name ?? 'Anonymous';
 
-   $donation = Donation::create([
-    'request_id' => $best ? (int)$best->request_id : null,
-    'school_id'  => (int)$schoolId,
-    'donation_type' => $best ? 'campaign' : 'school_fund', // ✅ FIX
-    'donor_id' => $donorId,
-    'amount' => (float)$request->amount,
-    'message' => $request->message ?? null,
-    'recurring' => $request->recurring ?? 'none',
-    'anonymous' => $request->anonymous ?? 0,
-    'donor_name' => $donorName,
-    'donor_email' => $user->email,
-    'status' => 'pending',
-]);
+    $donation = Donation::create([
+        'request_id' => null, // direct school donation = no request
+        'school_id'  => (int)$schoolId,
+        'donation_type' => 'school_fund',
+        'donor_id' => $donorId,
+        'amount' => (float)$request->amount,
+        'message' => $request->message ?? null,
+        'recurring' => $request->recurring ?? 'none',
+        'anonymous' => $request->anonymous ?? 0,
+        'donor_name' => $donorName,
+        'donor_email' => $user->email,
+        'status' => 'pending',
+    ]);
 
     Stripe::setApiKey(env('STRIPE_SECRET'));
-
-    $desc = $best
-        ? "Supports request: {$best->request_title}"
-        : "Supports school fund (no active requests)";
 
     $session = StripeSession::create([
         'payment_method_types' => ['card'],
@@ -1253,7 +1242,7 @@ public function receipt($id)
                 'currency' => 'lkr',
                 'product_data' => [
                     'name' => "Donation to {$school->school_name}",
-                    'description' => $desc,
+                    'description' => "Supports school fund",
                 ],
                 'unit_amount' => (int) round(((float)$donation->amount) * 100),
             ],
@@ -1271,8 +1260,8 @@ public function receipt($id)
 
     return response()->json([
         'checkout_url' => $session->url,
-        'request_id_used' => $best ? (int)$best->request_id : null,
-        'mode' => $best ? 'request' : 'school_fund',
+        'request_id_used' => null,
+        'mode' => 'school_fund',
     ]);
 }
 

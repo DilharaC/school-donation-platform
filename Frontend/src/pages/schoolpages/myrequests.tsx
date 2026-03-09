@@ -7,12 +7,7 @@ const REQUESTS_LIST_ENDPOINT = `${API_BASE}/my-requests`;
 const REQUEST_CREATE_ENDPOINT = `${API_BASE}/request/create`;
 const SCHOOL_ME_ENDPOINT = `${API_BASE}/school/me`;
 const REQUEST_SHOW_ENDPOINT = (id: number) => `${API_BASE}/donation_requests/${id}`;
-
-
 const REQUEST_UPDATE_ENDPOINT = (id: number) => `${API_BASE}/donation_requests/${id}/update`;
-
-
-
 
 const EVIDENCE_LIST_ENDPOINT = (id: number) => `${API_BASE}/donation_requests/${id}/evidences`;
 const EVIDENCE_UPLOAD_ENDPOINT = (id: number) => `${API_BASE}/donation_requests/${id}/evidences`;
@@ -43,7 +38,7 @@ type EvidenceRow = {
   id: number;
   request_id: number;
   file_url: string;
-  file_type?: string | null; // image | pdf
+  file_type?: string | null;
   note?: string | null;
   created_at?: string;
 };
@@ -77,6 +72,7 @@ const Card: React.FC<{ children: any; className?: string }> = ({ children, class
     {children}
   </div>
 );
+
 const Pill: React.FC<{ children: any; className?: string }> = ({ children, className }) => (
   <span
     className={cx(
@@ -88,6 +84,7 @@ const Pill: React.FC<{ children: any; className?: string }> = ({ children, class
     {children}
   </span>
 );
+
 const progressBarClass = (pct: number) => {
   if (pct >= 100) return "bg-emerald-500";
   if (pct >= 60) return "bg-sky-500";
@@ -111,6 +108,7 @@ const Button: React.FC<{
       : kind === "danger"
       ? "bg-rose-600 text-white hover:bg-rose-700"
       : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50";
+
   return (
     <button type={type} onClick={onClick} disabled={disabled} className={cx(base, styles, className)}>
       {children}
@@ -284,7 +282,6 @@ const timeAgo = (iso?: string) => {
   return `${days}d ago`;
 };
 
-// ✅ make relative storage paths work
 const resolveImageUrl = (url?: string | null) => {
   if (!url) return null;
   const u = String(url).trim();
@@ -300,6 +297,8 @@ const MyRequests: React.FC = () => {
 
   const [schoolId, setSchoolId] = useState<number | null>(null);
   const [schoolName, setSchoolName] = useState<string>("");
+  const [schoolVerified, setSchoolVerified] = useState<number>(0);
+  const [schoolStatus, setSchoolStatus] = useState<string>("");
 
   const [rows, setRows] = useState<RequestRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -328,16 +327,13 @@ const MyRequests: React.FC = () => {
     setMsgKind(kind);
   };
 
-  // Create
   const [creating, setCreating] = useState(false);
   const [savingCreate, setSavingCreate] = useState(false);
 
-  // View
   const [viewOpen, setViewOpen] = useState(false);
   const [viewLoading, setViewLoading] = useState(false);
   const [selected, setSelected] = useState<RequestRow | null>(null);
 
-  // Evidence (✅ MULTIPLE + INPUT RESET + SCROLL LIST)
   const [evidences, setEvidences] = useState<EvidenceRow[]>([]);
   const [evidenceLoading, setEvidenceLoading] = useState(false);
   const [evidenceUploading, setEvidenceUploading] = useState(false);
@@ -345,17 +341,14 @@ const MyRequests: React.FC = () => {
   const [evidenceNote, setEvidenceNote] = useState("");
   const evidenceInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Edit
   const [editing, setEditing] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
 
-  // Delete
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
-  // ✅ create form includes imageFile
   const [form, setForm] = useState({
     request_title: "",
     category: "Books",
@@ -366,7 +359,6 @@ const MyRequests: React.FC = () => {
     imageFile: null as File | null,
   });
 
-  // ✅ edit form
   const [editForm, setEditForm] = useState({
     request_title: "",
     category: "Books",
@@ -377,7 +369,6 @@ const MyRequests: React.FC = () => {
     imageFile: null as File | null,
   });
 
-  // Preview create
   const previewUrl = useMemo(() => {
     if (!form.imageFile) return "";
     return URL.createObjectURL(form.imageFile);
@@ -389,7 +380,6 @@ const MyRequests: React.FC = () => {
     };
   }, [previewUrl]);
 
-  // Preview edit
   const editPreviewUrl = useMemo(() => {
     if (!editForm.imageFile) return "";
     return URL.createObjectURL(editForm.imageFile);
@@ -410,7 +400,8 @@ const MyRequests: React.FC = () => {
     return Math.round((r / t) * 100);
   }, [summary.total_target, summary.total_raised]);
 
-  // auto hide toast
+  const canCreateRequest = schoolVerified === 1 && schoolStatus.toLowerCase() === "active";
+
   useEffect(() => {
     if (!msg) return;
     const t = setTimeout(() => setMsg(null), 2800);
@@ -422,6 +413,8 @@ const MyRequests: React.FC = () => {
     const s = (res.data as SchoolMeRes).school;
     setSchoolId(s.school_id);
     setSchoolName(s.school_name || "My School");
+    setSchoolVerified(Number(s.verified || 0));
+    setSchoolStatus(String(s.status || ""));
   };
 
   const fetchList = async (p = page) => {
@@ -467,7 +460,6 @@ const MyRequests: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // refetch on filters
   useEffect(() => {
     const t = setTimeout(() => {
       setPage(1);
@@ -490,7 +482,6 @@ const MyRequests: React.FC = () => {
     }
   };
 
-  // ✅ Upload multiple files (backend expects "files")
   const uploadEvidence = async () => {
     if (!selected?.request_id) return;
 
@@ -502,7 +493,7 @@ const MyRequests: React.FC = () => {
     setEvidenceUploading(true);
     try {
       const fd = new FormData();
-      evidenceFiles.forEach((f) => fd.append("files[]", f)); // ✅ Laravel multiple
+      evidenceFiles.forEach((f) => fd.append("files[]", f));
 
       if (evidenceNote.trim()) fd.append("note", evidenceNote.trim());
 
@@ -513,7 +504,6 @@ const MyRequests: React.FC = () => {
 
       toast("✅ Evidence uploaded!", "success");
 
-      // ✅ reset UI
       setEvidenceFiles([]);
       setEvidenceNote("");
       if (evidenceInputRef.current) evidenceInputRef.current.value = "";
@@ -547,32 +537,30 @@ const MyRequests: React.FC = () => {
     }
   };
 
-const openView = async (id: number) => {
-  setViewOpen(true);
-  setViewLoading(true);
-  setSelected(null);
-  setEvidences([]);
-  setEvidenceFiles([]);
-  setEvidenceNote("");
-  if (evidenceInputRef.current) evidenceInputRef.current.value = "";
+  const openView = async (id: number) => {
+    setViewOpen(true);
+    setViewLoading(true);
+    setSelected(null);
+    setEvidences([]);
+    setEvidenceFiles([]);
+    setEvidenceNote("");
+    if (evidenceInputRef.current) evidenceInputRef.current.value = "";
 
-  try {
-    const res = await axios.get(REQUEST_SHOW_ENDPOINT(id), { withCredentials: true });
-    const project = res.data?.project || res.data?.data || res.data?.request;
-    if (!project) throw new Error("No project key in response");
+    try {
+      const res = await axios.get(REQUEST_SHOW_ENDPOINT(id), { withCredentials: true });
+      const project = res.data?.project || res.data?.data || res.data?.request;
+      if (!project) throw new Error("No project key in response");
 
-    setSelected(project as RequestRow);
-
-    // If your backend already returns evidences inside project, this still works
-    await fetchEvidences(id);
-  } catch (e: any) {
-    console.error("VIEW ERROR:", e);
-    toast(e?.response?.data?.message || e?.message || "Failed to load request details", "error");
-    setViewOpen(false);
-  } finally {
-    setViewLoading(false);
-  }
-};
+      setSelected(project as RequestRow);
+      await fetchEvidences(id);
+    } catch (e: any) {
+      console.error("VIEW ERROR:", e);
+      toast(e?.response?.data?.message || e?.message || "Failed to load request details", "error");
+      setViewOpen(false);
+    } finally {
+      setViewLoading(false);
+    }
+  };
 
   const openEdit = (r: RequestRow) => {
     setEditId(r.request_id);
@@ -603,9 +591,14 @@ const openView = async (id: number) => {
   const canCreate = useMemo(() => Boolean(form.request_title.trim() && form.description.trim() && form.estimated_price), [form]);
   const canEdit = useMemo(() => Boolean(editForm.request_title.trim() && editForm.description.trim() && editForm.estimated_price), [editForm]);
 
-  // ✅ multipart create
   const createRequest = async () => {
     setSavingCreate(true);
+
+    if (!canCreateRequest) {
+      setSavingCreate(false);
+      toast("Only verified and active schools can create requests.", "error");
+      return;
+    }
 
     if (!schoolId) {
       setSavingCreate(false);
@@ -654,7 +647,6 @@ const openView = async (id: number) => {
     }
   };
 
-  // ✅ multipart update
   const updateRequest = async () => {
     if (!editId) return;
 
@@ -752,11 +744,9 @@ const openView = async (id: number) => {
 
   return (
     <div className="relative min-h-[calc(100vh-80px)] pb-12">
-      {/* Background */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-50 via-white to-slate-50" />
       <div className="absolute inset-x-0 top-0 -z-10 h-64 bg-gradient-to-r from-indigo-50 via-sky-50 to-emerald-50 opacity-80" />
 
-      {/* Toast */}
       {msg && (
         <div className="fixed top-4 right-4 z-[9999] max-w-sm">
           <div className={cx("rounded-2xl border px-4 py-3 shadow-lg text-sm", toastStyles)}>
@@ -771,7 +761,6 @@ const openView = async (id: number) => {
         </div>
       )}
 
-      {/* Header */}
       <div className="pt-6 space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
           <div>
@@ -794,13 +783,30 @@ const openView = async (id: number) => {
             <Button onClick={() => fetchList(page)} disabled={loading}>
               {loading ? "Refreshing..." : "Refresh"}
             </Button>
-            <Button kind="primary" onClick={() => setCreating(true)}>
+            <Button
+              kind="primary"
+              onClick={() => {
+                if (!canCreateRequest) {
+                  toast("Only verified and active schools can create requests.", "error");
+                  return;
+                }
+                setCreating(true);
+              }}
+              disabled={!canCreateRequest}
+            >
               + New Request
             </Button>
           </div>
         </div>
 
-        {/* Stats */}
+        {!canCreateRequest && (
+          <Card className="p-4 border-amber-200 bg-amber-50">
+            <div className="text-sm font-semibold text-amber-800">
+              Your school must be verified and active before creating donation requests.
+            </div>
+          </Card>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <Card className="p-5">
             <div className="text-xs text-slate-500">Total Raised</div>
@@ -819,10 +825,10 @@ const openView = async (id: number) => {
               <div className="text-xs text-slate-500 mb-1">overall</div>
             </div>
             <div className="mt-3 h-2 rounded-full bg-slate-100 overflow-hidden">
-             <div
-  className={cx("h-full transition-all", progressBarClass(overallPct))}
-  style={{ width: `${clamp(overallPct, 0, 100)}%` }}
-/>
+              <div
+                className={cx("h-full transition-all", progressBarClass(overallPct))}
+                style={{ width: `${clamp(overallPct, 0, 100)}%` }}
+              />
             </div>
           </Card>
 
@@ -833,7 +839,6 @@ const openView = async (id: number) => {
           </Card>
         </div>
 
-        {/* Filters */}
         <Card className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
             <Input label="Search" value={search} onChange={setSearch} placeholder="Title / Description..." />
@@ -901,7 +906,6 @@ const openView = async (id: number) => {
         </Card>
       </div>
 
-      {/* List */}
       <div className="mt-6">
         {loading ? (
           <div className="text-slate-500 text-center py-10">Loading…</div>
@@ -909,7 +913,18 @@ const openView = async (id: number) => {
           <Card className="p-10 text-center">
             <div className="text-4xl mb-3">📌</div>
             <div className="text-slate-900 font-extrabold text-xl">No requests found</div>
-            <Button kind="primary" className="mt-6" onClick={() => setCreating(true)}>
+            <Button
+              kind="primary"
+              className="mt-6"
+              onClick={() => {
+                if (!canCreateRequest) {
+                  toast("Only verified and active schools can create requests.", "error");
+                  return;
+                }
+                setCreating(true);
+              }}
+              disabled={!canCreateRequest}
+            >
               + New Request
             </Button>
           </Card>
@@ -976,11 +991,11 @@ const openView = async (id: number) => {
                       <span className="font-semibold text-slate-900">{money(Number(r.estimated_price || 0))}</span>
                     </div>
 
-                   <div className="mt-2 h-2.5 rounded-full bg-slate-200/70 overflow-hidden shadow-inner">
-                    <div
-  className={cx("h-full transition-all duration-500", progressBarClass(pct))}
-  style={{ width: `${pct}%` }}
-/>
+                    <div className="mt-2 h-2.5 rounded-full bg-slate-200/70 overflow-hidden shadow-inner">
+                      <div
+                        className={cx("h-full transition-all duration-500", progressBarClass(pct))}
+                        style={{ width: `${pct}%` }}
+                      />
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] text-slate-500">
@@ -1023,10 +1038,10 @@ const openView = async (id: number) => {
         )}
       </div>
 
-      {/* Create Modal */}
       <Modal open={creating} onClose={() => setCreating(false)} title="Create New Request">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input autoFocus label="Title *" value={form.request_title} onChange={(v) => setForm({ ...form, request_title: v })} />
+
           <label className="block">
             <div className="text-xs font-semibold text-slate-600 mb-1">Category *</div>
             <select
@@ -1066,13 +1081,12 @@ const openView = async (id: number) => {
 
         <div className="mt-5 flex items-center justify-end gap-2">
           <Button onClick={() => setCreating(false)}>Cancel</Button>
-          <Button kind="primary" onClick={createRequest} disabled={savingCreate || !canCreate}>
+          <Button kind="primary" onClick={createRequest} disabled={savingCreate || !canCreate || !canCreateRequest}>
             {savingCreate ? "Creating..." : "Create"}
           </Button>
         </div>
       </Modal>
 
-      {/* Edit Modal */}
       <Modal open={editing} onClose={() => setEditing(false)} title="Edit Request">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input autoFocus label="Title *" value={editForm.request_title} onChange={(v) => setEditForm({ ...editForm, request_title: v })} />
@@ -1116,7 +1130,12 @@ const openView = async (id: number) => {
             ) : null}
           </div>
 
-          <Input label="Document URL (optional)" value={editForm.document_url} onChange={(v) => setEditForm({ ...editForm, document_url: v })} placeholder="https://..." />
+          <Input
+            label="Document URL (optional)"
+            value={editForm.document_url}
+            onChange={(v) => setEditForm({ ...editForm, document_url: v })}
+            placeholder="https://..."
+          />
         </div>
 
         <div className="mt-5 flex items-center justify-end gap-2">
@@ -1127,7 +1146,6 @@ const openView = async (id: number) => {
         </div>
       </Modal>
 
-      {/* View Modal */}
       <Modal open={viewOpen} onClose={() => setViewOpen(false)} title="Request Details" wide>
         {viewLoading ? (
           <div className="text-slate-500 py-10 text-center">Loading…</div>
@@ -1182,7 +1200,6 @@ const openView = async (id: number) => {
                 </div>
               </Card>
 
-              {/* ✅ Evidence Upload + List (FIXED + SCROLL + RESET INPUT) */}
               <Card className="p-6">
                 <div className="text-sm font-extrabold text-slate-900">upload expenditures</div>
 
@@ -1225,6 +1242,7 @@ const openView = async (id: number) => {
                         {evidences.map((ev) => {
                           const url = resolveImageUrl(ev.file_url) || ev.file_url;
                           const isPdf = (ev.file_type || "").toLowerCase() === "pdf" || url.toLowerCase().endsWith(".pdf");
+
                           return (
                             <div key={ev.id} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 p-3">
                               <div className="min-w-0">
@@ -1268,7 +1286,6 @@ const openView = async (id: number) => {
         )}
       </Modal>
 
-      {/* Delete Confirm */}
       <Modal open={deleteOpen} onClose={() => (deleteBusy ? null : setDeleteOpen(false))} title="Confirm Delete">
         <div className="text-sm text-slate-700">Are you sure you want to delete this request? This action cannot be undone.</div>
         <div className="mt-5 flex items-center justify-end gap-2">

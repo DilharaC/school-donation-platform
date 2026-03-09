@@ -196,7 +196,7 @@ const SchoolDonations: React.FC = () => {
       const res = await axios.get(SCHOOL_TOP_DONORS_ENDPOINT, {
         withCredentials: true,
         params: {
-          limit: 8,
+          limit: 2,
           dateFrom: dateFrom || null,
           dateTo: dateTo || null,
         },
@@ -282,11 +282,14 @@ const SchoolDonations: React.FC = () => {
                         {d.initials || "A"}
                       </div>
 
-                      <div className="min-w-0">
-                        {/* ⬇️ CHANGED: name not bold */}
-                        <div className="font-semibold text-slate-900 truncate">{d.donor_name}</div>
-                        <div className="text-xs text-slate-500 truncate">{d.donor_email}</div>
-                      </div>
+                    <div className="min-w-0">
+  <div className="font-semibold text-slate-900 truncate">{d.donor_name || "Anonymous"}</div>
+  {d.donor_email ? (
+    <div className="text-xs text-slate-500 truncate">{d.donor_email}</div>
+  ) : (
+    <div className="text-xs text-slate-400 truncate">Anonymous donation</div>
+  )}
+</div>
                     </div>
 
                     <div className="text-right">

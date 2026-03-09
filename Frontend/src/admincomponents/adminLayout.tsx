@@ -1,28 +1,58 @@
-// src/components/Layout.tsx
-import React, { useMemo, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import "../css/index.css";
 
+// =======================
+// SVG Icons
+// =======================
 
-// =======================
-// SVG Icons (from your AdminDashboard)
-// =======================
-const Search = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="11" cy="11" r="8" />
-    <path d="m21 21-4.3-4.3" />
+const ShieldUser = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7l7-4z" />
+    <circle cx="12" cy="10" r="2.5" />
+    <path d="M8.5 16a4.5 4.5 0 0 1 7 0" />
   </svg>
 );
 
 const Bell = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
     <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
   </svg>
 );
 
 const LayoutDashboard = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <rect width="7" height="9" x="3" y="3" rx="1" />
     <rect width="7" height="5" x="14" y="3" rx="1" />
     <rect width="7" height="9" x="14" y="12" rx="1" />
@@ -31,7 +61,17 @@ const LayoutDashboard = () => (
 );
 
 const Users = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
     <circle cx="9" cy="7" r="4" />
     <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
@@ -40,27 +80,67 @@ const Users = () => (
 );
 
 const Heart = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
   </svg>
 );
 
 const TrendingUp = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
     <polyline points="16 7 22 7 22 13" />
   </svg>
 );
 
 const Settings = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
     <circle cx="12" cy="12" r="3" />
   </svg>
 );
 
 const FileText = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
     <path d="M14 2v4a2 2 0 0 0 2 2h4" />
     <path d="M10 9H8" />
@@ -68,13 +148,38 @@ const FileText = () => (
     <path d="M16 17H8" />
   </svg>
 );
-
+const MessageSquare = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/>
+  </svg>
+);
 const DollarSign = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <line x1="12" x2="12" y1="2" y2="22" />
     <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
   </svg>
 );
+
 const AuditTrail = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -93,6 +198,7 @@ const AuditTrail = () => (
     <line x1="8" y1="13" x2="14" y2="13" />
   </svg>
 );
+
 const School = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -114,7 +220,7 @@ const School = () => (
 );
 
 // =======================
-// Sidebar items (edit `to` paths to match your router)
+// Sidebar items
 // =======================
 type NavItem = { icon: React.FC; label: string; to: string };
 
@@ -122,24 +228,52 @@ const navItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Overview", to: "/overview" },
   { icon: Users, label: "Donors", to: "/Donors" },
   { icon: DollarSign, label: "Donations", to: "/donations" },
-   { icon: School, label: "Schools", to: "/schools" },
+  { icon: School, label: "Schools", to: "/schools" },
+  { icon: ShieldUser, label: "Ministry Accounts", to: "/ministry-accounts" },
   { icon: Heart, label: "Campaigns", to: "/Campaign" },
   { icon: TrendingUp, label: "Analytics", to: "/analytics" },
+   { icon: MessageSquare, label: "Messages", to: "/messages" },
+
   { icon: FileText, label: "Reports", to: "/reports" },
   { icon: AuditTrail, label: "Audit Trail", to: "/audit" },
-  { icon: Bell, label: "Notifications", to: "/notifications" },
+
   { icon: Settings, label: "Settings", to: "/settings" },
 ];
 
 const Layout: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const profileRef = useRef<HTMLDivElement | null>(null);
 
-  // Optional: derive a page title from current path label (simple)
   const title = useMemo(() => "Hello Admin!", []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        profileRef.current &&
+        !profileRef.current.contains(event.target as Node)
+      ) {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    setMenuOpen(false);
+    navigate("/");
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
-      {/* ================= Sidebar (from your AdminDashboard) ================= */}
+      {/* Sidebar */}
       <aside className="w-64 bg-slate-900 text-slate-100 flex flex-col fixed inset-y-0 left-0">
         {/* Brand */}
         <div className="px-6 py-5 border-b border-slate-800">
@@ -165,13 +299,16 @@ const Layout: React.FC = () => {
                 to={item.to}
                 end={item.to === "/admin"}
                 className={({ isActive }) =>
-                  `w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition
-                  ${isActive ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800/60 hover:text-white"}`
+                  `w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition ${
+                    isActive
+                      ? "bg-slate-800 text-white"
+                      : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
+                  }`
                 }
               >
                 {({ isActive }) => (
                   <>
-                    <span className={`${isActive ? "text-blue-400" : "text-slate-400"}`}>
+                    <span className={isActive ? "text-blue-400" : "text-slate-400"}>
                       <Icon />
                     </span>
                     {item.label}
@@ -186,20 +323,31 @@ const Layout: React.FC = () => {
         <div className="p-4 border-t border-slate-800">
           <p className="text-xs text-slate-400 mb-3">Quick Actions</p>
           <div className="space-y-2">
-            <button className="w-full bg-slate-800 hover:bg-slate-700 text-white rounded-xl py-2 text-sm">
-              + Add Donor
+            <button
+              onClick={() => navigate("/ministry-accounts")}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-white rounded-xl py-2 text-sm"
+            >
+              + Add Ministry Account
             </button>
-            <button className="w-full bg-slate-800 hover:bg-slate-700 text-white rounded-xl py-2 text-sm">
-              + Create Campaign
+
+            <button
+              onClick={() => navigate("/Campaign")}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-white rounded-xl py-2 text-sm"
+            >
+              + Manage Campaign
             </button>
-            <button className="w-full bg-slate-800 hover:bg-slate-700 text-white rounded-xl py-2 text-sm">
+
+            <button
+              onClick={() => navigate("/reports")}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-white rounded-xl py-2 text-sm"
+            >
               Export Report
             </button>
           </div>
         </div>
       </aside>
 
-      {/* ================= Main ================= */}
+      {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden ml-64">
         {/* Topbar */}
         <header className="bg-white border-b border-slate-200">
@@ -209,28 +357,18 @@ const Layout: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              {/* Search */}
-              <div className="hidden md:flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 w-80">
-                <span className="text-slate-500">
-                  <Search />
-                </span>
-                <input
-                  className="bg-transparent outline-none text-sm w-full text-slate-700"
-                  placeholder="Search donors, campaigns..."
-                />
-              </div>
-
               {/* Notifications */}
-              <button
+              <Link
+                to="/notifications"
                 className="relative w-10 h-10 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-700"
                 aria-label="Notifications"
               >
                 <Bell />
                 <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
-              </button>
+              </Link>
 
               {/* Profile dropdown */}
-              <div className="relative">
+              <div className="relative" ref={profileRef}>
                 <button
                   onClick={() => setMenuOpen((v) => !v)}
                   className="flex items-center gap-3 pl-2"
@@ -251,12 +389,13 @@ const Layout: React.FC = () => {
                       <p className="text-sm font-semibold text-slate-900">Admin Account</p>
                       <p className="text-xs text-slate-500">Signed in</p>
                     </div>
-                    <button className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 text-slate-700">
-                      Profile
-                    </button>
-                 
+
                     <div className="border-t border-slate-100" />
-                    <button className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 text-rose-600">
+
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 text-rose-600"
+                    >
                       Log out
                     </button>
                   </div>

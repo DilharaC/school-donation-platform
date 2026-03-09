@@ -9,7 +9,6 @@ const UPDATE_ME = `${API_BASE}/donor/me`; // POST (or PUT)
 const CHANGE_PASSWORD = `${API_BASE}/donor/security/change-password`; // POST
 const EXPORT_DONATIONS = `${API_BASE}/donor/exports/donations`; // GET blob
 
-
 type Donor = {
   donor_id: number;
   full_name: string;
@@ -17,8 +16,7 @@ type Donor = {
   phone?: string | null;
   address?: string | null;
   created_at?: string | null;
-
-  status?: string | null; // optional if you have
+  status?: string | null;
 };
 
 type TabKey = "profile" | "security" | "exports" | "danger";
@@ -30,7 +28,12 @@ const Card = ({ children, className }: { children: React.ReactNode; className?: 
 );
 
 const Pill = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-  <span className={cx("inline-flex items-center rounded-full border px-3 py-1 text-xs font-extrabold", className)}>
+  <span
+    className={cx(
+      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold",
+      className
+    )}
+  >
     {children}
   </span>
 );
@@ -51,7 +54,7 @@ const Input = ({
   placeholder?: string;
 }) => (
   <label className="block">
-    <div className="text-xs font-extrabold text-slate-700 mb-1">{label}</div>
+    <div className="mb-1 text-xs font-semibold text-slate-600">{label}</div>
     <input
       type={type}
       value={value}
@@ -59,9 +62,9 @@ const Input = ({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       className={cx(
-        "w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-4",
-        "border-slate-200 focus:ring-slate-200/60",
-        disabled ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"
+        "w-full rounded-xl border px-3 py-2 text-sm text-slate-700 outline-none focus:ring-4",
+        "border-slate-200 focus:ring-blue-100",
+        disabled ? "cursor-not-allowed bg-slate-100 text-slate-500" : "bg-white"
       )}
     />
   </label>
@@ -81,7 +84,7 @@ const TextArea = ({
   disabled?: boolean;
 }) => (
   <label className="block">
-    <div className="text-xs font-extrabold text-slate-700 mb-1">{label}</div>
+    <div className="mb-1 text-xs font-semibold text-slate-600">{label}</div>
     <textarea
       value={value}
       disabled={disabled}
@@ -89,9 +92,9 @@ const TextArea = ({
       placeholder={placeholder}
       rows={4}
       className={cx(
-        "w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-4",
-        "border-slate-200 focus:ring-slate-200/60",
-        disabled ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"
+        "w-full rounded-xl border px-3 py-2 text-sm text-slate-700 outline-none focus:ring-4",
+        "border-slate-200 focus:ring-blue-100",
+        disabled ? "cursor-not-allowed bg-slate-100 text-slate-500" : "bg-white"
       )}
     />
   </label>
@@ -102,18 +105,18 @@ const Tabs = ({ active, onChange }: { active: TabKey; onChange: (k: TabKey) => v
     { k: "profile", t: "Profile" },
     { k: "security", t: "Security" },
     { k: "exports", t: "Exports" },
-    { k: "danger", t: "Danger Zone" },
+  
   ];
 
   return (
-    <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm flex-wrap gap-1">
+    <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
       {items.map((x) => (
         <button
           key={x.k}
           onClick={() => onChange(x.k)}
           className={cx(
-            "px-4 py-2 rounded-xl text-sm font-extrabold transition",
-            active === x.k ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-50"
+            "rounded-xl px-4 py-2 text-sm font-semibold transition",
+            active === x.k ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"
           )}
         >
           {x.t}
@@ -267,16 +270,18 @@ export default function DonorSettings() {
     }
   };
 
-
   if (loading) return <div className="p-6 text-slate-500">Loading…</div>;
 
   if (!donor) {
     return (
-      <div className="p-6 max-w-2xl mx-auto">
+      <div className="mx-auto max-w-2xl p-6">
         <Card className="p-6">
-          <div className="text-xl font-extrabold text-slate-900">Donor Settings</div>
-          <div className="mt-2 text-sm text-rose-700 font-semibold">{err || "Unauthenticated"}</div>
-          <button onClick={loadMe} className="mt-4 px-4 py-2 rounded-xl bg-slate-900 text-white font-extrabold hover:bg-black">
+          <div className="text-xl font-semibold text-slate-800">Donor Settings</div>
+          <div className="mt-2 text-sm font-medium text-rose-700">{err || "Unauthenticated"}</div>
+          <button
+            onClick={loadMe}
+            className="mt-4 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+          >
             Retry
           </button>
         </Card>
@@ -285,23 +290,31 @@ export default function DonorSettings() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="mx-auto max-w-6xl p-6 text-slate-700">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="text-2xl font-extrabold text-slate-900">Settings</div>
+          <div className="text-2xl font-semibold text-slate-800">Settings</div>
           <div className="text-sm text-slate-500">Profile, security, exports & account actions.</div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Pill className="bg-slate-50 text-slate-700 border-slate-200">DONOR</Pill>
-          <Pill className="bg-slate-50 text-slate-700 border-slate-200">{donor.email}</Pill>
+          <Pill className="border-blue-200 bg-blue-50 text-blue-700">DONOR</Pill>
+          <Pill className="border-slate-200 bg-slate-50 text-slate-600">{donor.email}</Pill>
         </div>
       </div>
 
       {/* Alerts */}
-      {msg ? <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800 font-semibold">{msg}</div> : null}
-      {err ? <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800 font-semibold">{err}</div> : null}
+      {msg ? (
+        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 font-medium text-emerald-800">
+          {msg}
+        </div>
+      ) : null}
+      {err ? (
+        <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 font-medium text-rose-800">
+          {err}
+        </div>
+      ) : null}
 
       <div className="mt-5">
         <Tabs active={tab} onChange={setTab} />
@@ -311,17 +324,35 @@ export default function DonorSettings() {
         {/* Profile */}
         {tab === "profile" && (
           <Card className="p-6">
-            <div className="text-lg font-extrabold text-slate-900">Profile</div>
-            <div className="text-sm text-slate-500 mt-1">Update your contact details.</div>
+            <div className="text-lg font-semibold text-slate-800">Profile</div>
+            <div className="mt-1 text-sm text-slate-500">Update your contact details.</div>
 
-            <div className="mt-5 grid md:grid-cols-2 gap-4">
-              <Input label="Full name" value={profile.full_name} onChange={(v) => setProfile({ ...profile, full_name: v })} />
-              <Input label="Email" value={profile.email} onChange={(v) => setProfile({ ...profile, email: v })} />
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <Input
+                label="Full name"
+                value={profile.full_name}
+                onChange={(v) => setProfile({ ...profile, full_name: v })}
+              />
+              <Input
+                label="Email"
+                value={profile.email}
+                onChange={(v) => setProfile({ ...profile, email: v })}
+              />
 
-              <Input label="Phone" value={profile.phone} onChange={(v) => setProfile({ ...profile, phone: v })} placeholder="07XXXXXXXX" />
+              <Input
+                label="Phone"
+                value={profile.phone}
+                onChange={(v) => setProfile({ ...profile, phone: v })}
+                placeholder="07XXXXXXXX"
+              />
               <div />
               <div className="md:col-span-2">
-                <TextArea label="Address" value={profile.address} onChange={(v) => setProfile({ ...profile, address: v })} placeholder="Your address..." />
+                <TextArea
+                  label="Address"
+                  value={profile.address}
+                  onChange={(v) => setProfile({ ...profile, address: v })}
+                  placeholder="Your address..."
+                />
               </div>
             </div>
 
@@ -329,7 +360,7 @@ export default function DonorSettings() {
               <button
                 disabled={saving}
                 onClick={saveProfile}
-                className="px-4 py-2 rounded-xl bg-slate-900 text-white font-extrabold hover:bg-black disabled:opacity-50"
+                className="rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {saving ? "Saving..." : "Save Profile"}
               </button>
@@ -340,21 +371,36 @@ export default function DonorSettings() {
         {/* Security */}
         {tab === "security" && (
           <Card className="p-6">
-            <div className="text-lg font-extrabold text-slate-900">Change Password</div>
-            <div className="text-sm text-slate-500 mt-1">Keep your account secure.</div>
+            <div className="text-lg font-semibold text-slate-800">Change Password</div>
+            <div className="mt-1 text-sm text-slate-500">Keep your account secure.</div>
 
-            <div className="mt-5 grid md:grid-cols-2 gap-4">
-              <Input label="Current Password" type="password" value={pw.current_password} onChange={(v) => setPw({ ...pw, current_password: v })} />
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <Input
+                label="Current Password"
+                type="password"
+                value={pw.current_password}
+                onChange={(v) => setPw({ ...pw, current_password: v })}
+              />
               <div />
-              <Input label="New Password" type="password" value={pw.new_password} onChange={(v) => setPw({ ...pw, new_password: v })} />
-              <Input label="Confirm New Password" type="password" value={pw.confirm_password} onChange={(v) => setPw({ ...pw, confirm_password: v })} />
+              <Input
+                label="New Password"
+                type="password"
+                value={pw.new_password}
+                onChange={(v) => setPw({ ...pw, new_password: v })}
+              />
+              <Input
+                label="Confirm New Password"
+                type="password"
+                value={pw.confirm_password}
+                onChange={(v) => setPw({ ...pw, confirm_password: v })}
+              />
             </div>
 
             <div className="mt-5 flex justify-end">
               <button
                 disabled={saving}
                 onClick={changePassword}
-                className="px-4 py-2 rounded-xl bg-slate-900 text-white font-extrabold hover:bg-black disabled:opacity-50"
+                className="rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {saving ? "Saving..." : "Update Password"}
               </button>
@@ -365,16 +411,16 @@ export default function DonorSettings() {
         {/* Exports */}
         {tab === "exports" && (
           <Card className="p-6">
-            <div className="text-lg font-extrabold text-slate-900">Exports</div>
-            <div className="text-sm text-slate-500 mt-1">Download your donations as CSV.</div>
+            <div className="text-lg font-semibold text-slate-800">Exports</div>
+            <div className="mt-1 text-sm text-slate-500">Download your donations as CSV.</div>
 
-            <div className="mt-5 grid md:grid-cols-2 gap-4">
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
               <Card className="p-5">
-                <div className="text-sm font-extrabold text-slate-900">My Donations CSV</div>
-                <div className="text-xs text-slate-500 mt-1">All your donations (paid + pending).</div>
+                <div className="text-sm font-semibold text-slate-800">My Donations CSV</div>
+                <div className="mt-1 text-xs text-slate-500">All your donations (paid + pending).</div>
                 <button
                   onClick={() => download(EXPORT_DONATIONS, "my_donations.csv")}
-                  className="mt-4 px-4 py-2 rounded-xl bg-slate-900 text-white font-extrabold hover:bg-black"
+                  className="mt-4 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
                 >
                   Download
                 </button>
@@ -383,7 +429,7 @@ export default function DonorSettings() {
           </Card>
         )}
 
-       
+        
       </div>
     </div>
   );

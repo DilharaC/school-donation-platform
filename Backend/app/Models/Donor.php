@@ -5,11 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User as Authenticatable; // ✅ important
 use Illuminate\Notifications\Notifiable;
-
+use Laravel\Sanctum\HasApiTokens;
 class Donor extends Authenticatable
 {
      use Notifiable;
-
+  use HasApiTokens;
    
     protected $table = 'donors';        // Table name
     protected $primaryKey = 'donor_id'; // Primary key

@@ -97,22 +97,21 @@ function LineChart({
     return { x, y };
   });
 
-  const d = points.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(" ");
-  const last = data[data.length - 1]?.y ?? 0;
+  const pathD = points.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(" ");
+  const total = data.reduce((sum, item) => sum + Number(item.y || 0), 0);
 
   return (
     <div className="w-full">
-      {/* ✅ AdminDashboard palette (blue) */}
       <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-[90px] text-blue-700">
         <line x1="0" y1={h - pad} x2={w} y2={h - pad} stroke="currentColor" strokeOpacity="0.12" />
-        <path d={d} fill="none" stroke="currentColor" strokeOpacity="0.95" strokeWidth="2" />
+        <path d={pathD} fill="none" stroke="currentColor" strokeOpacity="0.95" strokeWidth="2" />
         {points.length > 0 && (
           <circle cx={points[points.length - 1].x} cy={points[points.length - 1].y} r="3.5" fill="currentColor" />
         )}
       </svg>
 
       <div className="mt-1 text-xs text-slate-500">
-        Last 30 days total: <span className="font-semibold text-slate-800">{formatLKR(last)}</span>
+        Last 30 days total: <span className="font-semibold text-slate-700">{formatLKR(total)}</span>
       </div>
     </div>
   );
@@ -137,14 +136,12 @@ function KpiCard({
     <Card className="p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs text-slate-500 font-bold">{label}</div>
-          {/* keep KPI number strong like admin */}
-          <div className="mt-2 text-2xl font-extrabold text-slate-900">{value}</div>
+          <div className="text-xs font-semibold text-slate-500">{label}</div>
+          <div className="mt-2 text-2xl font-semibold text-slate-800">{value}</div>
           {hint ? <div className="mt-1 text-xs text-slate-500">{hint}</div> : null}
         </div>
 
-        {/* ✅ blue badge like AdminDashboard */}
-        <div className="h-10 w-10 rounded-2xl bg-blue-50 border border-blue-200 grid place-items-center text-blue-700">
+        <div className="grid h-10 w-10 place-items-center rounded-2xl border border-blue-200 bg-blue-50 text-blue-700">
           <div className="h-5 w-5">{icon}</div>
         </div>
       </div>
@@ -165,11 +162,11 @@ function EmptyBlock({
 }) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center">
-      <div className="mx-auto h-12 w-12 rounded-2xl bg-blue-50 border border-blue-200 grid place-items-center text-blue-700">
+      <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-blue-200 bg-blue-50 text-blue-700">
         <div className="h-6 w-6">{icon}</div>
       </div>
-      <div className="mt-4 text-slate-900 font-extrabold text-lg">{title}</div>
-      <div className="mt-1 text-slate-500 text-sm">{desc}</div>
+      <div className="mt-4 text-lg font-semibold text-slate-800">{title}</div>
+      <div className="mt-1 text-sm text-slate-500">{desc}</div>
       {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
     </div>
   );
@@ -212,22 +209,24 @@ const DonorOverview: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 text-slate-700">
         <Card className="p-6">
-          <div className="h-6 w-52 bg-slate-100 rounded-lg animate-pulse" />
-          <div className="mt-3 h-4 w-80 bg-slate-100 rounded-lg animate-pulse" />
+          <div className="h-6 w-52 animate-pulse rounded-lg bg-slate-100" />
+          <div className="mt-3 h-4 w-80 animate-pulse rounded-lg bg-slate-100" />
         </Card>
-        <div className="grid md:grid-cols-4 gap-4">
+
+        <div className="grid gap-4 md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i} className="p-5">
-              <div className="h-4 w-20 bg-slate-100 rounded animate-pulse" />
-              <div className="mt-3 h-7 w-32 bg-slate-100 rounded animate-pulse" />
+              <div className="h-4 w-20 animate-pulse rounded bg-slate-100" />
+              <div className="mt-3 h-7 w-32 animate-pulse rounded bg-slate-100" />
             </Card>
           ))}
         </div>
+
         <Card className="p-6">
-          <div className="h-5 w-44 bg-slate-100 rounded animate-pulse" />
-          <div className="mt-4 h-20 bg-slate-100 rounded-xl animate-pulse" />
+          <div className="h-5 w-44 animate-pulse rounded bg-slate-100" />
+          <div className="mt-4 h-20 animate-pulse rounded-xl bg-slate-100" />
         </Card>
       </div>
     );
@@ -237,20 +236,19 @@ const DonorOverview: React.FC = () => {
   const donor = ov?.donor;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-slate-700">
       {/* Header */}
       <Card className="p-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
-            {/* ✅ blue like AdminDashboard */}
-            <div className="w-12 h-12 rounded-2xl bg-blue-700 text-white flex items-center justify-center font-extrabold">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-700 font-bold text-white">
               {initials(donor?.name)}
             </div>
 
             <div>
-              <div className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+              <div className="flex items-center gap-2 text-xl font-semibold text-slate-800">
                 Welcome back{donor?.name ? `, ${donor.name}` : ""}
-                <span className="inline-flex items-center justify-center h-6 w-6 rounded-xl bg-blue-50 border border-blue-200 text-blue-700">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-700">
                   <HeartIcon className="h-4 w-4" />
                 </span>
               </div>
@@ -264,8 +262,7 @@ const DonorOverview: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => nav("/projects")}
-              className="px-4 py-2 rounded-2xl bg-blue-700 text-white text-sm font-extrabold hover:bg-blue-800 inline-flex items-center gap-2
-                         focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+              className="inline-flex items-center gap-2 rounded-2xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
             >
               <MagnifyingGlassIcon className="h-5 w-5" />
               Browse Needs
@@ -273,8 +270,7 @@ const DonorOverview: React.FC = () => {
 
             <button
               onClick={() => nav("/donor/mydonations")}
-              className="px-4 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-extrabold text-slate-700 hover:bg-slate-50 inline-flex items-center gap-2
-                         focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2"
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2"
             >
               <ClipboardDocumentListIcon className="h-5 w-5 text-slate-500" />
               My Donations
@@ -284,7 +280,7 @@ const DonorOverview: React.FC = () => {
       </Card>
 
       {/* KPI cards */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           icon={<BanknotesIcon className="h-5 w-5" />}
           label="Total Donated"
@@ -306,18 +302,17 @@ const DonorOverview: React.FC = () => {
         <KpiCard
           icon={<CalendarDaysIcon className="h-5 w-5" />}
           label="Last Donation"
-          value={<span className="text-lg">{fmtDate(k?.last_donation_at || null)}</span>}
+          value={<span className="text-lg font-medium text-slate-700">{fmtDate(k?.last_donation_at || null)}</span>}
           hint="Most recent paid donation"
         />
       </div>
 
       {/* Trend + Top Schools */}
-      <div className="grid lg:grid-cols-3 gap-4">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Card className="p-6 lg:col-span-2">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="font-extrabold text-slate-900 flex items-center gap-2">
-                {/* ✅ blue icon like admin */}
+              <div className="flex items-center gap-2 font-semibold text-slate-800">
                 <ChartBarIcon className="h-5 w-5 text-blue-700" />
                 Donation trend
               </div>
@@ -326,7 +321,7 @@ const DonorOverview: React.FC = () => {
 
             <button
               onClick={() => nav("/donor/mydonations")}
-              className="text-sm font-extrabold text-slate-700 hover:text-slate-900 inline-flex items-center gap-1"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-slate-800"
             >
               View all <ArrowTopRightOnSquareIcon className="h-4 w-4" />
             </button>
@@ -347,14 +342,14 @@ const DonorOverview: React.FC = () => {
 
         <Card className="p-6">
           <div className="flex items-center justify-between">
-            <div className="font-extrabold text-slate-900 flex items-center gap-2">
+            <div className="flex items-center gap-2 font-semibold text-slate-800">
               <UsersIcon className="h-5 w-5 text-blue-700" />
               Top schools
             </div>
 
             <button
               onClick={() => nav("/donor/schools")}
-              className="text-sm font-extrabold text-slate-700 hover:text-slate-900 inline-flex items-center gap-1"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-slate-800"
             >
               Explore <ArrowTopRightOnSquareIcon className="h-4 w-4" />
             </button>
@@ -367,13 +362,13 @@ const DonorOverview: React.FC = () => {
               ov!.top_schools.map((s) => (
                 <div key={s.school_id} className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="font-extrabold text-slate-900 truncate">{s.school_name}</div>
-                    <div className="text-xs text-slate-500 truncate flex items-center gap-1.5">
+                    <div className="truncate font-semibold text-slate-800">{s.school_name}</div>
+                    <div className="flex items-center gap-1.5 truncate text-xs text-slate-500">
                       <MapPinIcon className="h-4 w-4 text-slate-400" />
                       {s.district || "—"} • {s.province || "—"} • {s.count} donations
                     </div>
                   </div>
-                  <div className="font-extrabold text-slate-900">{formatLKR(s.total)}</div>
+                  <div className="font-semibold text-slate-700">{formatLKR(s.total)}</div>
                 </div>
               ))
             )}
@@ -385,7 +380,7 @@ const DonorOverview: React.FC = () => {
       <Card className="p-6">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="font-extrabold text-slate-900 flex items-center gap-2">
+            <div className="flex items-center gap-2 font-semibold text-slate-800">
               <ClipboardDocumentListIcon className="h-5 w-5 text-blue-700" />
               Recent donations
             </div>
@@ -394,7 +389,7 @@ const DonorOverview: React.FC = () => {
 
           <button
             onClick={() => nav("/donor/mydonations")}
-            className="text-sm font-extrabold text-slate-700 hover:text-slate-900 inline-flex items-center gap-1"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-slate-800"
           >
             View all <ArrowTopRightOnSquareIcon className="h-4 w-4" />
           </button>
@@ -410,8 +405,7 @@ const DonorOverview: React.FC = () => {
                 action={
                   <button
                     onClick={() => nav("/projects")}
-                    className="px-4 py-2 rounded-2xl bg-blue-700 text-white text-sm font-extrabold hover:bg-blue-800 inline-flex items-center gap-2
-                               focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+                    className="inline-flex items-center gap-2 rounded-2xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
                   >
                     <MagnifyingGlassIcon className="h-5 w-5" />
                     Browse needs
@@ -426,15 +420,15 @@ const DonorOverview: React.FC = () => {
                 const isFund = reqId <= 0;
 
                 return (
-                  <div key={d.donation_id} className="p-4 flex items-start justify-between gap-4">
+                  <div key={d.donation_id} className="flex items-start justify-between gap-4 p-4">
                     <div className="min-w-0">
-                      <div className="font-extrabold text-slate-900 truncate flex items-center gap-2">
+                      <div className="flex items-center gap-2 truncate font-semibold text-slate-800">
                         <span
                           className={cx(
-                            "h-8 w-8 rounded-2xl border grid place-items-center",
+                            "grid h-8 w-8 place-items-center rounded-2xl border",
                             isFund
-                              ? "bg-slate-50 border-slate-200 text-slate-700"
-                              : "bg-blue-700 border-blue-700 text-white"
+                              ? "border-slate-200 bg-slate-50 text-slate-600"
+                              : "border-blue-700 bg-blue-700 text-white"
                           )}
                         >
                           {isFund ? (
@@ -447,7 +441,7 @@ const DonorOverview: React.FC = () => {
                         {isFund ? "Direct School Fund" : d.request_title || `Request #${reqId}`}
                       </div>
 
-                      <div className="text-xs text-slate-500 truncate flex items-center gap-1.5 mt-1">
+                      <div className="mt-1 flex items-center gap-1.5 truncate text-xs text-slate-500">
                         <MapPinIcon className="h-4 w-4 text-slate-400" />
                         {d.school_name || "School"} • {d.district || "—"} • {d.province || "—"}
                       </div>
@@ -456,8 +450,8 @@ const DonorOverview: React.FC = () => {
                     </div>
 
                     <div className="text-right">
-                      <div className="font-extrabold text-slate-900">{formatLKR(d.amount)}</div>
-                      <div className="text-[11px] text-green-700 font-extrabold">PAID</div>
+                      <div className="font-semibold text-slate-700">{formatLKR(d.amount)}</div>
+                      <div className="text-[11px] font-semibold text-green-700">PAID</div>
                     </div>
                   </div>
                 );

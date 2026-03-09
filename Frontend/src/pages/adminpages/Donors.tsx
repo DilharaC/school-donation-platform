@@ -610,9 +610,7 @@ const DonorPage: React.FC = () => {
 
             <div className="flex items-center justify-end gap-2">
               <GhostButton onClick={() => setSelected(null)}>Close</GhostButton>
-              <PrimaryButton onClick={() => alert("Wire this to your route: /donors/:id")}>
-                Open full profile
-              </PrimaryButton>
+              
             </div>
           </div>
         ) : null}
