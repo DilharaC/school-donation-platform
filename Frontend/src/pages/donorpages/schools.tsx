@@ -1,4 +1,9 @@
-// DonorSchools.tsx (FULL) — UPDATED to use total_received everywhere (NO fund_balance in UI)
+// DonorSchools.tsx (FULL) — UPDATED
+// ✅ Uses total_received everywhere
+// ✅ Softer text colors
+// ✅ Better button colors
+// ✅ Reduced overly dark UI
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import DonateModal from "../../components/DonateModal";
@@ -73,7 +78,7 @@ function Pill({
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold border",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
         cls
       )}
     >
@@ -86,8 +91,8 @@ function Pill({
 function ProgressBar({ value }: { value: number }) {
   const v = Math.max(0, Math.min(100, Math.round(value)));
   return (
-    <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-      <div className="h-full rounded-full bg-slate-900" style={{ width: `${v}%` }} />
+    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+      <div className="h-full rounded-full bg-blue-600" style={{ width: `${v}%` }} />
     </div>
   );
 }
@@ -117,7 +122,6 @@ type SchoolRow = {
   initials?: string;
   logo_url?: string | null;
 
-  // ✅ Use this for "Received / Total received" everywhere
   total_received?: number;
 };
 
@@ -218,21 +222,21 @@ function DonationSuccessModal({
       ? "border-amber-200 bg-amber-50 text-amber-900"
       : ui.tone === "bad"
       ? "border-rose-200 bg-rose-50 text-rose-900"
-      : "border-slate-200 bg-slate-50 text-slate-900";
+      : "border-slate-200 bg-slate-50 text-slate-800";
 
   return (
     <div className="fixed inset-0 z-[120]">
       <div className="absolute inset-0 bg-black/25 backdrop-blur-[1px]" onClick={onClose} />
       <div className="absolute inset-0 grid place-items-center p-4">
-        <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
-          <div className="p-6 sm:p-7 border-b border-slate-100 flex items-start justify-between gap-3">
+        <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+          <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-6 sm:p-7">
             <div className="min-w-0">
-              <div className="text-slate-900 font-extrabold text-xl">Donation status</div>
-              <div className="text-slate-500 text-sm mt-1">Stripe checkout verification</div>
+              <div className="text-xl font-semibold text-slate-800">Donation status</div>
+              <div className="mt-1 text-sm text-slate-500">Stripe checkout verification</div>
             </div>
             <button
               onClick={onClose}
-              className="rounded-2xl px-3 py-2 text-sm font-extrabold border border-slate-200 hover:bg-slate-50 inline-flex items-center gap-2"
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
             >
               <XMarkIcon className="h-5 w-5" />
               Close
@@ -242,17 +246,17 @@ function DonationSuccessModal({
           <div className="p-6 sm:p-7">
             <div className={cx("rounded-2xl border px-4 py-4", toneClasses)}>
               <div className="flex items-start gap-3">
-                <div className="shrink-0 mt-0.5">
+                <div className="mt-0.5 shrink-0">
                   <div
                     className={cx(
-                      "h-10 w-10 rounded-2xl grid place-items-center font-black",
+                      "grid h-10 w-10 place-items-center rounded-2xl font-semibold",
                       ui.tone === "ok"
                         ? "bg-emerald-600 text-white"
                         : ui.tone === "warn"
                         ? "bg-amber-600 text-white"
                         : ui.tone === "bad"
                         ? "bg-rose-600 text-white"
-                        : "bg-slate-700 text-white"
+                        : "bg-slate-600 text-white"
                     )}
                   >
                     {ui.tone === "ok" ? "✓" : ui.tone === "warn" ? "!" : ui.tone === "bad" ? "×" : "…"}
@@ -260,11 +264,11 @@ function DonationSuccessModal({
                 </div>
 
                 <div className="min-w-0">
-                  <div className="font-extrabold text-lg leading-tight">{ui.title}</div>
-                  <div className="text-sm opacity-80 mt-1">{ui.desc}</div>
+                  <div className="text-lg font-semibold leading-tight">{ui.title}</div>
+                  <div className="mt-1 text-sm opacity-80">{ui.desc}</div>
 
                   {details ? (
-                    <div className="mt-3 text-xs font-semibold opacity-70 break-words">Details: {details}</div>
+                    <div className="mt-3 break-words text-xs font-medium opacity-70">Details: {details}</div>
                   ) : null}
                 </div>
               </div>
@@ -272,18 +276,18 @@ function DonationSuccessModal({
 
             {sessionId ? (
               <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="text-xs text-slate-500 font-bold">Session ID</div>
-                <div className="text-slate-900 font-extrabold text-sm break-words">{sessionId}</div>
+                <div className="text-xs font-medium text-slate-500">Session ID</div>
+                <div className="break-words text-sm font-semibold text-slate-700">{sessionId}</div>
               </div>
             ) : null}
 
-            <div className="mt-6 flex flex-col sm:flex-row gap-3">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <button
                 onClick={onRecheck}
                 disabled={loading}
                 className={cx(
-                  "w-full sm:w-auto px-5 py-3 rounded-2xl font-extrabold text-white",
-                  loading ? "bg-slate-300 cursor-not-allowed" : "bg-slate-900 hover:bg-slate-800"
+                  "w-full rounded-2xl px-5 py-3 font-semibold text-white sm:w-auto",
+                  loading ? "cursor-not-allowed bg-slate-300" : "bg-blue-600 hover:bg-blue-700"
                 )}
               >
                 {loading ? "Checking…" : "Re-check status"}
@@ -291,7 +295,7 @@ function DonationSuccessModal({
 
               <button
                 onClick={onClose}
-                className="w-full sm:w-auto text-center px-5 py-3 rounded-2xl font-extrabold border border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3 text-center font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto"
               >
                 Continue
               </button>
@@ -527,7 +531,6 @@ export default function DonorSchools() {
       setSuccessStatus(s);
       if (res.data?.message) setSuccessDetails(String(res.data.message));
 
-      // ✅ refresh UI after verification
       await fetchSchools();
       if (drawerOpen && selected?.school_id) {
         await fetchSelectedDetail(selected.school_id);
@@ -585,7 +588,7 @@ export default function DonorSchools() {
 
   /** ---------------- Render ---------------- */
   return (
-    <div className="w-full px-3 sm:px-0">
+    <div className="w-full px-3 text-slate-700 sm:px-0">
       {/* Donation success modal */}
       <DonationSuccessModal
         open={successOpen}
@@ -600,17 +603,17 @@ export default function DonorSchools() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-xs text-slate-500 font-bold flex items-center gap-2">
-            <BuildingOffice2Icon className="h-4 w-4 text-slate-400" />
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <BuildingOffice2Icon className="h-4 w-4 text-blue-500" />
             Donor dashboard
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900">Schools</div>
-          <div className="text-sm text-slate-600 mt-1">Donate directly to schools or support their latest requests.</div>
+          <div className="text-2xl font-semibold text-slate-800 sm:text-3xl">Schools</div>
+          <div className="mt-1 text-sm text-slate-500">Donate directly to schools or support their latest requests.</div>
         </div>
 
         <button
           onClick={fetchSchools}
-          className="rounded-2xl px-4 py-2.5 font-extrabold bg-slate-900 text-white hover:opacity-95 flex items-center gap-2"
+          className="flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 font-semibold text-white hover:bg-blue-700"
         >
           <ArrowPathIcon className="h-5 w-5" />
           Refresh
@@ -618,35 +621,35 @@ export default function DonorSchools() {
       </div>
 
       {/* Filters */}
-      <div className="mt-4 rounded-3xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
-        <div className="flex items-center gap-2 text-xs font-extrabold text-slate-600 mb-3">
-          <FunnelIcon className="h-4 w-4 text-slate-400" />
+      <div className="mt-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-600">
+          <FunnelIcon className="h-4 w-4 text-blue-500" />
           Filters
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
           <div className="lg:col-span-5">
-            <label className="text-xs font-extrabold text-slate-600">Search</label>
-            <div className="mt-1 relative">
-              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <label className="text-xs font-semibold text-slate-600">Search</label>
+            <div className="relative mt-1">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search school name / province / district..."
-                className="w-full rounded-2xl border border-slate-200 pl-10 pr-3 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+                className="w-full rounded-2xl border border-slate-200 py-3 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-100"
               />
             </div>
           </div>
 
           <div className="lg:col-span-2">
-            <label className="text-xs font-extrabold text-slate-600">Province</label>
+            <label className="text-xs font-semibold text-slate-600">Province</label>
             <select
               value={province}
               onChange={(e) => {
                 setProvince(e.target.value);
                 setDistrict("all");
               }}
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-100"
             >
               <option value="all">All</option>
               {provinces.map((p) => (
@@ -658,11 +661,11 @@ export default function DonorSchools() {
           </div>
 
           <div className="lg:col-span-2">
-            <label className="text-xs font-extrabold text-slate-600">District</label>
+            <label className="text-xs font-semibold text-slate-600">District</label>
             <select
               value={district}
               onChange={(e) => setDistrict(e.target.value)}
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-100"
             >
               <option value="all">All</option>
               {districts.map((d) => (
@@ -674,11 +677,11 @@ export default function DonorSchools() {
           </div>
 
           <div className="lg:col-span-1">
-            <label className="text-xs font-extrabold text-slate-600">Need</label>
+            <label className="text-xs font-semibold text-slate-600">Need</label>
             <select
               value={needBand}
               onChange={(e) => setNeedBand(e.target.value as any)}
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-100"
             >
               <option value="all">All</option>
               <option value="high">High</option>
@@ -687,24 +690,24 @@ export default function DonorSchools() {
             </select>
           </div>
 
-          <div className="lg:col-span-2 flex items-end gap-2">
+          <div className="flex items-end gap-2 lg:col-span-2">
             <button
               onClick={apply}
-              className="w-full rounded-2xl px-3 py-3 text-sm font-extrabold border border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-2"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 px-3 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
             >
-              <AdjustmentsHorizontalIcon className="h-5 w-5 text-slate-700" />
+              <AdjustmentsHorizontalIcon className="h-5 w-5 text-slate-500" />
               Apply
             </button>
           </div>
         </div>
 
-        <div className="mt-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="text-xs font-extrabold text-slate-600">Show:</div>
+            <div className="text-xs font-semibold text-slate-600">Show:</div>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as any)}
-              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100"
             >
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
@@ -714,7 +717,7 @@ export default function DonorSchools() {
             <select
               value={verifiedFilter}
               onChange={(e) => setVerifiedFilter(e.target.value as any)}
-              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100"
             >
               <option value="verified">Verified</option>
               <option value="all">All</option>
@@ -723,7 +726,7 @@ export default function DonorSchools() {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="text-xs font-extrabold text-slate-600 flex items-center gap-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
               <ArrowsUpDownIcon className="h-4 w-4 text-slate-400" />
               Sort
             </div>
@@ -731,7 +734,7 @@ export default function DonorSchools() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100"
             >
               <option value="need_score">Need score</option>
               <option value="total_received">Total received</option>
@@ -744,7 +747,7 @@ export default function DonorSchools() {
             <select
               value={sortDir}
               onChange={(e) => setSortDir(e.target.value as any)}
-              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100"
             >
               <option value="desc">Desc</option>
               <option value="asc">Asc</option>
@@ -758,17 +761,17 @@ export default function DonorSchools() {
       {/* List */}
       <div className="mt-6">
         {loading ? (
-          <div className="text-slate-500 text-center py-12">Loading…</div>
+          <div className="py-12 text-center text-slate-500">Loading…</div>
         ) : rows.length === 0 ? (
           <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-            <div className="mx-auto h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200 grid place-items-center text-slate-700">
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-blue-200 bg-blue-50 text-blue-700">
               <BuildingOffice2Icon className="h-6 w-6" />
             </div>
-            <div className="text-slate-900 font-extrabold text-xl mt-4">No schools found</div>
-            <div className="text-slate-500 text-sm mt-1">Try changing filters.</div>
+            <div className="mt-4 text-xl font-semibold text-slate-800">No schools found</div>
+            <div className="mt-1 text-sm text-slate-500">Try changing filters.</div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {rows.map((s) => {
               const verified = Number(s.verified || 0) === 1;
               const level = needLevel(s.need_score);
@@ -778,20 +781,20 @@ export default function DonorSchools() {
                   key={s.school_id}
                   onClick={() => openSchool(s)}
                   className={cx(
-                    "group w-full text-left rounded-3xl border border-slate-200 bg-white p-5 shadow-sm",
+                    "group w-full rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm",
                     "transition duration-200",
-                    "hover:-translate-y-[2px] hover:shadow-md hover:border-slate-300",
-                    "focus:outline-none focus:ring-4 focus:ring-[#0B1E3B]/10"
+                    "hover:-translate-y-[2px] hover:border-slate-300 hover:shadow-md",
+                    "focus:outline-none focus:ring-4 focus:ring-blue-100"
                   )}
                 >
                   <div className="flex items-start gap-4">
                     {/* Logo */}
-                    <div className="shrink-0 h-14 w-14 rounded-2xl overflow-hidden bg-slate-100">
+                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
                       {toAbs(s.logo_url) ? (
-                        <img src={toAbs(s.logo_url)!} alt="logo" className="w-full h-full object-cover" />
+                        <img src={toAbs(s.logo_url)!} alt="logo" className="h-full w-full object-cover" />
                       ) : (
-                        <div className="w-full h-full grid place-items-center bg-[#0B1E3B]/10">
-                          <div className="h-10 w-10 rounded-2xl bg-[#0B1E3B] text-white grid place-items-center font-extrabold text-xs shadow-sm">
+                        <div className="grid h-full w-full place-items-center bg-blue-50">
+                          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-blue-600 text-xs font-semibold text-white shadow-sm">
                             {(s.initials || initials(s.school_name)).slice(0, 2)}
                           </div>
                         </div>
@@ -803,7 +806,7 @@ export default function DonorSchools() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <div className="text-base font-extrabold text-slate-900 truncate">{s.school_name}</div>
+                            <div className="truncate text-base font-semibold text-slate-800">{s.school_name}</div>
 
                             {verified ? (
                               <Pill
@@ -819,36 +822,35 @@ export default function DonorSchools() {
                             </Pill>
                           </div>
 
-                          <div className="mt-1 text-xs text-slate-500 truncate flex items-center gap-1.5">
+                          <div className="mt-1 flex items-center gap-1.5 truncate text-xs text-slate-500">
                             <MapPinIcon className="h-4 w-4 text-slate-400" />
                             {s.province ? s.province : "—"}
                             {s.district ? ` • ${s.district}` : ""}
                           </div>
 
                           <div className="mt-2 text-sm text-slate-600">
-                            Need score: <b className="text-[#0B1E3B]">{Number(s.need_score || 0).toFixed(1)}</b>
+                            Need score: <b className="text-blue-700">{Number(s.need_score || 0).toFixed(1)}</b>
                           </div>
                         </div>
 
                         {/* Campaign count */}
                         <div className="shrink-0 text-right">
-                          <div className="text-xs text-slate-500 font-bold flex items-center justify-end gap-1">
+                          <div className="flex items-center justify-end gap-1 text-xs font-medium text-slate-500">
                             <ClipboardDocumentListIcon className="h-4 w-4 text-slate-400" />
                             Campaigns
                           </div>
-                          <div className="text-xl font-extrabold text-[#0B1E3B]">{Number(s.campaigns_count || 0)}</div>
+                          <div className="text-xl font-semibold text-blue-700">{Number(s.campaigns_count || 0)}</div>
                         </div>
                       </div>
 
                       {/* Funding summary */}
-                      <div className="mt-4 rounded-2xl bg-[#0B1E3B]/5 border border-[#0B1E3B]/10 px-4 py-3">
+                      <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3">
                         <div className="flex items-center justify-between">
-                          <div className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
                             <CurrencyDollarIcon className="h-4 w-4 text-slate-400" />
                             Total received
                           </div>
-                          <div className="text-sm font-extrabold text-[#0B1E3B]">
-                            {/* ✅ ONLY total_received */}
+                          <div className="text-sm font-semibold text-blue-700">
                             {formatLKR(Number(s.total_received ?? 0))}
                           </div>
                         </div>
@@ -856,12 +858,12 @@ export default function DonorSchools() {
 
                       {/* Footer */}
                       <div className="mt-4 flex items-center justify-between">
-                        <div className="text-xs font-extrabold text-[#0B1E3B] group-hover:underline inline-flex items-center gap-1">
+                        <div className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 group-hover:underline">
                           View details
                           <ChevronRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-[2px]" />
                         </div>
 
-                        <span className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold text-white bg-[#0B1E3B] hover:bg-[#08162D] transition">
+                        <span className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700">
                           <HeartIcon className="h-4 w-4" />
                           Support school
                         </span>
@@ -875,10 +877,10 @@ export default function DonorSchools() {
         )}
 
         {/* pagination */}
-        <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-slate-600">
-            Page <span className="font-extrabold text-slate-900">{page}</span> / {pages} • Total{" "}
-            <span className="font-extrabold text-slate-900">{total}</span>
+            Page <span className="font-semibold text-slate-800">{page}</span> / {pages} • Total{" "}
+            <span className="font-semibold text-slate-800">{total}</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -886,8 +888,8 @@ export default function DonorSchools() {
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               className={cx(
-                "rounded-2xl px-4 py-2 text-sm font-extrabold border",
-                page <= 1 ? "border-slate-200 text-slate-400" : "border-slate-200 hover:bg-slate-50"
+                "rounded-2xl border px-4 py-2 text-sm font-semibold",
+                page <= 1 ? "border-slate-200 text-slate-400" : "border-slate-200 text-slate-600 hover:bg-slate-50"
               )}
             >
               Prev
@@ -896,8 +898,8 @@ export default function DonorSchools() {
               disabled={page >= pages}
               onClick={() => setPage((p) => Math.min(pages, p + 1))}
               className={cx(
-                "rounded-2xl px-4 py-2 text-sm font-extrabold border",
-                page >= pages ? "border-slate-200 text-slate-400" : "border-slate-200 hover:bg-slate-50"
+                "rounded-2xl border px-4 py-2 text-sm font-semibold",
+                page >= pages ? "border-slate-200 text-slate-400" : "border-slate-200 text-slate-600 hover:bg-slate-50"
               )}
             >
               Next
@@ -911,34 +913,34 @@ export default function DonorSchools() {
         <div
           className={cx(
             "absolute inset-0 transition-opacity duration-200",
-            drawerOpen ? "opacity-100 bg-black/20 backdrop-blur-[1px]" : "opacity-0"
+            drawerOpen ? "bg-black/20 opacity-100 backdrop-blur-[1px]" : "opacity-0"
           )}
           onClick={closeDrawer}
         />
 
         <div
           className={cx(
-            "absolute right-0 top-0 h-full w-full lg:w-[580px] bg-white shadow-2xl transition-transform duration-200",
+            "absolute right-0 top-0 h-full w-full bg-white shadow-2xl transition-transform duration-200 lg:w-[580px]",
             drawerOpen ? "translate-x-0" : "translate-x-full"
           )}
         >
-          <div className="h-full flex flex-col">
+          <div className="flex h-full flex-col">
             {/* Sticky header */}
-            <div className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b">
-              <div className="p-5 flex items-center justify-between gap-3">
+            <div className="sticky top-0 z-10 border-b bg-white/90 backdrop-blur">
+              <div className="flex items-center justify-between gap-3 p-5">
                 <div className="min-w-0">
-                  <div className="text-[11px] uppercase tracking-wide text-slate-500 font-extrabold flex items-center gap-2">
-                    <BuildingOffice2Icon className="h-4 w-4 text-slate-400" />
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    <BuildingOffice2Icon className="h-4 w-4 text-blue-500" />
                     School details
                   </div>
-                  <div className="text-lg font-extrabold text-slate-900 truncate">
+                  <div className="truncate text-lg font-semibold text-slate-800">
                     {selected?.school_name || "School"}
                   </div>
                 </div>
 
                 <button
                   onClick={closeDrawer}
-                  className="rounded-2xl px-3 py-2 text-sm font-extrabold border border-slate-200 hover:bg-slate-50 flex items-center gap-2"
+                  className="flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
                 >
                   <XMarkIcon className="h-5 w-5" />
                   Close
@@ -946,17 +948,17 @@ export default function DonorSchools() {
               </div>
             </div>
 
-            <div className="p-5 overflow-auto">
+            <div className="overflow-auto p-5">
               {detailLoading ? (
                 <div className="space-y-3">
-                  <div className="h-28 rounded-3xl bg-slate-100 animate-pulse" />
-                  <div className="h-40 rounded-3xl bg-slate-100 animate-pulse" />
-                  <div className="h-52 rounded-3xl bg-slate-100 animate-pulse" />
+                  <div className="h-28 animate-pulse rounded-3xl bg-slate-100" />
+                  <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
+                  <div className="h-52 animate-pulse rounded-3xl bg-slate-100" />
                 </div>
               ) : !detail ? (
                 <div className="rounded-3xl border border-slate-200 p-5 text-slate-700">
                   Could not load details.
-                  <div className="text-xs text-slate-500 mt-2">
+                  <div className="mt-2 text-xs text-slate-500">
                     This UI calls:{" "}
                     <span className="font-mono">{selected ? SCHOOL_DETAIL(selected.school_id) : "-"}</span>
                   </div>
@@ -966,23 +968,23 @@ export default function DonorSchools() {
                   {/* School summary card */}
                   <div className="rounded-3xl border border-slate-200 p-6">
                     <div className="flex items-start gap-4">
-                      <div className="h-14 w-14 rounded-2xl overflow-hidden bg-slate-900 shrink-0">
+                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-blue-600">
                         {toAbs(detail.school.logo_url) ? (
                           <img
                             src={toAbs(detail.school.logo_url)!}
                             alt="logo"
-                            className="w-full h-full object-cover"
+                            className="h-full w-full object-cover"
                           />
                         ) : (
-                          <div className="w-full h-full grid place-items-center text-white font-extrabold">
+                          <div className="grid h-full w-full place-items-center text-white font-semibold">
                             {(detail.school.initials || initials(detail.school.school_name)).slice(0, 2)}
                           </div>
                         )}
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="text-xl font-extrabold text-slate-900">{detail.school.school_name}</div>
-                        <div className="text-sm text-slate-600 flex items-center gap-2 mt-1">
+                        <div className="text-xl font-semibold text-slate-800">{detail.school.school_name}</div>
+                        <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
                           <MapPinIcon className="h-4 w-4 text-slate-400" />
                           <span>
                             {detail.school.province || "—"}{" "}
@@ -990,7 +992,7 @@ export default function DonorSchools() {
                           </span>
                         </div>
                         {detail.school.address ? (
-                          <div className="text-sm text-slate-600 mt-1">{detail.school.address}</div>
+                          <div className="mt-1 text-sm text-slate-600">{detail.school.address}</div>
                         ) : null}
 
                         <div className="mt-3 flex flex-wrap gap-2">
@@ -1014,40 +1016,39 @@ export default function DonorSchools() {
 
                     <div className="mt-5 grid grid-cols-3 gap-3">
                       <div className="rounded-2xl bg-slate-50 p-3">
-                        <div className="text-xs text-slate-500 font-bold">Received</div>
-                        <div className="font-extrabold text-slate-900">
-                          {/* ✅ ONLY total_received (fallback to donation_summary for safety) */}
+                        <div className="text-xs font-medium text-slate-500">Received</div>
+                        <div className="font-semibold text-slate-800">
                           {formatLKR(Number(detail.school.total_received ?? detail.donation_summary?.total_received ?? 0))}
                         </div>
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-3">
-                        <div className="text-xs text-slate-500 font-bold">Donations</div>
-                        <div className="font-extrabold text-slate-900">
+                        <div className="text-xs font-medium text-slate-500">Donations</div>
+                        <div className="font-semibold text-slate-800">
                           {Number(detail.donation_summary?.donations_count || 0)}
                         </div>
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-3">
-                        <div className="text-xs text-slate-500 font-bold">Need score</div>
-                        <div className="font-extrabold text-slate-900">
+                        <div className="text-xs font-medium text-slate-500">Need score</div>
+                        <div className="font-semibold text-slate-800">
                           {Number(detail.school.need_score || 0).toFixed(1)}
                         </div>
                       </div>
                     </div>
 
-                    {/* Donate to school (premium) */}
-                    <div className="mt-5 rounded-3xl border border-slate-200 p-5 bg-gradient-to-b from-white to-slate-50">
+                    {/* Donate to school */}
+                    <div className="mt-5 rounded-3xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-5">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                            <HeartIcon className="h-5 w-5 text-slate-900" />
+                          <div className="flex items-center gap-2 text-base font-semibold text-slate-800">
+                            <HeartIcon className="h-5 w-5 text-blue-600" />
                             Donate to School
                           </div>
-                          <div className="text-xs text-slate-500 mt-1">
+                          <div className="mt-1 text-xs text-slate-500">
                             We’ll auto-pick the best active request (or create General Fund) and redirect to Stripe.
                           </div>
                         </div>
-                        <div className="text-[11px] font-extrabold text-slate-700 bg-white border border-slate-200 px-3 py-1.5 rounded-full inline-flex items-center gap-2">
-                          <ShieldCheckIcon className="h-4 w-4 text-slate-700" />
+                        <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600">
+                          <ShieldCheckIcon className="h-4 w-4 text-blue-600" />
                           Stripe secure
                         </div>
                       </div>
@@ -1059,10 +1060,10 @@ export default function DonorSchools() {
                             type="button"
                             onClick={() => setDonateAmount(String(v))}
                             className={cx(
-                              "px-4 py-2 rounded-2xl text-sm font-extrabold border transition",
+                              "rounded-2xl border px-4 py-2 text-sm font-semibold transition",
                               donateAmount === String(v)
-                                ? "bg-slate-900 text-white border-slate-900"
-                                : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50"
+                                ? "border-blue-600 bg-blue-600 text-white"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                             )}
                           >
                             {formatLKR(v)}
@@ -1071,46 +1072,46 @@ export default function DonorSchools() {
                       </div>
 
                       {donateError ? (
-                        <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-800 text-sm font-bold">
+                        <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
                           {donateError}
                         </div>
                       ) : null}
 
                       <div className="mt-4">
-                        <label className="block text-xs font-extrabold text-slate-600">Amount (LKR)</label>
+                        <label className="block text-xs font-semibold text-slate-600">Amount (LKR)</label>
                         <input
                           inputMode="numeric"
                           value={donateAmount}
                           onChange={(e) => setDonateAmount(e.target.value.replace(/[^\d.]/g, ""))}
                           placeholder="e.g. 2500"
                           className={cx(
-                            "mt-1 w-full rounded-2xl border px-4 py-3 text-sm font-extrabold text-slate-900 outline-none",
-                            "focus:ring-2 focus:ring-slate-200",
+                            "mt-1 w-full rounded-2xl border px-4 py-3 text-sm font-semibold text-slate-700 outline-none",
+                            "focus:ring-2 focus:ring-blue-100",
                             donateAmountNum > 0 && donateAmountNum < MIN_LKR ? "border-rose-200" : "border-slate-200"
                           )}
                         />
                         <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
                           <span>Minimum LKR {MIN_LKR}</span>
-                          <span className="font-extrabold text-slate-700">
+                          <span className="font-semibold text-slate-700">
                             You will donate: {formatLKR(donateAmountNum || 0)}
                           </span>
                         </div>
                       </div>
 
                       <div className="mt-3">
-                        <label className="block text-xs font-extrabold text-slate-600">Message (optional)</label>
+                        <label className="block text-xs font-semibold text-slate-600">Message (optional)</label>
                         <textarea
                           value={donateMessage}
                           onChange={(e) => setDonateMessage(e.target.value)}
                           placeholder="Write a short message…"
-                          className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none min-h-[90px] focus:ring-2 focus:ring-slate-200"
+                          className="mt-1 min-h-[90px] w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-100"
                         />
                       </div>
 
                       <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
                         <div className="min-w-0">
-                          <div className="text-slate-900 font-extrabold text-sm">Donate anonymously</div>
-                          <div className="text-slate-500 text-xs">Hide your name in public lists.</div>
+                          <div className="text-sm font-semibold text-slate-800">Donate anonymously</div>
+                          <div className="text-xs text-slate-500">Hide your name in public lists.</div>
                         </div>
 
                         <button
@@ -1118,13 +1119,13 @@ export default function DonorSchools() {
                           onClick={() => setDonateAnonymous((v) => !v)}
                           className={cx(
                             "relative inline-flex h-8 w-14 items-center rounded-full transition",
-                            donateAnonymous ? "bg-slate-900" : "bg-slate-300"
+                            donateAnonymous ? "bg-blue-600" : "bg-slate-300"
                           )}
                           aria-pressed={donateAnonymous}
                         >
                           <span
                             className={cx(
-                              "inline-block h-6 w-6 rounded-full bg-white transition translate-x-1",
+                              "inline-block h-6 w-6 translate-x-1 rounded-full bg-white transition",
                               donateAnonymous && "translate-x-7"
                             )}
                           />
@@ -1135,10 +1136,10 @@ export default function DonorSchools() {
                         onClick={donateToSchool}
                         disabled={donateLoading || donateAmountNum < MIN_LKR}
                         className={cx(
-                          "mt-3 w-full rounded-2xl py-3 font-extrabold text-white transition flex items-center justify-center gap-2",
+                          "mt-3 flex w-full items-center justify-center gap-2 rounded-2xl py-3 font-semibold text-white transition",
                           donateLoading || donateAmountNum < MIN_LKR
-                            ? "bg-slate-300 cursor-not-allowed"
-                            : "bg-slate-900 hover:opacity-95"
+                            ? "cursor-not-allowed bg-slate-300"
+                            : "bg-blue-600 hover:bg-blue-700"
                         )}
                       >
                         <CurrencyDollarIcon className="h-5 w-5" />
@@ -1154,11 +1155,11 @@ export default function DonorSchools() {
 
                   {/* campaigns */}
                   <div className="rounded-3xl border border-slate-200 p-6">
-                    <div className="text-[11px] uppercase tracking-wide text-slate-500 font-extrabold flex items-center gap-2">
-                      <ClipboardDocumentListIcon className="h-4 w-4 text-slate-400" />
+                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      <ClipboardDocumentListIcon className="h-4 w-4 text-blue-500" />
                       Latest requests
                     </div>
-                    <div className="text-lg font-extrabold text-slate-900">Campaigns</div>
+                    <div className="text-lg font-semibold text-slate-800">Campaigns</div>
 
                     {detail.campaigns?.length ? (
                       <div className="mt-4 space-y-3">
@@ -1169,25 +1170,25 @@ export default function DonorSchools() {
                           const remaining = Math.max(0, goal - raised);
 
                           return (
-                            <div key={c.request_id} className="rounded-3xl border border-slate-200 p-4 bg-white">
+                            <div key={c.request_id} className="rounded-3xl border border-slate-200 bg-white p-4">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
-                                  <div className="font-extrabold text-slate-900 truncate">{c.request_title}</div>
-                                  <div className="text-xs text-slate-500 mt-1">
+                                  <div className="truncate font-semibold text-slate-800">{c.request_title}</div>
+                                  <div className="mt-1 text-xs text-slate-500">
                                     {c.category ? `${c.category} • ` : ""}
                                     {formatLKR(raised)} / {formatLKR(goal)} • <b className="text-slate-700">{p}%</b>
                                   </div>
-                                  <div className="text-[11px] text-slate-500 mt-1">
+                                  <div className="mt-1 text-[11px] text-slate-500">
                                     Remaining: <b className="text-slate-700">{formatLKR(remaining)}</b>
                                   </div>
                                 </div>
 
                                 <button
                                   onClick={(e) => {
-                                  e.stopPropagation();
-                                  openDonateForRequest(c.request_id);
-                                }}
-                                  className="shrink-0 rounded-2xl px-4 py-2 text-xs font-extrabold bg-slate-900 text-white hover:opacity-95 inline-flex items-center gap-2"
+                                    e.stopPropagation();
+                                    openDonateForRequest(c.request_id);
+                                  }}
+                                  className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
                                 >
                                   <HeartIcon className="h-4 w-4" />
                                   Donate

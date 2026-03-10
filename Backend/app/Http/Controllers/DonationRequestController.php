@@ -302,7 +302,7 @@ public function show($id)
 }
 
     // Create project
-  public function create(Request $request)
+ public function create(Request $request)
 {
     $user = Auth::guard('school')->user();
     $schoolId = $user?->school_id;
@@ -311,14 +311,28 @@ public function show($id)
         return response()->json(['message' => 'School not authenticated'], 401);
     }
 
+    // ✅ Only verified + active schools can create requests
+    if ((int)($user->verified ?? 0) !== 1) {
+        return response()->json([
+            'message' => 'Only verified schools can create donation requests.'
+        ], 403);
+    }
+
+    // optional: also require active status
+    if (strtolower((string)($user->status ?? '')) !== 'active') {
+        return response()->json([
+            'message' => 'Only active schools can create donation requests.'
+        ], 403);
+    }
+
     $request->validate([
-        'request_title' => 'required|string|max:255',
-        'category' => 'required|string|max:100',
-        'quantity' => 'required|integer|min:1',
+        'request_title'   => 'required|string|max:255',
+        'category'        => 'required|string|max:100',
+        'quantity'        => 'required|integer|min:1',
         'estimated_price' => 'required|numeric|min:0',
-        'description' => 'required|string',
-        'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
-        'document_url' => 'nullable|string',
+        'description'     => 'required|string',
+        'image'           => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
+        'document_url'    => 'nullable|string',
     ]);
 
     $imageUrl = null;
@@ -328,53 +342,46 @@ public function show($id)
         $imageUrl = '/storage/' . $path;
     }
 
-    // ✅ Create donation request
     $donationRequest = DonationRequest::create([
-        'school_id' => (int)$schoolId,
-        'request_title' => $request->request_title,
-        'category' => $request->category,
-        'quantity' => (int)$request->quantity,
-        'estimated_price' => (float)$request->estimated_price,
-        'amount_raised' => 0,
-        'description' => $request->description,
-        'image_url' => $imageUrl,
-        'document_url' => $request->document_url ? trim($request->document_url) : null,
-        'status' => 'Pending',
+        'school_id'        => (int)$schoolId,
+        'request_title'    => $request->request_title,
+        'category'         => $request->category,
+        'quantity'         => (int)$request->quantity,
+        'estimated_price'  => (float)$request->estimated_price,
+        'amount_raised'    => 0,
+        'description'      => $request->description,
+        'image_url'        => $imageUrl,
+        'document_url'     => $request->document_url ? trim($request->document_url) : null,
+        'status'           => 'Pending',
     ]);
 
-    // ==============================
-    // ✅ LEDGER ENTRY
-    // ==============================
     app(\App\Services\LedgerService::class)->record(
         'REQUEST_CREATED',
         'donation_request',
         (int)$donationRequest->request_id,
         [
-            'request_id' => (int)$donationRequest->request_id,
-            'school_id' => (int)$schoolId,
-            'request_title' => (string)$donationRequest->request_title,
-            'estimated_price' => (float)$donationRequest->estimated_price,
-            'status' => 'Pending',
-            'created_at' => now()->toDateTimeString(),
+            'request_id'       => (int)$donationRequest->request_id,
+            'school_id'        => (int)$schoolId,
+            'request_title'    => (string)$donationRequest->request_title,
+            'estimated_price'  => (float)$donationRequest->estimated_price,
+            'status'           => 'Pending',
+            'created_at'       => now()->toDateTimeString(),
         ]
     );
 
-    // ==============================
-    // ✅ MANUAL ADMIN NOTIFICATION
-    // ==============================
     DB::table('notifications')->insert([
-        'id' => \Illuminate\Support\Str::uuid()->toString(),
-        'type' => 'admin',
+        'id'              => \Illuminate\Support\Str::uuid()->toString(),
+        'type'            => 'admin',
         'notifiable_type' => 'admin',
-        'notifiable_id' => 1, // static admin
-        'data' => json_encode([
-            'title' => 'New Campaign Created',
-            'body' => 'A school created a new donation request. Review and approve.',
+        'notifiable_id'   => 1,
+        'data'            => json_encode([
+            'title'      => 'New Campaign Created',
+            'body'       => 'A school created a new donation request. Review and approve.',
             'request_id' => (int)$donationRequest->request_id,
-            'school_id' => (int)$schoolId,
+            'school_id'  => (int)$schoolId,
         ]),
-        'created_at' => now(),
-        'updated_at' => now(),
+        'created_at'      => now(),
+        'updated_at'      => now(),
     ]);
 
     return response()->json([

@@ -27,6 +27,11 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/solid";
 
+/* ======================= Notification API ======================= */
+const API_BASE = "http://localhost:8000/api";
+const NOTIF_API = `${API_BASE}/notifications`;
+const NOTIF_MARK_READ = (id: string) => `${API_BASE}/notifications/${id}/read`;
+
 /* ======================= Types ======================= */
 interface CardProps {
   children: React.ReactNode;
@@ -53,13 +58,21 @@ type ChangeObj = { pct: number | null; state: ChangeState };
 
 interface Stat {
   label: string;
-  value: string | number; // TODAY value
-  change: ChangeObj; // weekly % (7d vs prev 7d)
+  value: string | number;
+  change: ChangeObj;
   icon: React.FC;
   trend?: { x: string; y: number }[];
 }
 
 type RangeKey = "6M" | "12M" | "ALL";
+
+type DashboardAlert = {
+  id: string;
+  tone: "amber" | "rose" | "blue";
+  title: string;
+  desc: string;
+  created_at?: string | null;
+};
 
 /* ======================= Small UI Components ======================= */
 const Card: React.FC<CardProps> = ({ children, className = "" }) => (
@@ -74,7 +87,6 @@ const Skeleton: React.FC<{ className?: string }> = ({ className = "" }) => (
 
 const Progress: React.FC<ProgressProps> = ({ value, className = "" }) => (
   <div className={`w-full bg-slate-100 rounded-full overflow-hidden ${className}`}>
-    {/* ✅ keep your blue */}
     <div
       className="h-full bg-blue-600 transition-all duration-300"
       style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
@@ -146,7 +158,6 @@ const SecondaryButton: React.FC<ButtonProps> = ({
   </button>
 );
 
-/** ✅ Sparkline with UNIQUE gradient id (prevents collisions) */
 const MiniSpark: React.FC<{ data?: { x: string; y: number }[]; gid: string }> = ({ data, gid }) => {
   if (!data || data.length < 2) return <div className="h-9" />;
   const safe = data.map((d) => ({ ...d, y: Number(d.y || 0) }));
@@ -157,7 +168,6 @@ const MiniSpark: React.FC<{ data?: { x: string; y: number }[]; gid: string }> = 
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={safe} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
           <defs>
-            {/* ✅ keep your blue */}
             <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="10%" stopColor="#1d4ed8" stopOpacity={0.25} />
               <stop offset="90%" stopColor="#1d4ed8" stopOpacity={0} />
@@ -171,8 +181,6 @@ const MiniSpark: React.FC<{ data?: { x: string; y: number }[]; gid: string }> = 
 };
 
 /* ======================= Helpers ======================= */
-// const cx = (...s: Array<string | false | null | undefined>) => s.filter(Boolean).join(" ");
-
 const toInitials = (name?: string) => {
   if (!name) return "?";
   return name
@@ -191,6 +199,42 @@ const normalizeChange = (x: any): ChangeObj => {
   return { pct, state };
 };
 
+const safeJson = (v: any) => {
+  if (!v) return null;
+  if (typeof v === "object") return v;
+  try {
+    return JSON.parse(v);
+  } catch {
+    return null;
+  }
+};
+
+const fmtDate = (iso?: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
+
+const pickAlertTone = (title: string, body: string): "amber" | "rose" | "blue" => {
+  const text = `${title} ${body}`.toLowerCase();
+
+  if (
+    text.includes("verify") ||
+    text.includes("pending") ||
+    text.includes("urgent") ||
+    text.includes("failed")
+  ) {
+    return "rose";
+  }
+
+  if (
+    text.includes("ending") ||
+    text.includes("low funding") ||
+    text.includes("deadline") ||
+    text.includes("expir")
+  ) {
+    return "amber";
+  }
+
+  return "blue";
+};
+
 const alertIcon = (tone: "amber" | "rose" | "blue") => {
   if (tone === "amber") return <ExclamationTriangleIcon className="h-5 w-5 text-amber-700" />;
   if (tone === "rose") return <BellAlertIcon className="h-5 w-5 text-rose-700" />;
@@ -207,18 +251,11 @@ const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<Stat[]>([]);
   const [range, setRange] = useState<RangeKey>("12M");
 
-  // Top campaigns pagination
+  const [alerts, setAlerts] = useState<DashboardAlert[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState(true);
+
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 4;
-
-  // Alerts
-  const [alerts, setAlerts] = useState<
-    Array<{ id: string; tone: "amber" | "rose" | "blue"; title: string; desc: string }>
-  >([
-    { id: "ending", tone: "amber", title: "Campaign ending soon", desc: "“Health Kits Drive” ends this week." },
-    { id: "verify", tone: "rose", title: "Pending verification", desc: "3 donations require confirmation." },
-    { id: "low", tone: "blue", title: "Low funding campaign", desc: "“Playground Project” is at 22%." },
-  ]);
 
   const rangedChart = useMemo(() => {
     const base = Array.isArray(chartData) ? chartData : [];
@@ -243,14 +280,70 @@ const AdminDashboard: React.FC = () => {
 
   const hasNextPage = currentPage * itemsPerPage < sortedTopCampaigns.length;
 
+  const fetchUnreadAlerts = async () => {
+    try {
+      setAlertsLoading(true);
+
+      const res = await axios.get(NOTIF_API, {
+        withCredentials: true,
+        params: {
+          role: "admin",
+          unread: 1,
+          page: 1,
+          limit: 3, // show only top 3 unread alerts in dashboard
+        },
+      });
+
+      const rows = res.data?.rows || [];
+
+      const mapped: DashboardAlert[] = rows.map((r: any) => {
+        const data = safeJson(r.data) || r.data_obj || {};
+        const title = data?.title || "Notification";
+        const desc = data?.body || "";
+        const tone = pickAlertTone(title, desc);
+
+        return {
+          id: String(r.id),
+          tone,
+          title,
+          desc,
+          created_at: r.created_at,
+        };
+      });
+
+      setAlerts(mapped);
+    } catch (error) {
+      console.error("Unread alerts fetch error:", error);
+      setAlerts([]);
+    } finally {
+      setAlertsLoading(false);
+    }
+  };
+
+  const dismissAlert = async (id: string) => {
+    try {
+      await axios.post(
+        NOTIF_MARK_READ(id),
+        null,
+        {
+          withCredentials: true,
+          params: { role: "admin" },
+        }
+      );
+
+      setAlerts((prev) => prev.filter((x) => x.id !== id));
+    } catch (error) {
+      console.error("Failed to mark alert as read:", error);
+    }
+  };
+
   useEffect(() => {
     let alive = true;
     let inFlight = false;
     let interval: ReturnType<typeof setInterval> | null = null;
 
     const fetchDashboardData = async (silent = false) => {
-      if (!alive) return;
-      if (inFlight) return;
+      if (!alive || inFlight) return;
       inFlight = true;
 
       try {
@@ -304,7 +397,6 @@ const AdminDashboard: React.FC = () => {
             : 0,
         }));
 
-        // ✅ use Heroicons but keep blue theme
         setStats([
           { label: "Today Donors", value: todayDonors.toLocaleString(), change: donorsChange, icon: UsersIcon as any, trend: donorsMini },
           { label: "Today Raised (LKR)", value: todayRaised.toLocaleString(), change: raisedChange, icon: BanknotesIcon as any, trend: chartMini },
@@ -320,7 +412,12 @@ const AdminDashboard: React.FC = () => {
     };
 
     fetchDashboardData(false);
-    interval = setInterval(() => fetchDashboardData(true), 20000);
+    fetchUnreadAlerts();
+
+    interval = setInterval(() => {
+      fetchDashboardData(true);
+      fetchUnreadAlerts();
+    }, 20000);
 
     return () => {
       alive = false;
@@ -348,7 +445,6 @@ const AdminDashboard: React.FC = () => {
             ))
           : stats.map((stat, idx) => {
               const Icon = stat.icon as any;
-
               const pct = stat.change.pct ?? 0;
               const isUp = pct >= 0;
 
@@ -370,7 +466,6 @@ const AdminDashboard: React.FC = () => {
                 <Card key={stat.label} className="p-5 hover:shadow-md transition">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      {/* ✅ keep your blue badge */}
                       <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
                         <Icon className="h-5 w-5" />
                       </div>
@@ -388,7 +483,6 @@ const AdminDashboard: React.FC = () => {
                         {stat.change.state === "new" ? "" : isUp ? "▲" : "▼"} {badgeText}
                       </span>
 
-                      {/* ✅ unique gradient id */}
                       <MiniSpark data={stat.trend} gid={`${idx}-${stat.label.replace(/\s+/g, "-")}`} />
                     </div>
                   </div>
@@ -399,7 +493,6 @@ const AdminDashboard: React.FC = () => {
 
       {/* Chart + Top Campaigns */}
       <div className="grid gap-6 lg:grid-cols-7 items-stretch">
-        {/* Chart */}
         <Card className="p-6 lg:col-span-4 flex flex-col h-full">
           <div className="flex items-start justify-between mb-5 gap-4">
             <div>
@@ -430,7 +523,6 @@ const AdminDashboard: React.FC = () => {
             <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={rangedChart} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
-                  {/* ✅ keep your blue */}
                   <linearGradient id="fillDonations" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#1d4ed8" stopOpacity={0.25} />
                     <stop offset="95%" stopColor="#1d4ed8" stopOpacity={0} />
@@ -457,7 +549,6 @@ const AdminDashboard: React.FC = () => {
                   formatter={(value: any) => [`LKR ${Number(value || 0).toLocaleString()}`, "Donations"]}
                 />
 
-                {/* ✅ keep your blue */}
                 <Area
                   type="monotone"
                   dataKey="donations"
@@ -471,7 +562,6 @@ const AdminDashboard: React.FC = () => {
           )}
         </Card>
 
-        {/* Top Campaigns */}
         <Card className="p-6 lg:col-span-3 flex flex-col h-full">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
@@ -562,7 +652,6 @@ const AdminDashboard: React.FC = () => {
 
       {/* Recent Donations + Alerts */}
       <div className="grid gap-6 lg:grid-cols-7">
-        {/* Recent Donations */}
         <Card className="p-6 lg:col-span-4">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -641,20 +730,22 @@ const AdminDashboard: React.FC = () => {
           )}
         </Card>
 
-        {/* Alerts */}
+        {/* Alerts = only unread notifications */}
         <Card className="p-6 lg:col-span-3">
           <div className="mb-4">
             <h3 className="text-lg font-semibold text-slate-900 inline-flex items-center gap-2">
               <BellAlertIcon className="h-5 w-5 text-blue-700" />
               Alerts & Tasks
             </h3>
-            <p className="text-sm text-slate-500">Things to review</p>
+            <p className="text-sm text-slate-500">Unread admin notifications</p>
           </div>
 
           <div className="space-y-3">
-            {alerts.length === 0 ? (
+            {alertsLoading ? (
+              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
+            ) : alerts.length === 0 ? (
               <div className="text-sm text-slate-500 p-4 rounded-2xl border border-slate-200">
-                No alerts right now 🎉
+                No unread notifications 
               </div>
             ) : (
               alerts.map((a) => (
@@ -672,16 +763,17 @@ const AdminDashboard: React.FC = () => {
                     {alertIcon(a.tone)}
                   </div>
 
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-900">{a.title}</p>
                     <p className="text-sm text-slate-600 mt-1">{a.desc}</p>
+                    <p className="text-xs text-slate-500 mt-2">{fmtDate(a.created_at)}</p>
                   </div>
 
                   <button
                     className="text-slate-500 hover:text-slate-700 font-semibold"
-                    onClick={() => setAlerts((prev) => prev.filter((x) => x.id !== a.id))}
-                    aria-label="Dismiss alert"
-                    title="Dismiss"
+                    onClick={() => dismissAlert(a.id)}
+                    aria-label="Mark as read"
+                    title="Mark as read"
                   >
                     <XMarkIcon className="h-5 w-5" />
                   </button>

@@ -11,6 +11,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MinistryController;
 use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ContactMessageController;
 
 Route::middleware('web')->get('/sanctum/csrf-cookie', function () {
     return response()->json(['status' => 'csrf cookie set']);
@@ -116,13 +117,19 @@ Route::get('/donor/exports/donations', [DonorController::class, 'exportDonations
  Route::post('/donor/deactivate', [DonorController::class, 'deactivate']);
 });
 
-Route::middleware(['web', 'auth:sanctum'])->group(function () {
- Route::get('/ministry/campaigns', [MinistryController::class, 'index2']);
+
+
+Route::get('/ministry/accounts', [MinistryController::class, 'accounts']);
+Route::post('/ministry/accounts', [MinistryController::class, 'storeAccount']);
+Route::put('/ministry/accounts/{id}', [MinistryController::class, 'updateAccount']);
+Route::patch('/ministry/accounts/{id}/toggle', [MinistryController::class, 'toggleAccount']);
+
+Route::middleware(['web', 'auth:ministry'])->group(function () {
+    Route::get('/ministry/campaigns', [MinistryController::class, 'index2']);
     Route::get('/ministry/campaigns/{id}', [MinistryController::class, 'show2']);
     Route::get('/ministry/campaigns/{id}/donations', [MinistryController::class, 'donations2']);
     Route::get('/reports/ministry/pdf', [DonationController::class, 'ministryReportPdf']);
-Route::get('/ministry/overview', [MinistryController::class, 'overview']);
-
+    Route::get('/ministry/overview', [MinistryController::class, 'overview']);
 });
     Route::get('/donors', [MinistryController::class, 'index']);
     Route::get('/donors/{id}', [MinistryController::class, 'show']);
@@ -131,4 +138,6 @@ Route::get('/ministry/overview', [MinistryController::class, 'overview']);
 
 
 
+Route::get('/contact-messages', [ContactMessageController::class, 'index']);
 
+Route::post('/contact-messages', [ContactMessageController::class, 'store']);

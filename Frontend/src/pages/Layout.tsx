@@ -25,14 +25,32 @@ const Layout: React.FC<LayoutProps> = ({ currentUser, setCurrentUser }) => {
   const headerRef = useRef<HTMLElement>(null);
   const navigate = useNavigate();
 
-  const DashboardLink = currentUser?.userType === "donor" ? "/donor " : "/school/schooloverview";
+ const DashboardLink =
+  currentUser?.userType === "donor"
+    ? "/donor"
+    : currentUser?.userType === "school"
+    ? "/school/schooloverview"
+    : currentUser?.userType === "ministry"
+    ? "/ministry/overview"
+    : "/";
 
-  const primaryCta = useMemo(() => {
-    if (!currentUser) return { to: "/support-school", label: "Support a School" };
-    return currentUser?.userType === "donor"
-      ? { to: "/support-school", label: "Support a School" }
-      : { to: "/register-school", label: "Register School" };
-  }, [currentUser]);
+const primaryCta = useMemo(() => {
+  if (!currentUser) return { to: "/support-school", label: "Support a School" };
+
+  if (currentUser.userType === "donor") {
+    return { to: "/support-school", label: "Support a School" };
+  }
+
+  if (currentUser.userType === "school") {
+    return { to: "/register-school", label: "Support a School" };
+  }
+
+  if (currentUser.userType === "ministry") {
+    return { to: "/ministry", label: "Support a School" };
+  }
+
+  return { to: "/", label: "Home" };
+}, [currentUser]);
 
   const handleLogout = async () => {
     try {
@@ -250,9 +268,15 @@ useEffect(() => {
                       <div className="text-sm font-extrabold text-slate-900 max-w-[160px] truncate">
                         {currentUser?.name || "User"}
                       </div>
-                      <div className="text-[11px] text-slate-500 -mt-0.5">
-                        {currentUser?.userType === "donor" ? "Donor" : "School"}
-                      </div>
+                    <div className="text-[11px] text-slate-500 -mt-0.5">
+  {currentUser?.userType === "donor"
+    ? "Donor"
+    : currentUser?.userType === "school"
+    ? "School"
+    : currentUser?.userType === "ministry"
+    ? "Ministry"
+    : "User"}
+</div>
                     </div>
                     <i className="bx bx-chevron-down text-lg text-slate-600 hidden sm:block" />
                   </button>

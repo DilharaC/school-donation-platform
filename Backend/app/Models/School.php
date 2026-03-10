@@ -6,13 +6,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User as Authenticatable; // ✅ important
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 class School extends Authenticatable
 {
     use Notifiable;
 
  
     use HasFactory;
-
+  use HasApiTokens;
     protected $table = 'schools';
     protected $primaryKey = 'school_id';
 

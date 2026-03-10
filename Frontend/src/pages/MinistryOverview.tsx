@@ -112,18 +112,20 @@ export default function MinistryOverview() {
   const [err, setErr] = useState<string | null>(null);
 
   const load = async () => {
-    setLoading(true);
-    setErr(null);
-    try {
-      const res = await axios.get<OverviewRes>(OVERVIEW_ENDPOINT, { params: { days } });
-      setData(res.data);
-    } catch (e: any) {
-      setErr(e?.response?.data?.message || e?.message || "Failed to load overview");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  setLoading(true);
+  setErr(null);
+  try {
+    const res = await axios.get<OverviewRes>(OVERVIEW_ENDPOINT, {
+      params: { days },
+      withCredentials: true,
+    });
+    setData(res.data);
+  } catch (e: any) {
+    setErr(e?.response?.data?.message || e?.message || "Failed to load overview");
+  } finally {
+    setLoading(false);
+  }
+};
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
