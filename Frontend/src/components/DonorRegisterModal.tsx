@@ -189,7 +189,7 @@ export default function DonorRegisterModal({
           onClick={(e) => e.stopPropagation()}
         >
           {/* Left image panel */}
-          <div className="relative hidden md:block h-[520px]">
+          <div className="relative hidden md:block h-full min-h-full">
             <img src={leftImageUrl} alt="Register" className="absolute inset-0 h-full w-full object-cover" />
             <div className="absolute inset-0 bg-black/40" />
 

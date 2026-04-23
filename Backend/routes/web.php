@@ -17,6 +17,21 @@ Route::get('/test-need', function () {
     return $response->json();
 });
 
+Route::get('/ssl-config-check', function () {
+    return response()->json([
+        'php_version' => PHP_VERSION,
+        'loaded_ini' => php_ini_loaded_file(),
+        'curl.cainfo' => ini_get('curl.cainfo'),
+        'openssl.cafile' => ini_get('openssl.cafile'),
+        'curl_ca_exists' => file_exists(ini_get('curl.cainfo')),
+        'openssl_ca_exists' => file_exists(ini_get('openssl.cafile')),
+    ]);
+});
+
+    Route::get('/phpinfo-test', function () {
+    phpinfo();
+});
+
 // // // Sanctum built-in CSRF cookie route
 // Route::get('/sanctum/csrf-cookie', [CsrfCookieController::class, 'show']);
 // // Login / Logout

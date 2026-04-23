@@ -3,34 +3,33 @@
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
-
 def calculate_need_score(students, facilities, area_type, performance):
-    score = 0
+    # 1. Student pressure score (max 25)
+    # Bigger schools add need, but capped
+    student_score = min((students / 2000) * 25, 25)
 
-    # Bigger weight for number of students
-    score += (students / 1000) * 20  
+    # 2. Facility shortage score (max 40)
+    # This is the most important part
+    # More facilities reduce need, but low facilities increase strongly
+    facility_score = max(0, ((60 - facilities) / 60) * 40)
 
-    # Bigger impact for facilities (less facilities → higher need)
-    score += ((20 - facilities) / 20) * 15  
+    # 3. Performance score (max 20)
+    # Lower performance = higher need
+    performance_score = max(0, ((100 - performance) / 100) * 20)
 
-    # Performance reduces score a bit (higher performance → lower need)
-    score += (100 - performance) * 0.5  
-
-    # Area type adjustment
+    # 4. Area disadvantage score (max 15)
     area_type = area_type.lower()
-    if area_type == "rural":
-        score += 10
+    if area_type == "plantation":
+        area_score = 15
+    elif area_type == "rural":
+        area_score = 12
     elif area_type == "urban":
-        score += 5
+        area_score = 5
     else:
-        score += 7  # default for suburban/other
+        area_score = 8
 
-  
-   
-
-    # Clamp score between 0 and 100
-    score = min(max(score, 0), 100)
-    return round(score, 2)
+    total_score = student_score + facility_score + performance_score + area_score
+    return round(min(max(total_score, 0), 100), 2)
 
 @app.route('/calculate_need', methods=['POST'])
 def calculate_need():

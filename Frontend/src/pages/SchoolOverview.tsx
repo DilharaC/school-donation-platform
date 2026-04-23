@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import ChatWidget from "../components/ChatWidget";
 
 /** ===================== Types ===================== */
 type OverviewRes = {
@@ -680,6 +681,7 @@ const SchoolOverview: React.FC = () => {
           </Card>
         </div>
       </div>
+        <ChatWidget /> 
     </div>
   );
 };

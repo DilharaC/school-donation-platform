@@ -803,39 +803,39 @@ public function me(Request $request)
         'documents_url'   => $current->documents_url ?? null,
     ];
 
-    $validated = $request->validate([
-        'school_name'     => 'required|string|max:255',
-        'registration_no' => 'nullable|string|max:255',
-        'contact_email'   => 'required|email|max:255',
-        'contact_phone'   => 'nullable|string|max:20',
+$validated = $request->validate([
+    'school_name'     => 'sometimes|string|max:255',
+    'registration_no' => 'sometimes|string|max:255',
+    'contact_email'   => 'sometimes|email|max:255',
+    'contact_phone'   => 'sometimes|nullable|string|max:20',
 
-        'alt_phone'       => 'nullable|string|max:20',
-        'principal_name'  => 'nullable|string|max:150',
-        'postal_code'     => 'nullable|string|max:10',
-        'website'         => 'nullable|url|max:255',
+    'alt_phone'       => 'sometimes|nullable|string|max:20',
+    'principal_name'  => 'sometimes|nullable|string|max:150',
+    'postal_code'     => 'sometimes|nullable|string|max:10',
+    'website'         => 'sometimes|nullable|url|max:255',
 
-        'district'        => 'nullable|string|max:100',
-        'province'        => 'nullable|string|max:100',
-        'address'         => 'nullable|string|max:255',
-        'contact_person'  => 'nullable|string|max:150',
+    'district'        => 'sometimes|nullable|string|max:100',
+    'province'        => 'sometimes|nullable|string|max:100',
+    'address'         => 'sometimes|nullable|string|max:255',
+    'contact_person'  => 'sometimes|nullable|string|max:150',
 
-        'category'        => 'required|in:Primary,Secondary',
-        'level'           => 'required|in:Grade 1-5,Grade 6-9,Grade 10-13,All',
+   'category' => 'sometimes|nullable|string|max:100',
+    'level'           => 'sometimes|in:Grade 1-5,Grade 6-9,Grade 10-13,All',
 
-        'student_count'      => 'nullable|integer|min:0',
-        'teacher_count'      => 'nullable|integer|min:0',
-        'establishment_year' => 'nullable|integer|min:1800|max:2100',
+    'student_count'      => 'sometimes|nullable|integer|min:0',
+    'teacher_count'      => 'sometimes|nullable|integer|min:0',
+    'establishment_year' => 'sometimes|nullable|integer|min:1800|max:2100',
 
-        'latitude'        => 'nullable|numeric',
-        'longitude'       => 'nullable|numeric',
+    'latitude'        => 'sometimes|nullable|numeric',
+    'longitude'       => 'sometimes|nullable|numeric',
 
-        'bank_name'      => 'nullable|string|max:50',
-        'account_holder' => 'nullable|string|max:100',
-        'bank_account'   => 'nullable|string|max:50',
+    'bank_name'       => 'sometimes|nullable|string|max:50',
+    'account_holder'  => 'sometimes|nullable|string|max:100',
+    'bank_account'    => 'sometimes|nullable|string|max:50',
 
-        'logo'     => 'nullable|file|mimes:jpg,jpeg,png|max:4096',
-        'document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
-    ]);
+    'logo'            => 'nullable|file|mimes:jpg,jpeg,png|max:4096',
+    'document'        => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+]);
 
     // prepare upload paths
     $logoPath = $current->logo_url ?? null;
@@ -854,42 +854,41 @@ public function me(Request $request)
         $docPath = 'uploads/docs/' . $name;
     }
 
-    return DB::transaction(function () use ($schoolId, $validated, $logoPath, $docPath, $before) {
+  return DB::transaction(function () use ($schoolId, $validated, $logoPath, $docPath, $before, $current) {
+DB::table('schools')->where('school_id', $schoolId)->update([
+    'school_name'     => $validated['school_name'] ?? $current->school_name,
+    'registration_no' => $validated['registration_no'] ?? $current->registration_no,
+    'contact_email'   => $validated['contact_email'] ?? $current->contact_email,
+    'contact_phone'   => $validated['contact_phone'] ?? $current->contact_phone,
 
-        DB::table('schools')->where('school_id', $schoolId)->update([
-            'school_name'     => $validated['school_name'],
-            'registration_no' => $validated['registration_no'] ?? null,
-            'contact_email'   => $validated['contact_email'],
-            'contact_phone'   => $validated['contact_phone'] ?? null,
+    'alt_phone'       => $validated['alt_phone'] ?? $current->alt_phone,
+    'principal_name'  => $validated['principal_name'] ?? $current->principal_name,
+    'postal_code'     => $validated['postal_code'] ?? $current->postal_code,
+    'website'         => $validated['website'] ?? $current->website,
 
-            'alt_phone'       => $validated['alt_phone'] ?? null,
-            'principal_name'  => $validated['principal_name'] ?? null,
-            'postal_code'     => $validated['postal_code'] ?? null,
-            'website'         => $validated['website'] ?? null,
+    'district'        => $validated['district'] ?? $current->district,
+    'province'        => $validated['province'] ?? $current->province,
+    'address'         => $validated['address'] ?? $current->address,
+    'contact_person'  => $validated['contact_person'] ?? $current->contact_person,
 
-            'district'        => $validated['district'] ?? null,
-            'province'        => $validated['province'] ?? null,
-            'address'         => $validated['address'] ?? null,
-            'contact_person'  => $validated['contact_person'] ?? null,
+    'category'        => $validated['category'] ?? $current->category,
+    'level'           => $validated['level'] ?? $current->level,
 
-            'category'        => $validated['category'],
-            'level'           => $validated['level'],
+    'student_count'      => $validated['student_count'] ?? $current->student_count,
+    'teacher_count'      => $validated['teacher_count'] ?? $current->teacher_count,
+    'establishment_year' => $validated['establishment_year'] ?? $current->establishment_year,
 
-            'student_count'      => $validated['student_count'] ?? null,
-            'teacher_count'      => $validated['teacher_count'] ?? null,
-            'establishment_year' => $validated['establishment_year'] ?? null,
+    'latitude'        => $validated['latitude'] ?? $current->latitude,
+    'longitude'       => $validated['longitude'] ?? $current->longitude,
 
-            'latitude'        => $validated['latitude'] ?? null,
-            'longitude'       => $validated['longitude'] ?? null,
+    'bank_name'       => $validated['bank_name'] ?? $current->bank_name,
+    'account_holder'  => $validated['account_holder'] ?? $current->account_holder,
+    'bank_account'    => $validated['bank_account'] ?? $current->bank_account,
 
-            'bank_name'      => $validated['bank_name'] ?? null,
-            'account_holder' => $validated['account_holder'] ?? null,
-            'bank_account'   => $validated['bank_account'] ?? null,
-
-            'logo_url'       => $logoPath,
-            'documents_url'  => $docPath,
-            'updated_at'     => now(),
-        ]);
+    'logo_url'        => $logoPath,
+    'documents_url'   => $docPath,
+    'updated_at'      => now(),
+]);
 
         $row = DB::table('schools')->where('school_id', $schoolId)->first();
 

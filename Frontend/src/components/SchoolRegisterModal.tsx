@@ -86,7 +86,7 @@ const BANKS = [
   "Commercial Leasing & Finance Bank",
 ];
 
-const CATEGORIES = ["Primary", "Secondary", "Mixed", "Others"];
+const CATEGORIES = ["National", "Provincial", "Private", "International", "Other"];
 
 const inputBase =
   "w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none bg-white " +

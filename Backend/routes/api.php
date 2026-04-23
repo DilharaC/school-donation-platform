@@ -12,11 +12,11 @@ use App\Http\Controllers\MinistryController;
 use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ContactMessageController;
+use App\Http\Controllers\ChatController;
 
 Route::middleware('web')->get('/sanctum/csrf-cookie', function () {
     return response()->json(['status' => 'csrf cookie set']);
 });
-
 
 
 Route::middleware('web')->group(function () {
@@ -29,6 +29,10 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/donor/donations/{donationId}/allocations', [DonationController::class, 'donationAllocations']);
 });
+
+Route::post('/chat', [ChatController::class, 'chat']);
+
+
 
 
 Route::get('/recent-donors', [DonationController::class, 'recentDonors']);

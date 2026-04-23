@@ -66,7 +66,7 @@ type ProjectDetail = {
 
 interface ProjectsProps {}
 
-const categories = ["All", "Technology", "Books", "Infrastructure", "Furniture", "Arts", "Sports"];
+const categories = ["All", "ICT", "Books", "Furniture", "Stationery", "Labs", "Sports", "Others"];
 
 const API_HOST = "http://localhost:8000";
 const API_URL = `${API_HOST}/api/donation_requests`;

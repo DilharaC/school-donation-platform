@@ -1,15 +1,7 @@
 // src/pages/AdminDashboard.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import ReactECharts from "echarts-for-react";
 import "../css/index.css";
 import {
   ArrowTrendingUpIcon,
@@ -60,7 +52,7 @@ interface Stat {
   label: string;
   value: string | number;
   change: ChangeObj;
-  icon: React.FC;
+  icon: React.FC<any>;
   trend?: { x: string; y: number }[];
 }
 
@@ -112,7 +104,9 @@ const Pill: React.FC<{
     slate: "bg-slate-50 text-slate-700 border-slate-200",
   };
   return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full border ${tones[tone]}`}>
+    <span
+      className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full border ${tones[tone]}`}
+    >
       {children}
     </span>
   );
@@ -158,26 +152,53 @@ const SecondaryButton: React.FC<ButtonProps> = ({
   </button>
 );
 
-const MiniSpark: React.FC<{ data?: { x: string; y: number }[]; gid: string }> = ({ data, gid }) => {
-  if (!data || data.length < 2) return <div className="h-9" />;
-  const safe = data.map((d) => ({ ...d, y: Number(d.y || 0) }));
-  const fillId = `sparkFill-${gid}`;
+const MiniSpark: React.FC<{ data?: { x: string; y: number }[] }> = ({ data }) => {
+  if (!data || data.length < 2) return <div className="h-10 w-24" />;
 
-  return (
-    <div className="h-9 w-24">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={safe} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
-          <defs>
-            <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="10%" stopColor="#1d4ed8" stopOpacity={0.25} />
-              <stop offset="90%" stopColor="#1d4ed8" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <Area type="monotone" dataKey="y" stroke="#1d4ed8" fill={`url(#${fillId})`} strokeWidth={2} />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
+  const option = {
+    animation: true,
+    animationDuration: 700,
+    grid: { left: 0, right: 0, top: 2, bottom: 2 },
+    xAxis: {
+      type: "category",
+      data: data.map((d) => d.x),
+      show: false,
+      boundaryGap: false,
+    },
+    yAxis: {
+      type: "value",
+      show: false,
+      splitLine: { show: false },
+    },
+    tooltip: { show: false },
+    series: [
+      {
+        type: "line",
+        data: data.map((d) => Number(d.y || 0)),
+        smooth: true,
+        symbol: "none",
+        lineStyle: {
+          width: 2.5,
+          color: "#1d4ed8",
+        },
+        areaStyle: {
+          color: {
+            type: "linear",
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: "rgba(29,78,216,0.28)" },
+              { offset: 1, color: "rgba(29,78,216,0.02)" },
+            ],
+          },
+        },
+      },
+    ],
+  };
+
+  return <ReactECharts option={option} style={{ height: 40, width: 96 }} opts={{ renderer: "svg" }} />;
 };
 
 /* ======================= Helpers ======================= */
@@ -255,7 +276,7 @@ const AdminDashboard: React.FC = () => {
   const [alertsLoading, setAlertsLoading] = useState(true);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 4;
+  const itemsPerPage = 3;
 
   const rangedChart = useMemo(() => {
     const base = Array.isArray(chartData) ? chartData : [];
@@ -280,6 +301,100 @@ const AdminDashboard: React.FC = () => {
 
   const hasNextPage = currentPage * itemsPerPage < sortedTopCampaigns.length;
 
+  const mainTrendOption = useMemo(() => {
+    return {
+      animation: true,
+      animationDuration: 900,
+      animationEasing: "cubicOut",
+      grid: {
+        left: 10,
+        right: 10,
+        top: 20,
+        bottom: 10,
+        containLabel: true,
+      },
+      tooltip: {
+        trigger: "axis",
+        backgroundColor: "rgba(15,23,42,0.94)",
+        borderWidth: 0,
+        textStyle: {
+          color: "#fff",
+          fontSize: 12,
+        },
+        extraCssText:
+          "border-radius:14px; box-shadow: 0 12px 30px rgba(0,0,0,0.18); backdrop-filter: blur(10px);",
+        formatter: (params: any) => {
+          const point = Array.isArray(params) ? params[0] : params;
+          return `
+            <div style="padding:2px 4px;">
+              <div style="font-weight:700; margin-bottom:6px;">${point?.axisValue ?? ""}</div>
+              <div>Donations: <b>LKR ${Number(point?.value ?? 0).toLocaleString()}</b></div>
+            </div>
+          `;
+        },
+      },
+      xAxis: {
+        type: "category",
+        boundaryGap: false,
+        data: rangedChart.map((r: any) => r.month),
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: "#64748b",
+          fontSize: 12,
+        },
+      },
+      yAxis: {
+        type: "value",
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: {
+          lineStyle: {
+            color: "#e2e8f0",
+            type: "dashed",
+          },
+        },
+        axisLabel: {
+          color: "#64748b",
+          formatter: (v: number) => `${Math.round(Number(v) / 1000)}k`,
+        },
+      },
+      series: [
+        {
+          name: "Donations",
+          type: "line",
+          smooth: true,
+          symbol: "circle",
+          symbolSize: 7,
+          showSymbol: false,
+          lineStyle: {
+            width: 3.5,
+            color: "#1d4ed8",
+            shadowColor: "rgba(29,78,216,0.20)",
+            shadowBlur: 10,
+          },
+          itemStyle: {
+            color: "#1d4ed8",
+          },
+          areaStyle: {
+            color: {
+              type: "linear",
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: "rgba(29,78,216,0.24)" },
+                { offset: 1, color: "rgba(29,78,216,0.02)" },
+              ],
+            },
+          },
+          data: rangedChart.map((r: any) => Number(r?.donations || 0)),
+        },
+      ],
+    };
+  }, [rangedChart]);
+
   const fetchUnreadAlerts = async () => {
     try {
       setAlertsLoading(true);
@@ -290,7 +405,7 @@ const AdminDashboard: React.FC = () => {
           role: "admin",
           unread: 1,
           page: 1,
-          limit: 3, // show only top 3 unread alerts in dashboard
+          limit: 3,
         },
       });
 
@@ -398,10 +513,34 @@ const AdminDashboard: React.FC = () => {
         }));
 
         setStats([
-          { label: "Today Donors", value: todayDonors.toLocaleString(), change: donorsChange, icon: UsersIcon as any, trend: donorsMini },
-          { label: "Today Raised (LKR)", value: todayRaised.toLocaleString(), change: raisedChange, icon: BanknotesIcon as any, trend: chartMini },
-          { label: "Today Campaigns", value: todayCampaigns.toLocaleString(), change: campaignsChange, icon: HeartIcon as any, trend: activeMini },
-          { label: "Today Avg Donation", value: Math.round(todayAvg).toLocaleString(), change: avgChange, icon: ArrowTrendingUpIcon as any, trend: avgMini },
+          {
+            label: "Today Donors",
+            value: todayDonors.toLocaleString(),
+            change: donorsChange,
+            icon: UsersIcon as any,
+            trend: donorsMini,
+          },
+          {
+            label: "Today Raised (LKR)",
+            value: todayRaised.toLocaleString(),
+            change: raisedChange,
+            icon: BanknotesIcon as any,
+            trend: chartMini,
+          },
+          {
+            label: "Today Campaigns",
+            value: todayCampaigns.toLocaleString(),
+            change: campaignsChange,
+            icon: HeartIcon as any,
+            trend: activeMini,
+          },
+          {
+            label: "Today Avg Donation",
+            value: Math.round(todayAvg).toLocaleString(),
+            change: avgChange,
+            icon: ArrowTrendingUpIcon as any,
+            trend: avgMini,
+          },
         ]);
       } catch (error) {
         console.error("Dashboard fetch error:", error);
@@ -440,10 +579,10 @@ const AdminDashboard: React.FC = () => {
                   <Skeleton className="w-14 h-6" />
                 </div>
                 <Skeleton className="mt-4 w-24 h-7" />
-                <Skeleton className="mt-3 w-24 h-9" />
+                <Skeleton className="mt-3 w-24 h-10" />
               </Card>
             ))
-          : stats.map((stat, idx) => {
+          : stats.map((stat) => {
               const Icon = stat.icon as any;
               const pct = stat.change.pct ?? 0;
               const isUp = pct >= 0;
@@ -464,18 +603,18 @@ const AdminDashboard: React.FC = () => {
 
               return (
                 <Card key={stat.label} className="p-5 hover:shadow-md transition">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2 rounded-xl bg-blue-50 text-blue-600 shrink-0">
                         <Icon className="h-5 w-5" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm text-slate-500">{stat.label}</p>
-                        <p className="mt-2 text-2xl font-bold text-slate-900">{stat.value}</p>
+                        <p className="mt-2 text-2xl font-bold text-slate-900 truncate">{stat.value}</p>
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-2">
+                    <div className="flex flex-col items-end gap-2 shrink-0">
                       <span
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeClass}`}
                         title="Weekly change (last 7 days vs previous 7 days)"
@@ -483,7 +622,7 @@ const AdminDashboard: React.FC = () => {
                         {stat.change.state === "new" ? "" : isUp ? "▲" : "▼"} {badgeText}
                       </span>
 
-                      <MiniSpark data={stat.trend} gid={`${idx}-${stat.label.replace(/\s+/g, "-")}`} />
+                      <MiniSpark data={stat.trend} />
                     </div>
                   </div>
                 </Card>
@@ -520,45 +659,7 @@ const AdminDashboard: React.FC = () => {
           {loading ? (
             <Skeleton className="h-[300px] w-full" />
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={rangedChart} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="fillDonations" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#1d4ed8" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#1d4ed8" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.6} />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={10} stroke="#64748b" />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={10}
-                  tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`}
-                  stroke="#64748b"
-                />
-
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "white",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "12px",
-                    padding: "8px 12px",
-                  }}
-                  formatter={(value: any) => [`LKR ${Number(value || 0).toLocaleString()}`, "Donations"]}
-                />
-
-                <Area
-                  type="monotone"
-                  dataKey="donations"
-                  stroke="#1d4ed8"
-                  fillOpacity={1}
-                  fill="url(#fillDonations)"
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <ReactECharts option={mainTrendOption} style={{ height: 300, width: "100%" }} notMerge lazyUpdate />
           )}
         </Card>
 
@@ -730,7 +831,6 @@ const AdminDashboard: React.FC = () => {
           )}
         </Card>
 
-        {/* Alerts = only unread notifications */}
         <Card className="p-6 lg:col-span-3">
           <div className="mb-4">
             <h3 className="text-lg font-semibold text-slate-900 inline-flex items-center gap-2">
@@ -745,7 +845,7 @@ const AdminDashboard: React.FC = () => {
               Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
             ) : alerts.length === 0 ? (
               <div className="text-sm text-slate-500 p-4 rounded-2xl border border-slate-200">
-                No unread notifications 
+                No unread notifications
               </div>
             ) : (
               alerts.map((a) => (
