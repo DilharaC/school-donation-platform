@@ -23,48 +23,76 @@ public function index(Request $request)
     $page     = max(1, (int) $request->query('page', 1));
     $limit    = max(1, min(50, (int) $request->query('limit', 6)));
 
-    $needBand = $request->query('needBand', 'all'); 
-    $sortBy   = $request->query('sortBy', 'latest');
-    $query = DonationRequest::with('school');
-    $query->where('status', 'Approved');
+    $needBand = strtolower($request->query('needBand', 'all'));
+    $sortBy   = strtolower($request->query('sortBy', 'latest'));
+
+    $baseQuery = DB::table('donation_requests')
+        ->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
+        ->where('donation_requests.status', 'Approved');
+
     if ($search !== '') {
-        $query->where(function ($q) use ($search) {
-            $q->where('request_title', 'like', "%{$search}%")
-              ->orWhere('description', 'like', "%{$search}%")
-              ->orWhereHas('school', function ($q2) use ($search) {
-                  $q2->where('school_name', 'like', "%{$search}%");
-              });
+        $baseQuery->where(function ($q) use ($search) {
+            $q->where('donation_requests.request_title', 'like', "%{$search}%")
+              ->orWhere('donation_requests.description', 'like', "%{$search}%")
+              ->orWhere('schools.school_name', 'like', "%{$search}%")
+              ->orWhere('schools.district', 'like', "%{$search}%")
+              ->orWhere('schools.province', 'like', "%{$search}%");
         });
     }
-    if ($category && $category !== 'All') {
-        $query->where('category', $category);
-    }
-    if ($needBand === 'high') {
-        $query->whereHas('school', fn ($q) => $q->where('need_score', '>=', 70));
-    } elseif ($needBand === 'medium') {
-        $query->whereHas('school', fn ($q) => $q->whereBetween('need_score', [40, 69.9999]));
-    } elseif ($needBand === 'low') {
-        $query->whereHas('school', fn ($q) => $q->where('need_score', '<', 40));
-    }
-    $summary = (clone $query)->reorder()->selectRaw('
-        COUNT(*) as total_requests,
-        SUM(CASE WHEN status = "Approved" THEN 1 ELSE 0 END) as approved_count,
-        SUM(CASE WHEN status = "Pending" THEN 1 ELSE 0 END) as pending_count,
-        COALESCE(SUM(amount_raised),0) as total_raised,
-        COALESCE(SUM(estimated_price),0) as total_target
-    ')->first();
 
-    if ($sortBy === 'need_high' || $sortBy === 'need_low') {
-        $dir = $sortBy === 'need_high' ? 'desc' : 'asc';
-        $query->leftJoin('schools', 'donation_requests.school_id', '=', 'schools.school_id')
-              ->select('donation_requests.*')
-              ->orderBy('schools.need_score', $dir)
-              ->orderBy('donation_requests.created_at', 'desc');
-    } else {
-        $query->orderBy('donation_requests.created_at', 'desc');
+    if ($category && $category !== 'All') {
+        $baseQuery->where('donation_requests.category', $category);
     }
-    $total = (clone $query)->distinct('donation_requests.request_id')->count('donation_requests.request_id');
-  $projects = (clone $query)
+
+    if ($needBand === 'high') {
+        $baseQuery->where('schools.need_score', '>=', 70);
+    } elseif ($needBand === 'medium') {
+        $baseQuery->whereBetween('schools.need_score', [40, 69.9999]);
+    } elseif ($needBand === 'low') {
+        $baseQuery->where('schools.need_score', '<', 40);
+    }
+
+    $summary = (clone $baseQuery)
+        ->selectRaw('
+            COUNT(DISTINCT donation_requests.request_id) as total_requests,
+            COALESCE(SUM(donation_requests.amount_raised),0) as total_raised,
+            COALESCE(SUM(donation_requests.estimated_price),0) as total_target
+        ')
+        ->first();
+
+    $total = (clone $baseQuery)
+        ->distinct()
+        ->count('donation_requests.request_id');
+
+    $listQuery = (clone $baseQuery)->select(
+        'donation_requests.request_id',
+        'donation_requests.school_id',
+        'donation_requests.request_title',
+        'donation_requests.category',
+        'donation_requests.quantity',
+        'donation_requests.estimated_price',
+        'donation_requests.amount_raised',
+        'donation_requests.description',
+        'donation_requests.image_url',
+        'donation_requests.document_url',
+        'donation_requests.status',
+        'donation_requests.created_at',
+        'donation_requests.updated_at',
+        'schools.school_name',
+        'schools.need_score'
+    );
+
+    if ($sortBy === 'need_high') {
+        $listQuery->orderByDesc('schools.need_score')
+                  ->orderByDesc('donation_requests.created_at');
+    } elseif ($sortBy === 'need_low') {
+        $listQuery->orderBy('schools.need_score')
+                  ->orderByDesc('donation_requests.created_at');
+    } else {
+        $listQuery->orderByDesc('donation_requests.created_at');
+    }
+
+    $projects = $listQuery
         ->skip(($page - 1) * $limit)
         ->take($limit)
         ->get()
@@ -72,13 +100,13 @@ public function index(Request $request)
             return [
                 'request_id' => $project->request_id,
                 'school_id' => $project->school_id,
-                'school_name' => $project->school->school_name ?? 'Unknown School',
-                'need_score' => (float) ($project->school->need_score ?? 0),
+                'school_name' => $project->school_name ?? 'Unknown School',
+                'need_score' => (float) ($project->need_score ?? 0),
                 'request_title' => $project->request_title,
                 'category' => $project->category,
-                'quantity' => (int)$project->quantity,
-                'estimated_price' => (float)$project->estimated_price,
-                'amount_raised' => (float)$project->amount_raised,
+                'quantity' => (int) $project->quantity,
+                'estimated_price' => (float) $project->estimated_price,
+                'amount_raised' => (float) $project->amount_raised,
                 'description' => $project->description,
                 'image_url' => $project->image_url,
                 'document_url' => $project->document_url,
@@ -90,11 +118,11 @@ public function index(Request $request)
 
     return response()->json([
         'projects' => $projects,
-        'total' => (int)$total,
+        'total' => (int) $total,
         'summary' => [
             'total_requests' => (int) ($summary->total_requests ?? 0),
-            'approved_count' => (int) ($summary->approved_count ?? 0),
-            'pending_count' => (int) ($summary->pending_count ?? 0),
+            'approved_count' => (int) ($summary->total_requests ?? 0),
+            'pending_count' => 0,
             'total_raised' => (float) ($summary->total_raised ?? 0),
             'total_target' => (float) ($summary->total_target ?? 0),
         ],
@@ -104,7 +132,7 @@ public function adminIndex(Request $request)
 {
     $search   = trim($request->query('search', ''));
     $category = $request->query('category', 'All');
-    $status   = $request->query('status', null); // ✅ admin can filter status
+    $status   = $request->query('status', null); 
     $page     = max(1, (int) $request->query('page', 1));
     $limit    = max(1, min(50, (int) $request->query('limit', 10)));
 

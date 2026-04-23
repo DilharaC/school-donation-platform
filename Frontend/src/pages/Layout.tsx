@@ -1,8 +1,9 @@
 // Layout.tsx (FULL) — wider + no black (uses rose + slate), full-width pages supported
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Outlet, Link, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import LoginModal from "../pages/LoginModal";
+import ChatWidget from "../components/ChatWidget";
 
 interface LayoutProps {
   currentUser: any;
@@ -35,18 +36,18 @@ const Layout: React.FC<LayoutProps> = ({ currentUser, setCurrentUser }) => {
     : "/";
 
 const primaryCta = useMemo(() => {
-  if (!currentUser) return { to: "/support-school", label: "Support a School" };
+  if (!currentUser) return { to: "/projects", label: "Support a School" };
 
   if (currentUser.userType === "donor") {
-    return { to: "/support-school", label: "Support a School" };
+    return { to: "/projects", label: "Support a School" };
   }
 
   if (currentUser.userType === "school") {
-    return { to: "/register-school", label: "Support a School" };
+    return { to: "/projects", label: "Support a School" };
   }
 
   if (currentUser.userType === "ministry") {
-    return { to: "/ministry", label: "Support a School" };
+    return { to: "/ministry", label: "View Analytics" };
   }
 
   return { to: "/", label: "Home" };
@@ -66,20 +67,21 @@ const primaryCta = useMemo(() => {
       console.error("Logout failed:", err);
     }
   };
+  const location = useLocation();
 const [loginOpen, setLoginOpen] = useState(false);
 // ✅ Listen global event to open LoginModal (ex: from Projects donate button)
-useEffect(() => {
-  const handler = (e: any) => {
-    setLoginOpen(true);
+// useEffect(() => {
+//   const handler = (e: any) => {
+//     setLoginOpen(true);
 
-    if (e?.detail?.redirectTo) {
-      sessionStorage.setItem("afterLoginRedirect", e.detail.redirectTo);
-    }
-  };
+//     if (e?.detail?.redirectTo) {
+//       sessionStorage.setItem("afterLoginRedirect", e.detail.redirectTo);
+//     }
+//   };
 
-  window.addEventListener("openLoginModal", handler);
-  return () => window.removeEventListener("openLoginModal", handler);
-}, []);
+//   window.addEventListener("openLoginModal", handler);
+//   return () => window.removeEventListener("openLoginModal", handler);
+// }, []);
   // Close dropdown on outside click
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -113,47 +115,65 @@ useEffect(() => {
 }, []);
 
   // Header hide/show on scroll
-  useEffect(() => {
-    let lastScrollTop = 0;
+useEffect(() => {
+  let lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
 
-    const handleScroll = () => {
-      const header = headerRef.current;
-      if (!header) return;
+  const handleScroll = () => {
+    const header = headerRef.current;
+    if (!header) return;
 
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
 
-      if (scrollTop === 0) {
-        header.classList.remove("-translate-y-full");
-        header.classList.remove("shadow-sm");
-        header.classList.add("translate-y-0");
-      } else if (scrollTop > lastScrollTop) {
-        header.classList.add("-translate-y-full");
-        header.classList.remove("shadow-sm");
-      } else {
-        header.classList.remove("-translate-y-full");
-        header.classList.add("shadow-sm");
-      }
+    if (scrollTop <= 0) {
+      header.classList.remove("-translate-y-full");
+      header.classList.remove("shadow-sm");
+      header.classList.add("translate-y-0");
+    } else if (scrollTop > lastScrollTop) {
+      header.classList.add("-translate-y-full");
+      header.classList.remove("translate-y-0");
+      header.classList.remove("shadow-sm");
+    } else {
+      header.classList.remove("-translate-y-full");
+      header.classList.add("translate-y-0");
+      header.classList.add("shadow-sm");
+    }
 
-      lastScrollTop = scrollTop <= 0 ? 0 : scrollTop;
-    };
+    lastScrollTop = Math.max(scrollTop, 0);
+  };
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  handleScroll();
 
+  window.addEventListener("scroll", handleScroll, { passive: true });
+  return () => window.removeEventListener("scroll", handleScroll);
+}, [location.pathname, location.hash]);
+
+useEffect(() => {
+  const header = headerRef.current;
+  if (!header) return;
+
+  header.classList.remove("-translate-y-full");
+  header.classList.add("translate-y-0");
+
+  const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+  if (scrollTop <= 0) {
+    header.classList.remove("shadow-sm");
+  } else {
+    header.classList.add("shadow-sm");
+  }
+}, [location.pathname, location.hash]);
   const mainLinks = [
     { to: "/", label: "Home" },
     { to: "/projects", label: "Projects" },
-    { to: "/about", label: "About" },
-    { to: "/blog", label: "Updates" },
-    { to: "/contact", label: "Contact" },
+   { to: "/#about", label: "About" },
+  
+   { to: "/#contact", label: "Contact" },
   ];
 
   const helpLinks = [
-    { to: "/support-school", label: "Donate money" },
+    { to: "/projects", label: "Donate money" },
     { to: "/projects", label: "Fund a project" },
-    { to: "/volunteer", label: "Volunteer" },
-    { to: "/partner", label: "Partner with us" },
+  
+   
   ];
 
   return (
@@ -163,10 +183,8 @@ useEffect(() => {
         <div className="mx-auto max-w-7xl px-4 sm:px-8 h-10 flex items-center justify-between">
           <div className="text-xs text-slate-500">Transparent donations • Verified schools • Evidence & receipts</div>
           <div className="flex items-center gap-4 text-xs font-bold text-slate-700">
-            <Link className="hover:text-slate-900" to="/faq">
-              FAQs
-            </Link>
-            <Link className="hover:text-slate-900" to="/contact">
+            
+            <Link className="hover:text-slate-900" to="/#contact">
               Contact
             </Link>
             {currentUser && (
@@ -179,9 +197,9 @@ useEffect(() => {
       </div>
 
       {/* Header */}
-   <header
+ <header
   ref={headerRef}
-  className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-slate-200 shadow-sm"
+  className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-slate-200 shadow-sm transform transition-transform duration-300"
 >
   <nav className="w-full px-6 sm:px-12 lg:px-20 xl:px-32">
     <div className="flex h-16 lg:h-20 items-center justify-between">
@@ -191,56 +209,72 @@ useEffect(() => {
                 SD
               </div>
               <div className="leading-tight">
-                <div className="font-extrabold tracking-tight group-hover:opacity-90">SchoolDonate</div>
+                <div className="font-extrabold tracking-tight group-hover:opacity-90">EDUFund Connect</div>
                 <div className="text-[11px] text-slate-500 -mt-0.5">Help schools faster</div>
               </div>
             </Link>
 
             {/* Desktop nav */}
             <div className="hidden md:flex items-center gap-1">
-              {mainLinks.map((x) => (
-                <NavLink
-                  key={x.to}
-                  to={x.to}
-                  className={({ isActive }) =>
-                    cx(
-                      "px-3 py-2 rounded-xl text-sm font-semibold transition",
-                      isActive
-                        ? "bg-rose-500 text-white shadow-sm"
-                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
-                    )
-                  }
-                >
-                  {x.label}
-                </NavLink>
-              ))}
+{mainLinks.map((x) =>
+  x.label === "About" || x.label === "Contact" ? (
+    <a
+      key={x.to}
+      href={x.label === "About" ? "/#about" : "/#contact"}
+      className="px-3 py-2 rounded-xl text-sm font-semibold transition text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+    >
+      {x.label}
+    </a>
+  ) : (
+    <NavLink
+      key={x.to}
+      to={x.to}
+      className={({ isActive }) =>
+        cx(
+          "px-3 py-2 rounded-xl text-sm font-semibold transition",
+          isActive
+            ? "bg-rose-500 text-white shadow-sm"
+            : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+        )
+      }
+    >
+      {x.label}
+    </NavLink>
+  )
+)}
 
               {/* Group: How you can help */}
-              <div className="relative group">
-                <button className="px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition inline-flex items-center gap-2">
-                  How you can help
-                  <i className="bx bx-chevron-down text-lg" />
-                </button>
+            <div className="relative group">
+  <button className="px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition inline-flex items-center gap-2">
+    How you can help
+    <i className="bx bx-chevron-down text-lg" />
+  </button>
 
-                <div className="hidden group-hover:block absolute left-0 top-11 w-[420px] rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
-                  <div className="p-4 border-b border-slate-100">
-                    <div className="font-extrabold text-slate-900">Get involved</div>
-                    <div className="text-xs text-slate-500 mt-1">Choose a way to help schools faster.</div>
-                  </div>
-                  <div className="p-2 grid grid-cols-2 gap-1">
-                    {helpLinks.map((l) => (
-                      <Link
-                        key={l.to}
-                        to={l.to}
-                        className="px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition"
-                      >
-                        {l.label}
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+  <div className="absolute left-0 top-full pt-2 opacity-0 invisible translate-y-1 pointer-events-none transition-all duration-200 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:pointer-events-auto">
+    <div className="w-[420px] rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
+      <div className="p-4 border-b border-slate-100">
+        <div className="font-extrabold text-slate-900">Get involved</div>
+        <div className="text-xs text-slate-500 mt-1">
+          Choose a way to help schools faster.
+        </div>
+      </div>
+
+      <div className="p-2 grid grid-cols-2 gap-1">
+        {helpLinks.map((l) => (
+          <Link
+            key={l.to}
+            to={l.to}
+            className="px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition"
+          >
+            {l.label}
+          </Link>
+        ))}
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
 
             {/* Right actions */}
             <div className="flex items-center gap-2">
@@ -301,14 +335,7 @@ useEffect(() => {
                           Dashboard
                         </Link>
 
-                        <Link
-                          to="/account"
-                          onClick={() => setDropdownVisible(false)}
-                          className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition"
-                        >
-                          <i className="bx bx-cog text-lg" />
-                          Settings
-                        </Link>
+                      
 
                         <button
                           onClick={handleLogout}
@@ -360,17 +387,27 @@ useEffect(() => {
 
             <div className="p-3">
               <div className="rounded-2xl border border-slate-200 p-2">
-                {mainLinks.map((x) => (
-                  <Link
-                    key={x.to}
-                    to={x.to}
-                    onClick={() => setMobileOpen(false)}
-                    className="block px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition"
-                  >
-                    {x.label}
-                  </Link>
-                ))}
-              </div>
+          {mainLinks.map((x) =>
+  x.label === "About" || x.label === "Contact" ? (
+    <a
+      key={x.to}
+      href={x.label === "About" ? "/#about" : "/#contact"}
+      onClick={() => setMobileOpen(false)}
+      className="block px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition"
+    >
+      {x.label}
+    </a>
+  ) : (
+    <Link
+      key={x.to}
+      to={x.to}
+      onClick={() => setMobileOpen(false)}
+      className="block px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition"
+    >
+      {x.label}
+    </Link>
+  )
+)}           </div>
 
               <div className="mt-3 rounded-2xl border border-slate-200 p-2">
                 <div className="px-3 py-2 text-xs font-extrabold text-slate-500">How you can help</div>
@@ -414,10 +451,9 @@ useEffect(() => {
           IMPORTANT: full-width pages (hero sections) can control their own max-width.
           If you want ALL pages constrained, change this to max-w-7xl container again.
       */}
-      <main className="px-0">
-        <Outlet />
-      </main>
-
+  <main className="px-0">
+  <Outlet />
+</main>
       {/* Footer */}
    <footer className="bg-gradient-to-br from-[#0B1B3A] via-[#0E2148] to-[#0B1B3A] text-white">
 
@@ -513,6 +549,7 @@ useEffect(() => {
   onClose={() => setLoginOpen(false)}
   setCurrentUser={setCurrentUser}
 />
+<ChatWidget />
     </div>
   );
 };

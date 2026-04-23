@@ -1,23 +1,10 @@
 // src/pages/AnalyticsPage.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import ReactECharts from "echarts-for-react";
 import { MapContainer, TileLayer, Popup, CircleMarker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-} from "recharts";
-
-// import ".../css/index.css";
 
 /* ===================== Types ===================== */
 interface School {
@@ -33,7 +20,7 @@ interface School {
 
 interface Trend {
   month: string;
-  donations: number; // total amount per month
+  donations: number;
 }
 
 /* ===================== Sri Lanka Bounds ===================== */
@@ -54,10 +41,10 @@ const getNeedBucket = (need: number): NeedBucket => {
 };
 
 const getNeedColor = (need: number) => {
-  if (need >= 70) return "#ef4444"; // red-500
-  if (need >= 40) return "#fb923c"; // orange-400
-  if (need >= 10) return "#facc15"; // yellow-400
-  return "#22c55e"; // green-500
+  if (need >= 70) return "#ef4444";
+  if (need >= 40) return "#fb923c";
+  if (need >= 10) return "#facc15";
+  return "#22c55e";
 };
 
 const formatMoney = (value: number) =>
@@ -88,8 +75,11 @@ const Pill: React.FC<{
     rose: "bg-rose-50 text-rose-700 border-rose-200",
     slate: "bg-slate-50 text-slate-700 border-slate-200",
   };
+
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full border ${tones[tone]}`}>
+    <span
+      className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full border ${tones[tone]}`}
+    >
       {children}
     </span>
   );
@@ -106,18 +96,25 @@ const KpiCard: React.FC<{
       <div className="min-w-0">
         <p className="text-sm text-slate-500 font-medium">{title}</p>
         <div className="mt-2 text-3xl font-extrabold text-slate-900 whitespace-nowrap">
-  {value}
-</div>
+          {value}
+        </div>
         {sub && <div className="mt-1 text-sm text-slate-500">{sub}</div>}
       </div>
-      {icon && <div className="p-2 rounded-xl bg-blue-50 text-blue-700 shrink-0">{icon}</div>}
+      {icon && (
+        <div className="p-2 rounded-xl bg-blue-50 text-blue-700 shrink-0">
+          {icon}
+        </div>
+      )}
     </div>
   </ShellCard>
 );
 
 const ProgressBar: React.FC<{ value: number }> = ({ value }) => (
   <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-    <div className="h-full bg-blue-600" style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+    <div
+      className="h-full bg-blue-600"
+      style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+    />
   </div>
 );
 
@@ -207,7 +204,11 @@ const Toggle: React.FC<{
         checked ? "bg-blue-600" : "bg-slate-200"
       }`}
     >
-      <span className={`w-4 h-4 rounded-full bg-white transition ${checked ? "translate-x-4" : ""}`} />
+      <span
+        className={`w-4 h-4 rounded-full bg-white transition ${
+          checked ? "translate-x-4" : ""
+        }`}
+      />
     </span>
     {label}
   </label>
@@ -218,13 +219,19 @@ const downloadCSV = (filename: string, rows: Array<Record<string, any>>) => {
   if (!rows.length) return;
 
   const headers = Object.keys(rows[0]);
+
   const escape = (v: any) => {
     const s = String(v ?? "");
-    if (s.includes('"') || s.includes(",") || s.includes("\n")) return `"${s.replaceAll('"', '""')}"`;
+    if (s.includes('"') || s.includes(",") || s.includes("\n")) {
+      return `"${s.replaceAll('"', '""')}"`;
+    }
     return s;
   };
 
-  const csv = [headers.join(","), ...rows.map((r) => headers.map((h) => escape(r[h])).join(","))].join("\n");
+  const csv = [
+    headers.join(","),
+    ...rows.map((r) => headers.map((h) => escape(r[h])).join(",")),
+  ].join("\n");
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -245,14 +252,12 @@ const AnalyticsPage: React.FC = () => {
   const [trends, setTrends] = useState<Trend[]>([]);
   const [range, setRange] = useState<"6M" | "12M" | "ALL">("12M");
 
-  // ✅ Filters (added)
   const [search, setSearch] = useState("");
   const [provinceFilter, setProvinceFilter] = useState<string>("ALL");
   const [districtFilter, setDistrictFilter] = useState<string>("ALL");
   const [needFilter, setNeedFilter] = useState<NeedFilter>("ALL");
   const [hideZero, setHideZero] = useState<boolean>(false);
 
-  // ✅ Pagination (your request)
   const [provincePage, setProvincePage] = useState(1);
   const [schoolPage, setSchoolPage] = useState(1);
   const provincesPerPage = 8;
@@ -272,26 +277,24 @@ const AnalyticsPage: React.FC = () => {
 
         if (!alive) return;
 
-const safeSchools: School[] = (schoolsRes.data || []).map((s: any) => ({
-  school_id: Number(s.school_id),
-  school_name: String(s.school_name ?? ""),
-  district: String(s.district ?? "Unknown"),
-  province: String(s.province ?? "Unknown"),
-  latitude: Number(s.latitude),
-  longitude: Number(s.longitude),
+        const safeSchools: School[] = (schoolsRes.data || []).map((s: any) => ({
+          school_id: Number(s.school_id),
+          school_name: String(s.school_name ?? ""),
+          district: String(s.district ?? "Unknown"),
+          province: String(s.province ?? "Unknown"),
+          latitude: Number(s.latitude),
+          longitude: Number(s.longitude),
+          total_received: Number(s.total_received ?? s.fund_balance ?? 0),
+          need_score: Number(s.need_score ?? 0),
+        }));
 
-  // ✅ fund_balance comes from schools table
-  // backend should return it as total_received (recommended)
-  total_received: Number(s.total_received ?? s.fund_balance ?? 0),
-
-  need_score: Number(s.need_score ?? 0),
-}));
-setSchools(safeSchools);
+        setSchools(safeSchools);
 
         const safeTrends: Trend[] = (trendsRes.data || []).map((t: any) => ({
-          month: t.month,
-          donations: Number(t.donations),
+          month: String(t.month ?? ""),
+          donations: Number(t.donations ?? 0),
         }));
+
         setTrends(safeTrends);
       } catch (err) {
         console.error("Analytics load error:", err);
@@ -301,12 +304,11 @@ setSchools(safeSchools);
     };
 
     load();
+
     return () => {
       alive = false;
     };
   }, []);
-
-  /* ===================== Derived (Filters) ===================== */
 
   const uniqueProvinces = useMemo(() => {
     const set = new Set<string>();
@@ -317,7 +319,6 @@ setSchools(safeSchools);
   const uniqueDistricts = useMemo(() => {
     const set = new Set<string>();
     for (const s of schools) {
-      // if province filter selected, show districts only from that province
       if (provinceFilter !== "ALL" && (s.province || "Unknown") !== provinceFilter) continue;
       set.add((s.district || "Unknown").trim());
     }
@@ -343,7 +344,6 @@ setSchools(safeSchools);
       return hay.includes(q);
     });
 
-    // remove duplicates by school_id (prevents repeated rows if backend duplicates)
     const seen = new Set<number>();
     const unique: School[] = [];
     for (const s of out) {
@@ -354,13 +354,10 @@ setSchools(safeSchools);
     return unique;
   }, [schools, search, provinceFilter, districtFilter, needFilter, hideZero]);
 
-  // reset pages when filters change (avoid blank pages)
   useEffect(() => {
     setProvincePage(1);
     setSchoolPage(1);
   }, [search, provinceFilter, districtFilter, needFilter, hideZero]);
-
-  /* ===================== Derived Analytics (use filteredSchools) ===================== */
 
   const totalRaisedFromSchools = useMemo(
     () => filteredSchools.reduce((sum, s) => sum + Number(s.total_received || 0), 0),
@@ -380,20 +377,30 @@ setSchools(safeSchools);
   );
 
   const needBreakdown = useMemo(() => {
-    const counts: Record<NeedBucket, number> = { High: 0, Medium: 0, Low: 0, "Very Low": 0 };
+    const counts: Record<NeedBucket, number> = {
+      High: 0,
+      Medium: 0,
+      Low: 0,
+      "Very Low": 0,
+    };
+
     for (const s of filteredSchools) {
       const bucket = getNeedBucket(Number(s.need_score ?? 0));
       counts[bucket] += 1;
     }
+
     return counts;
   }, [filteredSchools]);
 
   const topSchoolsAll = useMemo(() => {
-    return [...filteredSchools].sort((a, b) => Number(b.total_received || 0) - Number(a.total_received || 0));
+    return [...filteredSchools].sort(
+      (a, b) => Number(b.total_received || 0) - Number(a.total_received || 0)
+    );
   }, [filteredSchools]);
 
   const topProvincesAll = useMemo(() => {
     const map = new Map<string, { province: string; total: number; schools: number }>();
+
     for (const s of filteredSchools) {
       const key = (s.province || "Unknown").trim();
       const current = map.get(key) ?? { province: key, total: 0, schools: 0 };
@@ -401,18 +408,19 @@ setSchools(safeSchools);
       current.schools += 1;
       map.set(key, current);
     }
+
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [filteredSchools]);
 
   const displayedProvinces = useMemo(() => {
     const start = (provincePage - 1) * provincesPerPage;
     return topProvincesAll.slice(start, start + provincesPerPage);
-  }, [topProvincesAll, provincePage, provincesPerPage]);
+  }, [topProvincesAll, provincePage]);
 
   const displayedSchools = useMemo(() => {
     const start = (schoolPage - 1) * schoolsPerPage;
     return topSchoolsAll.slice(start, start + schoolsPerPage);
-  }, [topSchoolsAll, schoolPage, schoolsPerPage]);
+  }, [topSchoolsAll, schoolPage]);
 
   const provincesHasNext = provincePage * provincesPerPage < topProvincesAll.length;
   const schoolsHasNext = schoolPage * schoolsPerPage < topSchoolsAll.length;
@@ -433,22 +441,25 @@ setSchools(safeSchools);
     return totalRaisedFromSchools / filteredSchools.length;
   }, [filteredSchools.length, totalRaisedFromSchools]);
 
-  const highNeedCount = useMemo(() => needBreakdown.High, [needBreakdown.High]);
+  const highNeedCount = useMemo(() => needBreakdown.High, [needBreakdown]);
 
   const highNeedZeroCount = useMemo(() => {
-    return filteredSchools.filter((s) => (s.need_score ?? 0) >= 70 && Number(s.total_received || 0) <= 0).length;
+    return filteredSchools.filter(
+      (s) => (s.need_score ?? 0) >= 70 && Number(s.total_received || 0) <= 0
+    ).length;
   }, [filteredSchools]);
 
-  // Month-to-month % change (based on trends, not filteredSchools)
   const lastMonth = rangedTrends.length ? rangedTrends[rangedTrends.length - 1] : null;
   const prevMonth = rangedTrends.length > 1 ? rangedTrends[rangedTrends.length - 2] : null;
 
   const monthChangePct = useMemo(() => {
     const a = Number(lastMonth?.donations || 0);
     const b = Number(prevMonth?.donations || 0);
+
     if (!prevMonth) return null;
     if (b === 0 && a > 0) return "NEW";
     if (b === 0 && a === 0) return "0.0%";
+
     const pct = ((a - b) / b) * 100;
     const sign = pct >= 0 ? "+" : "";
     return `${sign}${pct.toFixed(1)}%`;
@@ -458,11 +469,11 @@ setSchools(safeSchools);
     if (monthChangePct === null) return "slate" as const;
     if (monthChangePct === "NEW") return "blue" as const;
     if (monthChangePct === "0.0%") return "slate" as const;
+
     const pct = Number(monthChangePct.replace("%", ""));
     return pct >= 0 ? ("green" as const) : ("rose" as const);
   }, [monthChangePct]);
 
-  // Province bar chart data (top 8 by raised)
   const provincesBarData = useMemo(() => {
     return topProvincesAll.slice(0, 8).map((p) => ({
       province: p.province,
@@ -473,7 +484,198 @@ setSchools(safeSchools);
   const topProvince = useMemo(() => topProvincesAll[0] || null, [topProvincesAll]);
   const topSchool = useMemo(() => topSchoolsAll[0] || null, [topSchoolsAll]);
 
-  /* ===================== Render ===================== */
+  /* ===================== ECharts Options ===================== */
+
+  const trendsChartOption = useMemo(() => {
+    return {
+      animation: true,
+      animationDuration: 900,
+      animationEasing: "cubicOut",
+      grid: {
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: 20,
+        containLabel: true,
+      },
+      tooltip: {
+        trigger: "axis",
+        backgroundColor: "rgba(15,23,42,0.92)",
+        borderWidth: 0,
+        textStyle: {
+          color: "#fff",
+          fontSize: 12,
+        },
+        extraCssText:
+          "backdrop-filter: blur(10px); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.18);",
+        formatter: (params: any) => {
+          const point = Array.isArray(params) ? params[0] : params;
+          const value = Number(point?.value ?? 0);
+          const month = point?.axisValue ?? "";
+          return `
+            <div style="padding:2px 4px;">
+              <div style="font-weight:700; margin-bottom:6px;">${month}</div>
+              <div>Donations: <b>LKR ${value.toLocaleString()}</b></div>
+            </div>
+          `;
+        },
+      },
+      xAxis: {
+        type: "category",
+        boundaryGap: false,
+        data: rangedTrends.map((t) => t.month),
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: "#64748b",
+          fontSize: 12,
+        },
+      },
+      yAxis: {
+        type: "value",
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: {
+          lineStyle: {
+            color: "#e2e8f0",
+            type: "dashed",
+          },
+        },
+        axisLabel: {
+          color: "#64748b",
+          fontSize: 12,
+          formatter: (value: number) => `${Math.round(value / 1000)}k`,
+        },
+      },
+      series: [
+        {
+          name: "Donations",
+          type: "line",
+          smooth: true,
+          symbol: "circle",
+          symbolSize: 7,
+          showSymbol: false,
+          emphasis: {
+            focus: "series",
+            scale: true,
+          },
+          lineStyle: {
+            width: 4,
+            color: "#2563eb",
+            shadowColor: "rgba(37,99,235,0.25)",
+            shadowBlur: 10,
+          },
+          itemStyle: {
+            color: "#2563eb",
+            borderColor: "#ffffff",
+            borderWidth: 2,
+          },
+          areaStyle: {
+            color: {
+              type: "linear",
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: "rgba(59,130,246,0.35)" },
+                { offset: 1, color: "rgba(59,130,246,0.02)" },
+              ],
+            },
+          },
+          data: rangedTrends.map((t) => Number(t.donations || 0)),
+        },
+      ],
+    };
+  }, [rangedTrends]);
+
+  const provinceBarChartOption = useMemo(() => {
+    return {
+      animation: true,
+      animationDuration: 900,
+      animationEasing: "cubicOut",
+      grid: {
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: 40,
+        containLabel: true,
+      },
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        backgroundColor: "rgba(15,23,42,0.92)",
+        borderWidth: 0,
+        textStyle: {
+          color: "#fff",
+          fontSize: 12,
+        },
+        extraCssText:
+          "backdrop-filter: blur(10px); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.18);",
+        formatter: (params: any) => {
+          const point = Array.isArray(params) ? params[0] : params;
+          return `
+            <div style="padding:2px 4px;">
+              <div style="font-weight:700; margin-bottom:6px;">${point?.name ?? ""}</div>
+              <div>Raised: <b>LKR ${Number(point?.value ?? 0).toLocaleString()}</b></div>
+            </div>
+          `;
+        },
+      },
+      xAxis: {
+        type: "category",
+        data: provincesBarData.map((p) => p.province),
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: "#64748b",
+          fontSize: 12,
+          interval: 0,
+          rotate: provincesBarData.length > 5 ? 20 : 0,
+        },
+      },
+      yAxis: {
+        type: "value",
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: {
+          lineStyle: {
+            color: "#e2e8f0",
+            type: "dashed",
+          },
+        },
+        axisLabel: {
+          color: "#64748b",
+          fontSize: 12,
+          formatter: (value: number) => `${Math.round(value / 1000)}k`,
+        },
+      },
+      series: [
+        {
+          type: "bar",
+          barWidth: 34,
+          data: provincesBarData.map((p) => ({
+            value: p.raised,
+            itemStyle: {
+              borderRadius: [12, 12, 0, 0],
+              color: {
+                type: "linear",
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
+                colorStops: [
+                  { offset: 0, color: "#60a5fa" },
+                  { offset: 1, color: "#2563eb" },
+                ],
+              },
+            },
+          })),
+        },
+      ],
+    };
+  }, [provincesBarData]);
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -481,7 +683,9 @@ setSchools(safeSchools);
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
           <div>
             <h1 className="text-3xl font-extrabold text-slate-900">Analytics</h1>
-            <p className="text-slate-500 mt-1">Donation trends, school distribution, and need-level insights.</p>
+            <p className="text-slate-500 mt-1">
+              Donation trends, school distribution, and need-level insights.
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -494,7 +698,7 @@ setSchools(safeSchools);
           </div>
         </div>
 
-        {/* ✅ Filters Row (added) */}
+        {/* Filters */}
         <ShellCard className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
             <div className="md:col-span-4">
@@ -527,7 +731,11 @@ setSchools(safeSchools);
 
             <div className="md:col-span-3">
               <label className="text-xs font-semibold text-slate-600">District</label>
-              <Select value={districtFilter} onChange={(e) => setDistrictFilter(e.target.value)} className="w-full mt-1">
+              <Select
+                value={districtFilter}
+                onChange={(e) => setDistrictFilter(e.target.value)}
+                className="w-full mt-1"
+              >
                 {uniqueDistricts.map((d) => (
                   <option key={d} value={d}>
                     {d}
@@ -538,7 +746,11 @@ setSchools(safeSchools);
 
             <div className="md:col-span-2">
               <label className="text-xs font-semibold text-slate-600">Need Level</label>
-              <Select value={needFilter} onChange={(e) => setNeedFilter(e.target.value as NeedFilter)} className="w-full mt-1">
+              <Select
+                value={needFilter}
+                onChange={(e) => setNeedFilter(e.target.value as NeedFilter)}
+                className="w-full mt-1"
+              >
                 <option value="ALL">All</option>
                 <option value="High">High (70+)</option>
                 <option value="Medium">Medium (40–69)</option>
@@ -603,7 +815,7 @@ setSchools(safeSchools);
         </ShellCard>
       </div>
 
-      {/* KPI Cards (✅ added 2 more KPIs) */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <KpiCard
           title="Schools (Filtered)"
@@ -675,7 +887,7 @@ setSchools(safeSchools);
         />
       </div>
 
-      {/* ✅ Insights Panel (added) */}
+      {/* Insights */}
       <ShellCard className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -730,7 +942,7 @@ setSchools(safeSchools);
               </div>
             </div>
 
-            <Select value={range} onChange={(e) => setRange(e.target.value as any)}>
+            <Select value={range} onChange={(e) => setRange(e.target.value as "6M" | "12M" | "ALL")}>
               <option value="6M">Last 6 Months</option>
               <option value="12M">Last 12 Months</option>
               <option value="ALL">All Time</option>
@@ -738,36 +950,11 @@ setSchools(safeSchools);
           </div>
 
           {loading ? (
-            <Skeleton className="h-[300px] w-full" />
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={rangedTrends} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={10} stroke="#64748b" />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={10}
-                  tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`}
-                  allowDecimals={false}
-                  stroke="#64748b"
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "white",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "12px",
-                    padding: "8px 12px",
-                  }}
-                  formatter={(v: any) => [`LKR ${Number(v).toLocaleString()}`, "Donations"]}
-                />
-                <Line type="monotone" dataKey="donations" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-
-          {!loading && trends.length === 0 && (
+            <Skeleton className="h-[320px] w-full" />
+          ) : rangedTrends.length === 0 ? (
             <div className="text-center py-10 text-slate-500">No trend data yet.</div>
+          ) : (
+            <ReactECharts option={trendsChartOption} style={{ height: 320, width: "100%" }} notMerge lazyUpdate />
           )}
         </ShellCard>
 
@@ -803,7 +990,7 @@ setSchools(safeSchools);
         </ShellCard>
       </div>
 
-      {/* ✅ Donations by Province Chart (added) */}
+      {/* Province chart */}
       <ShellCard className="p-6">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
@@ -814,40 +1001,16 @@ setSchools(safeSchools);
         </div>
 
         {loading ? (
-          <Skeleton className="h-[280px] w-full" />
+          <Skeleton className="h-[320px] w-full" />
         ) : provincesBarData.length === 0 ? (
           <div className="text-center py-10 text-slate-500">No province data for current filters.</div>
         ) : (
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={provincesBarData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-              <XAxis dataKey="province" tickLine={false} axisLine={false} tickMargin={10} stroke="#64748b" />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickMargin={10}
-                tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`}
-                allowDecimals={false}
-                stroke="#64748b"
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "12px",
-                  padding: "8px 12px",
-                }}
-                formatter={(v: any) => [`LKR ${Number(v).toLocaleString()}`, "Raised"]}
-              />
-             <Bar dataKey="raised" fill="#2563eb" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <ReactECharts option={provinceBarChartOption} style={{ height: 320, width: "100%" }} notMerge lazyUpdate />
         )}
       </ShellCard>
 
       {/* Top Provinces + Top Schools */}
       <div className="grid grid-cols-1 lg:grid-cols-7 gap-6 items-stretch">
-        {/* Top Provinces */}
         <ShellCard className="p-6 lg:col-span-3 flex flex-col">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
@@ -879,7 +1042,9 @@ setSchools(safeSchools);
                       <tr key={p.province} className="border-b border-slate-100">
                         <td className="py-2 pr-3 font-semibold text-slate-900">{p.province}</td>
                         <td className="py-2 pr-3 text-slate-700">{p.schools}</td>
-                        <td className="py-2 text-right font-semibold text-slate-900">LKR {formatMoney(p.total)}</td>
+                        <td className="py-2 text-right font-semibold text-slate-900">
+                          LKR {formatMoney(p.total)}
+                        </td>
                       </tr>
                     ))}
                     {topProvincesAll.length === 0 && (
@@ -895,10 +1060,16 @@ setSchools(safeSchools);
 
               {topProvincesAll.length > provincesPerPage && (
                 <div className="pt-4 mt-4 border-t border-slate-200 flex justify-between">
-                  <SecondaryButton onClick={() => setProvincePage((p) => Math.max(1, p - 1))} disabled={provincePage === 1}>
+                  <SecondaryButton
+                    onClick={() => setProvincePage((p) => Math.max(1, p - 1))}
+                    disabled={provincePage === 1}
+                  >
                     Previous
                   </SecondaryButton>
-                  <Button onClick={() => setProvincePage((p) => p + 1)} disabled={!provincesHasNext}>
+                  <Button
+                    onClick={() => setProvincePage((p) => p + 1)}
+                    disabled={!provincesHasNext}
+                  >
                     Next
                   </Button>
                 </div>
@@ -907,12 +1078,11 @@ setSchools(safeSchools);
           )}
         </ShellCard>
 
-        {/* Top Schools */}
         <ShellCard className="p-6 lg:col-span-4 flex flex-col">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Top Schools by Donations</h2>
-              <p className="text-sm text-slate-500">Shows {schoolsPerPage} per page (use next/previous)</p>
+              <p className="text-sm text-slate-500">Shows {schoolsPerPage} per page</p>
             </div>
             <Pill tone="slate">{topSchoolsAll.length} total</Pill>
           </div>
@@ -933,6 +1103,7 @@ setSchools(safeSchools);
                 {displayedSchools.map((s) => {
                   const pct = (Number(s.total_received || 0) / maxSchoolTotal) * 100;
                   const meta = `${s.district || ""}${s.province ? ` • ${s.province}` : ""}`;
+
                   return (
                     <BarRow
                       key={s.school_id}
@@ -944,15 +1115,23 @@ setSchools(safeSchools);
                   );
                 })}
 
-                {topSchoolsAll.length === 0 && <div className="text-center py-10 text-slate-500">No schools found.</div>}
+                {topSchoolsAll.length === 0 && (
+                  <div className="text-center py-10 text-slate-500">No schools found.</div>
+                )}
               </div>
 
               {topSchoolsAll.length > schoolsPerPage && (
                 <div className="pt-4 mt-4 border-t border-slate-200 flex justify-between">
-                  <SecondaryButton onClick={() => setSchoolPage((p) => Math.max(1, p - 1))} disabled={schoolPage === 1}>
+                  <SecondaryButton
+                    onClick={() => setSchoolPage((p) => Math.max(1, p - 1))}
+                    disabled={schoolPage === 1}
+                  >
                     Previous
                   </SecondaryButton>
-                  <Button onClick={() => setSchoolPage((p) => p + 1)} disabled={!schoolsHasNext}>
+                  <Button
+                    onClick={() => setSchoolPage((p) => p + 1)}
+                    disabled={!schoolsHasNext}
+                  >
                     Next
                   </Button>
                 </div>
@@ -983,7 +1162,10 @@ setSchools(safeSchools);
             maxZoom={14}
             style={{ height: "500px", width: "100%" }}
           >
-            <TileLayer attribution="© OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <TileLayer
+              attribution="© OpenStreetMap"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
 
             {filteredSchools.map((school) => (
               <CircleMarker
@@ -1004,7 +1186,8 @@ setSchools(safeSchools);
                       {school.district} District, {school.province} Province
                     </p>
                     <p>
-                      Need Score: <strong>{Number(school.need_score ?? 0)}</strong> ({getNeedBucket(Number(school.need_score ?? 0))})
+                      Need Score: <strong>{Number(school.need_score ?? 0)}</strong>{" "}
+                      ({getNeedBucket(Number(school.need_score ?? 0))})
                     </p>
                     <p>
                       Total Received: <strong>LKR {formatMoney(Number(school.total_received || 0))}</strong>
@@ -1016,7 +1199,6 @@ setSchools(safeSchools);
           </MapContainer>
         )}
 
-        {/* Legend */}
         <div className="absolute bottom-6 left-6 bg-white p-3 rounded-xl shadow text-sm z-[1000] border border-slate-200">
           <p className="font-semibold mb-2 text-slate-900">Need Level</p>
           <div className="space-y-1">
@@ -1041,7 +1223,8 @@ setSchools(safeSchools);
 
         {!loading && (
           <div className="px-1 pt-3 text-xs text-slate-500">
-            Note: Trend chart uses your <b>donation-trends</b> endpoint (amount per month). For true donation <b>count</b>, add a backend endpoint that returns number of donation records.
+            Note: Trend chart uses your <b>donation-trends</b> endpoint. For true donation{" "}
+            <b>count</b>, add a backend endpoint that returns number of donation records.
           </div>
         )}
       </ShellCard>
