@@ -18,11 +18,6 @@ class ChatController extends Controller
     {
         $message = trim((string) $request->input('message', ''));
 
-        Log::debug('Chat Request Received', [
-            'message' => $message,
-            'ip' => $request->ip(),
-        ]);
-
         if ($message === '') {
             return response()->json([
                 'reply' => 'Please enter a message.',
@@ -48,18 +43,29 @@ class ChatController extends Controller
         try {
             $actor = $this->actorResolver->resolve($request);
 
-            Log::debug('Actor Resolved', [
-                'actor' => $actor,
-            ]);
+            $historyKey = $this->historyKey($actor);
+            $history = session()->get($historyKey, []);
 
-            $result = $this->aiChatService->handle($actor, $message);
+            $result = $this->aiChatService->handle($actor, $message, $history);
 
-            Log::debug('AI Service Result', [
-                'result' => $result,
-            ]);
+            $reply = $result['reply'] ?? 'Sorry, I could not process your request.';
+
+            $history[] = [
+                'role' => 'user',
+                'message' => $message,
+            ];
+
+            $history[] = [
+                'role' => 'assistant',
+                'message' => $reply,
+            ];
+
+            $history = array_slice($history, -16);
+
+            session()->put($historyKey, $history);
 
             return response()->json([
-                'reply' => $result['reply'] ?? 'Sorry, I could not process your request.',
+                'reply' => $reply,
                 'meta' => [
                     'role' => $actor['role'] ?? 'guest',
                     'used_db' => (bool) ($result['used_db'] ?? false),
@@ -67,42 +73,18 @@ class ChatController extends Controller
                 ],
             ]);
         } catch (\Throwable $e) {
-            $errorMessage = $e->getMessage();
-
             Log::error('ChatController@chat failed', [
-                'message' => $errorMessage,
+                'error' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString(),
                 'actor' => $actor,
                 'user_message' => $message,
             ]);
 
-            $userReply = '⚠️ Something went wrong. Please try again.';
-
-            if (
-                str_contains($errorMessage, '503') ||
-                str_contains($errorMessage, 'UNAVAILABLE') ||
-                str_contains($errorMessage, 'high demand')
-            ) {
-                $userReply = 'AI service is busy right now. Please try again in a moment.';
-            } elseif (
-                str_contains($errorMessage, '429') ||
-                str_contains($errorMessage, 'RESOURCE_EXHAUSTED') ||
-                str_contains($errorMessage, 'quota')
-            ) {
-                $userReply = 'AI request limit reached right now. Please try again later.';
-            } elseif (
-                str_contains($errorMessage, 'cURL error 60') ||
-                str_contains($errorMessage, 'SSL certificate problem')
-            ) {
-                $userReply = 'SSL configuration issue detected while connecting to AI service.';
-            } elseif (config('app.debug')) {
-                $userReply = '❌ ERROR: ' . $errorMessage;
-            }
-
             return response()->json([
-                'reply' => $userReply,
+                'reply' => config('app.debug')
+                    ? '❌ ERROR: ' . $e->getMessage()
+                    : '⚠️ Something went wrong. Please try again.',
                 'meta' => [
                     'role' => $actor['role'] ?? 'guest',
                     'used_db' => false,
@@ -110,5 +92,29 @@ class ChatController extends Controller
                 ],
             ], 500);
         }
+    }
+
+    public function clearChat(Request $request)
+    {
+        $actor = $this->actorResolver->resolve($request);
+
+        session()->forget($this->historyKey($actor));
+
+        return response()->json([
+            'reply' => 'Chat history cleared.',
+        ]);
+    }
+
+    protected function historyKey(array $actor): string
+    {
+        $role = $actor['role'] ?? 'guest';
+
+        $id = $actor['school_id']
+            ?? $actor['donor_id']
+            ?? $actor['ministry_id']
+            ?? $actor['admin_id']
+            ?? 'guest';
+
+        return "chat_history_{$role}_{$id}";
     }
 }
